@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/completionhistory/db" VERSION="20260415" COMMENT="XMLDB file for local_completionhistory"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_completionhistory_achievement" COMMENT="Immutable achievement ledger. Rows are append-only and never mutated or deleted when source data changes.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="ledgeruuid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="UUID v4 for external reference"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="User who completed the course. No FK — must survive user deletion."/>
+        <FIELD NAME="useridnumber_snapshot" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="user.idnumber at capture time"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Course ID at capture time. No FK — must survive course deletion."/>
+        <FIELD NAME="courseidnumber_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="course.idnumber at capture time"/>
+        <FIELD NAME="courseshortname_snapshot" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="course.shortname at capture time"/>
+        <FIELD NAME="coursename_snapshot" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="course.fullname at capture time"/>
+        <FIELD NAME="completiontime" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Completion timestamp from course_completions.timecompleted"/>
+        <FIELD NAME="grade_decimal" TYPE="number" LENGTH="10" DECIMALS="5" NOTNULL="false" SEQUENCE="false" COMMENT="Course total final grade"/>
+        <FIELD NAME="grade_passed" TYPE="int" LENGTH="1" NOTNULL="false" SEQUENCE="false" COMMENT="1=passed, 0=failed, NULL=unknown"/>
+        <FIELD NAME="grade_source" TYPE="char" LENGTH="50" NOTNULL="false" SEQUENCE="false" COMMENT="Grade source: gradebook, manual, etc."/>
+        <FIELD NAME="artifacturl" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Optional certificate or transcript URL"/>
+        <FIELD NAME="artifactstorage" TYPE="char" LENGTH="30" NOTNULL="false" SEQUENCE="false" COMMENT="none, url, or pluginfile"/>
+        <FIELD NAME="source_component" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Component that triggered capture: core_completion, cli_backfill"/>
+        <FIELD NAME="source_event" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Event class name or CLI command"/>
+        <FIELD NAME="source_event_hash" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="SHA-256 dedup key: hash of userid|courseid|timecompleted|source_component"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="When this ledger row was written"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="ledgeruuid_uq" UNIQUE="true" FIELDS="ledgeruuid"/>
+        <INDEX NAME="source_event_hash_uq" UNIQUE="true" FIELDS="source_event_hash"/>
+        <INDEX NAME="userid_ix" UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="courseid_ix" UNIQUE="false" FIELDS="courseid"/>
+        <INDEX NAME="completiontime_ix" UNIQUE="false" FIELDS="completiontime"/>
+        <INDEX NAME="courseidnumber_snapshot_ix" UNIQUE="false" FIELDS="courseidnumber_snapshot"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_ach_program" COMMENT="Many-to-many snapshot of programs associated with an achievement at capture time.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="achievementid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="FK to local_completionhistory_achievement"/>
+        <FIELD NAME="allocationid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="enrol_programs_allocations.id at capture time"/>
+        <FIELD NAME="programid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Program ID at capture time. No FK to enrol_programs_programs."/>
+        <FIELD NAME="programidnumber_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="Program idnumber at capture time"/>
+        <FIELD NAME="programname_snapshot" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Program fullname at capture time"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="achievementid_fk" TYPE="foreign" FIELDS="achievementid" REFTABLE="local_completionhistory_achievement" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="achievementid_ix" UNIQUE="false" FIELDS="achievementid"/>
+        <INDEX NAME="programid_ix" UNIQUE="false" FIELDS="programid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_course_map" COMMENT="Mutable mapping from retired/legacy courses to replacement courses.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="oldcourseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Old course ID, NULL if course was deleted"/>
+        <FIELD NAME="oldcourseidnumber_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="oldcoursename_snapshot" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="newcourseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Replacement course ID"/>
+        <FIELD NAME="newcourseidnumber_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="newcoursename_snapshot" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="migrationrule" TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="redirect_incomplete" SEQUENCE="false" COMMENT="Rule type: redirect_incomplete, recommend, etc."/>
+        <FIELD NAME="active" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="effectivetime" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="When replacement becomes effective"/>
+        <FIELD NAME="note" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Admin notes"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="oldcourseid_ix" UNIQUE="false" FIELDS="oldcourseid"/>
+        <INDEX NAME="newcourseid_ix" UNIQUE="false" FIELDS="newcourseid"/>
+        <INDEX NAME="active_ix" UNIQUE="false" FIELDS="active"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_purge_audit" COMMENT="Audit trail when completion records are purged by enrol_programs or other components.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="programid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="reason" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false" COMMENT="Purge reason: program_reset, course_deleted, user_deleted, etc."/>
+        <FIELD NAME="detailsjson" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="JSON-encoded detail blob"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid_ix" UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="programid_ix" UNIQUE="false" FIELDS="programid"/>
+        <INDEX NAME="timecreated_ix" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_outbox" COMMENT="Future SIS sync queue. Stub table for external integration.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="entitytype" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false" COMMENT="achievement, course_map, etc."/>
+        <FIELD NAME="entityid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="payloadjson" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="pending" SEQUENCE="false" COMMENT="pending, sent, failed, cancelled"/>
+        <FIELD NAME="retrycount" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="lasterror" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="status_timecreated_ix" UNIQUE="false" FIELDS="status, timecreated"/>
+        <INDEX NAME="entityid_ix" UNIQUE="false" FIELDS="entityid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
