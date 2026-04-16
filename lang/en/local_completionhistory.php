@@ -76,8 +76,12 @@ $string['col_passed'] = 'Passed';
 $string['col_programs'] = 'Programs';
 $string['col_artifact'] = 'Certificate';
 $string['col_source'] = 'Source';
+$string['col_source_event'] = 'Source event';
 $string['col_captured'] = 'Captured';
 $string['col_user'] = 'User';
+$string['col_useridnumber'] = 'User ID#';
+$string['col_courseidnumber'] = 'Course ID#';
+$string['col_courseshortname'] = 'Short name';
 $string['col_oldcourse'] = 'Old course';
 $string['col_newcourse'] = 'New course';
 $string['col_migrationrule'] = 'Migration rule';
@@ -86,6 +90,21 @@ $string['col_effectivetime'] = 'Effective date';
 $string['col_note'] = 'Notes';
 $string['col_reason'] = 'Reason';
 $string['col_details'] = 'Details';
+
+// Ledger filter UI.
+$string['filter_heading'] = 'Filters';
+$string['filter_passed'] = 'Pass status';
+$string['filter_passed_any'] = 'Any';
+$string['filter_passed_yes'] = 'Passed';
+$string['filter_passed_no'] = 'Not passed';
+$string['filter_passed_unknown'] = 'Unknown / N/A';
+$string['filter_datefrom'] = 'Completed from';
+$string['filter_dateto'] = 'Completed to';
+$string['filter_programs_heading'] = 'Program association';
+$string['filter_hasprograms'] = 'Has at least one program';
+$string['filter_programs'] = 'Specific programs';
+$string['filter_programs_help'] = 'Hold Ctrl / Cmd to select multiple. Selecting a program implies "Has program".';
+$string['filter_columns'] = 'Extra columns';
 
 // Migration rules.
 $string['migrationrule_redirect_incomplete'] = 'Redirect incomplete learners';

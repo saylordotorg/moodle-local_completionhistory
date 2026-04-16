@@ -35,6 +35,9 @@ class achievements_table extends table_sql {
     /** @var bool Whether to show the user column (staff view). */
     protected bool $showuser;
 
+    /** @var array Optional extra column names to include. */
+    protected array $optionalcols;
+
     /** @var array Cached program associations keyed by achievementid. */
     protected array $programcache = [];
 
@@ -42,11 +45,13 @@ class achievements_table extends table_sql {
      * Constructor.
      *
      * @param string $uniqueid
-     * @param bool $showuser Whether to show the user column.
+     * @param bool   $showuser       Whether to show the user column.
+     * @param array  $optionalcols   Optional column names to append (e.g. 'useridnumber_snapshot').
      */
-    public function __construct(string $uniqueid, bool $showuser = false) {
+    public function __construct(string $uniqueid, bool $showuser = false, array $optionalcols = []) {
         parent::__construct($uniqueid);
-        $this->showuser = $showuser;
+        $this->showuser     = $showuser;
+        $this->optionalcols = $optionalcols;
 
         $columns = [];
         $headers = [];
@@ -75,15 +80,32 @@ class achievements_table extends table_sql {
             get_string('col_captured', 'local_completionhistory'),
         ]);
 
+        // Optional extra columns appended after the core set.
+        $optionalheadermap = [
+            'useridnumber_snapshot'    => get_string('col_useridnumber', 'local_completionhistory'),
+            'courseidnumber_snapshot'  => get_string('col_courseidnumber', 'local_completionhistory'),
+            'courseshortname_snapshot' => get_string('col_courseshortname', 'local_completionhistory'),
+            'source_event'             => get_string('col_source_event', 'local_completionhistory'),
+            'artifacturl'              => get_string('col_artifact', 'local_completionhistory'),
+        ];
+        foreach ($optionalcols as $col) {
+            if (isset($optionalheadermap[$col])) {
+                $columns[] = $col;
+                $headers[]  = $optionalheadermap[$col];
+            }
+        }
+
         $this->define_columns($columns);
         $this->define_headers($headers);
         $this->no_sorting('programs');
+        $this->no_sorting('artifacturl');
         $this->sortable(true, 'completiontime', SORT_DESC);
     }
 
-    /**
-     * Format the user column.
-     */
+    // -----------------------------------------------------------------------
+    // Core column formatters.
+    // -----------------------------------------------------------------------
+
     public function col_userid($row): string {
         global $DB;
         if ((int) $row->userid === 0) {
@@ -96,9 +118,6 @@ class achievements_table extends table_sql {
         return fullname($user);
     }
 
-    /**
-     * Format the course name column.
-     */
     public function col_coursename_snapshot($row): string {
         $name = format_string($row->coursename_snapshot);
         if (!empty($row->courseidnumber_snapshot)) {
@@ -107,16 +126,10 @@ class achievements_table extends table_sql {
         return $name;
     }
 
-    /**
-     * Format the completion time column.
-     */
     public function col_completiontime($row): string {
         return userdate($row->completiontime, get_string('strftimedaydate', 'langconfig'));
     }
 
-    /**
-     * Format the grade column.
-     */
     public function col_grade_decimal($row): string {
         if ($row->grade_decimal === null) {
             return '-';
@@ -125,19 +138,30 @@ class achievements_table extends table_sql {
     }
 
     /**
-     * Format the passed column.
+     * Passed column rendered as a colour pill with a check or X icon.
      */
     public function col_grade_passed($row): string {
         if ($row->grade_passed === null) {
-            return get_string('gradeunknown', 'local_completionhistory');
+            return html_writer::tag(
+                'span',
+                '&#8212; ' . get_string('gradeunknown', 'local_completionhistory'),
+                ['class' => 'badge badge-secondary', 'style' => 'font-size:0.85em']
+            );
         }
-        return $row->grade_passed ? get_string('gradepassed', 'local_completionhistory')
-                                  : get_string('gradefailed', 'local_completionhistory');
+        if ($row->grade_passed) {
+            return html_writer::tag(
+                'span',
+                '&#10003; ' . get_string('gradepassed', 'local_completionhistory'),
+                ['class' => 'badge badge-success', 'style' => 'font-size:0.85em']
+            );
+        }
+        return html_writer::tag(
+            'span',
+            '&#10007; ' . get_string('gradefailed', 'local_completionhistory'),
+            ['class' => 'badge badge-danger', 'style' => 'font-size:0.85em']
+        );
     }
 
-    /**
-     * Format the programs column.
-     */
     public function col_programs($row): string {
         global $DB;
 
@@ -160,17 +184,41 @@ class achievements_table extends table_sql {
         return implode(' ', $names);
     }
 
-    /**
-     * Format the source column.
-     */
     public function col_source_component($row): string {
         return s($row->source_component);
     }
 
-    /**
-     * Format the captured time column.
-     */
     public function col_timecreated($row): string {
         return userdate($row->timecreated, get_string('strftimedatetimeshort', 'langconfig'));
+    }
+
+    // -----------------------------------------------------------------------
+    // Optional column formatters.
+    // -----------------------------------------------------------------------
+
+    public function col_useridnumber_snapshot($row): string {
+        return s($row->useridnumber_snapshot ?? '');
+    }
+
+    public function col_courseidnumber_snapshot($row): string {
+        return s($row->courseidnumber_snapshot ?? '');
+    }
+
+    public function col_courseshortname_snapshot($row): string {
+        return s($row->courseshortname_snapshot ?? '');
+    }
+
+    public function col_source_event($row): string {
+        return s($row->source_event ?? '');
+    }
+
+    public function col_artifacturl($row): string {
+        if (empty($row->artifacturl)) {
+            return '-';
+        }
+        return html_writer::link($row->artifacturl, get_string('col_artifact', 'local_completionhistory'), [
+            'target' => '_blank',
+            'rel'    => 'noopener noreferrer',
+        ]);
     }
 }
