@@ -59,9 +59,29 @@ class ledger_service {
         $courseshortname = $course ? $course->shortname : null;
         $courseidnumber = $course ? $course->idnumber : null;
 
-        // Snapshot user idnumber.
-        $user = $DB->get_record('user', ['id' => $userid], 'id, idnumber');
-        $useridnumber = $user ? $user->idnumber : null;
+        // Snapshot user fields.
+        $user = $DB->get_record('user', ['id' => $userid], 'id, idnumber, firstname, lastname, email');
+        $useridnumber = $user ? $user->idnumber   : null;
+        $firstname    = $user ? $user->firstname  : null;
+        $lastname     = $user ? $user->lastname   : null;
+        $email        = $user ? $user->email      : null;
+
+        // Snapshot earliest enrolment date for this user+course.
+        $enrolments = $DB->get_records_sql(
+            "SELECT ue.timestart, ue.timecreated
+               FROM {user_enrolments} ue
+               JOIN {enrol} e ON e.id = ue.enrolid
+              WHERE e.courseid = :courseid AND ue.userid = :userid",
+            ['courseid' => $courseid, 'userid' => $userid]
+        );
+        $enrolledtime = null;
+        foreach ($enrolments as $ue) {
+            // Prefer timestart when set (> 0), otherwise fall back to timecreated.
+            $ts = ($ue->timestart > 0) ? (int) $ue->timestart : (int) $ue->timecreated;
+            if ($enrolledtime === null || $ts < $enrolledtime) {
+                $enrolledtime = $ts;
+            }
+        }
 
         // Snapshot grade if enabled.
         $gradedata = null;
@@ -77,11 +97,15 @@ class ledger_service {
         $record->ledgeruuid = self::generate_uuid();
         $record->userid = $userid;
         $record->useridnumber_snapshot = $useridnumber ?: null;
+        $record->firstname_snapshot    = $firstname    ?: null;
+        $record->lastname_snapshot     = $lastname     ?: null;
+        $record->email_snapshot        = $email        ?: null;
         $record->courseid = $courseid;
         $record->courseidnumber_snapshot = $courseidnumber ?: null;
         $record->courseshortname_snapshot = $courseshortname;
         $record->coursename_snapshot = $coursename;
-        $record->completiontime = $timecompleted;
+        $record->completiontime        = $timecompleted;
+        $record->enrolledtime_snapshot = $enrolledtime;
         $record->grade_decimal = $gradedata ? $gradedata->finalgrade : null;
         $record->grade_passed = $gradedata ? $gradedata->passed : null;
         $record->grade_source = $gradedata ? 'gradebook' : null;

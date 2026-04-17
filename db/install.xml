@@ -10,11 +10,15 @@
         <FIELD NAME="ledgeruuid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="UUID v4 for external reference"/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="User who completed the course. No FK — must survive user deletion."/>
         <FIELD NAME="useridnumber_snapshot" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="user.idnumber at capture time"/>
+        <FIELD NAME="firstname_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="user.firstname at capture time"/>
+        <FIELD NAME="lastname_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="user.lastname at capture time"/>
+        <FIELD NAME="email_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="user.email at capture time"/>
         <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Course ID at capture time. No FK — must survive course deletion."/>
         <FIELD NAME="courseidnumber_snapshot" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="course.idnumber at capture time"/>
         <FIELD NAME="courseshortname_snapshot" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="course.shortname at capture time"/>
         <FIELD NAME="coursename_snapshot" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="course.fullname at capture time"/>
         <FIELD NAME="completiontime" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Completion timestamp from course_completions.timecompleted"/>
+        <FIELD NAME="enrolledtime_snapshot" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Earliest enrolment start for this user+course at capture time"/>
         <FIELD NAME="grade_decimal" TYPE="number" LENGTH="10" DECIMALS="5" NOTNULL="false" SEQUENCE="false" COMMENT="Course total final grade"/>
         <FIELD NAME="grade_passed" TYPE="int" LENGTH="1" NOTNULL="false" SEQUENCE="false" COMMENT="1=passed, 0=failed, NULL=unknown"/>
         <FIELD NAME="grade_source" TYPE="char" LENGTH="50" NOTNULL="false" SEQUENCE="false" COMMENT="Grade source: gradebook, manual, etc."/>

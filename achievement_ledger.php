@@ -49,7 +49,11 @@ $filterdateto     = optional_param('filterdateto', '', PARAM_TEXT);
 
 // Optional extra columns (each stored as showcol_<colname>=1).
 $optionalcoldefs = [
+    'firstname_snapshot'      => get_string('col_firstname', 'local_completionhistory'),
+    'lastname_snapshot'       => get_string('col_lastname', 'local_completionhistory'),
+    'email_snapshot'          => get_string('col_email', 'local_completionhistory'),
     'useridnumber_snapshot'   => get_string('col_useridnumber', 'local_completionhistory'),
+    'enrolledtime_snapshot'   => get_string('col_enrolleddate', 'local_completionhistory'),
     'courseidnumber_snapshot' => get_string('col_courseidnumber', 'local_completionhistory'),
     'courseshortname_snapshot'=> get_string('col_courseshortname', 'local_completionhistory'),
     'source_event'            => get_string('col_source_event', 'local_completionhistory'),

@@ -82,7 +82,11 @@ class achievements_table extends table_sql {
 
         // Optional extra columns appended after the core set.
         $optionalheadermap = [
+            'firstname_snapshot'       => get_string('col_firstname', 'local_completionhistory'),
+            'lastname_snapshot'        => get_string('col_lastname', 'local_completionhistory'),
+            'email_snapshot'           => get_string('col_email', 'local_completionhistory'),
             'useridnumber_snapshot'    => get_string('col_useridnumber', 'local_completionhistory'),
+            'enrolledtime_snapshot'    => get_string('col_enrolleddate', 'local_completionhistory'),
             'courseidnumber_snapshot'  => get_string('col_courseidnumber', 'local_completionhistory'),
             'courseshortname_snapshot' => get_string('col_courseshortname', 'local_completionhistory'),
             'source_event'             => get_string('col_source_event', 'local_completionhistory'),
@@ -196,8 +200,31 @@ class achievements_table extends table_sql {
     // Optional column formatters.
     // -----------------------------------------------------------------------
 
+    public function col_firstname_snapshot($row): string {
+        return s($row->firstname_snapshot ?? '');
+    }
+
+    public function col_lastname_snapshot($row): string {
+        return s($row->lastname_snapshot ?? '');
+    }
+
+    public function col_email_snapshot($row): string {
+        $email = $row->email_snapshot ?? '';
+        if ($email === '') {
+            return '-';
+        }
+        return html_writer::link('mailto:' . $email, s($email));
+    }
+
     public function col_useridnumber_snapshot($row): string {
         return s($row->useridnumber_snapshot ?? '');
+    }
+
+    public function col_enrolledtime_snapshot($row): string {
+        if (empty($row->enrolledtime_snapshot)) {
+            return '-';
+        }
+        return userdate($row->enrolledtime_snapshot, get_string('strftimedaydate', 'langconfig'));
     }
 
     public function col_courseidnumber_snapshot($row): string {
