@@ -44,4 +44,14 @@ $tasks = [
         'month'     => '*',
         'disabled'  => 1,
     ],
+    [
+        'classname' => 'local_completionhistory\task\reconcile_anonymization',
+        'blocking'  => 0,
+        'minute'    => '30',
+        'hour'      => '4',
+        'day'       => '*',
+        'dayofweek' => '*',
+        'month'     => '*',
+        'disabled'  => 1,
+    ],
 ];

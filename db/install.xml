@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/completionhistory/db" VERSION="20260415" COMMENT="XMLDB file for local_completionhistory"
+<XMLDB PATH="local/completionhistory/db" VERSION="20260417" COMMENT="XMLDB file for local_completionhistory"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -22,8 +22,11 @@
         <FIELD NAME="grade_decimal" TYPE="number" LENGTH="10" DECIMALS="5" NOTNULL="false" SEQUENCE="false" COMMENT="Course total final grade"/>
         <FIELD NAME="grade_passed" TYPE="int" LENGTH="1" NOTNULL="false" SEQUENCE="false" COMMENT="1=passed, 0=failed, NULL=unknown"/>
         <FIELD NAME="grade_source" TYPE="char" LENGTH="50" NOTNULL="false" SEQUENCE="false" COMMENT="Grade source: gradebook, manual, etc."/>
+        <FIELD NAME="exam_track" TYPE="char" LENGTH="30" NOTNULL="false" SEQUENCE="false" COMMENT="Exam track that completed this course: program_final, direct_credit, certificate, or NULL if not tracked"/>
+        <FIELD NAME="attempts_used" TYPE="int" LENGTH="2" NOTNULL="false" SEQUENCE="false" COMMENT="Number of attempts consumed on the completing track"/>
+        <FIELD NAME="attempts_allowed" TYPE="int" LENGTH="2" NOTNULL="false" SEQUENCE="false" COMMENT="Maximum attempts allowed on the completing track (0 = unlimited)"/>
         <FIELD NAME="artifacturl" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Optional certificate or transcript URL"/>
-        <FIELD NAME="artifactstorage" TYPE="char" LENGTH="30" NOTNULL="false" SEQUENCE="false" COMMENT="none, url, or pluginfile"/>
+        <FIELD NAME="artifactstorage" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="Artifact storage marker, such as tool_certificate:{code}"/>
         <FIELD NAME="source_component" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Component that triggered capture: core_completion, cli_backfill"/>
         <FIELD NAME="source_event" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Event class name or CLI command"/>
         <FIELD NAME="source_event_hash" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="SHA-256 dedup key: hash of userid|courseid|timecompleted|source_component"/>
@@ -39,6 +42,7 @@
         <INDEX NAME="courseid_ix" UNIQUE="false" FIELDS="courseid"/>
         <INDEX NAME="completiontime_ix" UNIQUE="false" FIELDS="completiontime"/>
         <INDEX NAME="courseidnumber_snapshot_ix" UNIQUE="false" FIELDS="courseidnumber_snapshot"/>
+        <INDEX NAME="exam_track_ix" UNIQUE="false" FIELDS="exam_track"/>
       </INDEXES>
     </TABLE>
 
@@ -59,6 +63,61 @@
       <INDEXES>
         <INDEX NAME="achievementid_ix" UNIQUE="false" FIELDS="achievementid"/>
         <INDEX NAME="programid_ix" UNIQUE="false" FIELDS="programid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_exam_attempt" COMMENT="Per-attempt audit trail for tracked exam types. One row per quiz attempt on a configured exam track.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="No FK — survives user deletion."/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="No FK — survives course deletion."/>
+        <FIELD NAME="quizid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Quiz instance ID at time of attempt. No FK."/>
+        <FIELD NAME="exam_track" TYPE="char" LENGTH="30" NOTNULL="true" SEQUENCE="false" COMMENT="program_final | direct_credit | certificate"/>
+        <FIELD NAME="attempt_number" TYPE="int" LENGTH="2" NOTNULL="true" SEQUENCE="false" COMMENT="Attempt number within this track (1, 2, 3…)"/>
+        <FIELD NAME="attempts_allowed" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="3" SEQUENCE="false" COMMENT="Max attempts on this track (0 = unlimited)"/>
+        <FIELD NAME="grade_decimal" TYPE="number" LENGTH="10" DECIMALS="5" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="grade_passed" TYPE="int" LENGTH="1" NOTNULL="false" SEQUENCE="false" COMMENT="1=passed, 0=failed, NULL=no threshold"/>
+        <FIELD NAME="resulted_in_completion" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 if this attempt triggered course completion"/>
+        <FIELD NAME="achievementid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="FK to achievement if this attempt completed the course. NULL otherwise."/>
+        <FIELD NAME="timetaken" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Unix timestamp when attempt was submitted"/>
+        <FIELD NAME="duration" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Attempt duration in seconds (timefinish - timestart) at capture time"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid_courseid_ix" UNIQUE="false" FIELDS="userid, courseid"/>
+        <INDEX NAME="userid_courseid_track_ix" UNIQUE="false" FIELDS="userid, courseid, exam_track"/>
+        <INDEX NAME="achievementid_ix" UNIQUE="false" FIELDS="achievementid"/>
+        <INDEX NAME="timetaken_ix" UNIQUE="false" FIELDS="timetaken"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_course_exam_config" COMMENT="Per-course exam assessment model configuration.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="No FK — config survives course deletion for audit purposes."/>
+        <FIELD NAME="course_type" TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="standard" SEQUENCE="false" COMMENT="standard | program | open_dual | open_cert"/>
+        <FIELD NAME="program_final_quizid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Quiz ID for the single program final exam."/>
+        <FIELD NAME="dc_quizid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Quiz ID for the direct credit exam."/>
+        <FIELD NAME="cert_quizid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Quiz ID for the certificate final exam."/>
+        <FIELD NAME="program_attempts_allowed" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="3" SEQUENCE="false"/>
+        <FIELD NAME="dc_attempts_allowed" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="3" SEQUENCE="false"/>
+        <FIELD NAME="cert_attempts_allowed" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 = unlimited"/>
+        <FIELD NAME="notes" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseid_uq" UNIQUE="true" FIELDS="courseid"/>
+        <INDEX NAME="course_type_ix" UNIQUE="false" FIELDS="course_type"/>
+        <INDEX NAME="program_final_quizid_ix" UNIQUE="false" FIELDS="program_final_quizid"/>
+        <INDEX NAME="dc_quizid_ix" UNIQUE="false" FIELDS="dc_quizid"/>
+        <INDEX NAME="cert_quizid_ix" UNIQUE="false" FIELDS="cert_quizid"/>
       </INDEXES>
     </TABLE>
 
@@ -104,6 +163,28 @@
         <INDEX NAME="userid_ix" UNIQUE="false" FIELDS="userid"/>
         <INDEX NAME="programid_ix" UNIQUE="false" FIELDS="programid"/>
         <INDEX NAME="timecreated_ix" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_flag_def" COMMENT="Admin-defined system flags applied to exam attempts at render time.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="code" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false" COMMENT="Machine-friendly unique identifier"/>
+        <FIELD NAME="name" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Display label shown on badges"/>
+        <FIELD NAME="description" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="flag_type" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false" COMMENT="fast_completion | duplicate_account"/>
+        <FIELD NAME="configjson" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Type-specific JSON config"/>
+        <FIELD NAME="severity" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="warning" SEQUENCE="false" COMMENT="info | warning | critical"/>
+        <FIELD NAME="enabled" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="code_uq" UNIQUE="true" FIELDS="code"/>
+        <INDEX NAME="enabled_ix" UNIQUE="false" FIELDS="enabled"/>
       </INDEXES>
     </TABLE>
 

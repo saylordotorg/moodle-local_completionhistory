@@ -17,14 +17,14 @@
 namespace local_completionhistory\table;
 
 use table_sql;
-use moodle_url;
 use html_writer;
+use local_completionhistory\local\course_config_service;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/tablelib.php');
 
 /**
- * Table for displaying achievement records.
+ * Table for displaying achievement records in the staff ledger.
  *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
@@ -32,155 +32,269 @@ require_once($CFG->libdir . '/tablelib.php');
  */
 class achievements_table extends table_sql {
 
-    /** @var bool Whether to show the user column (staff view). */
     protected bool $showuser;
-
-    /** @var array Optional extra column names to include. */
-    protected array $optionalcols;
-
-    /** @var array Cached program associations keyed by achievementid. */
     protected array $programcache = [];
 
-    /**
-     * Constructor.
-     *
-     * @param string $uniqueid
-     * @param bool   $showuser       Whether to show the user column.
-     * @param array  $optionalcols   Optional column names to append (e.g. 'useridnumber_snapshot').
-     */
-    public function __construct(string $uniqueid, bool $showuser = false, array $optionalcols = []) {
+    private const NOSORT_COLS = ['programs', 'enroldays', 'completiondays', 'attempts', 'artifacturl'];
+
+    private const STAFF_COLS = [
+        ['user_firstname',           'col_firstname'],
+        ['user_lastname',            'col_lastname'],
+        ['user_email',               'col_email'],
+        ['useridnumber_snapshot',    'col_useridnumber'],
+        ['coursename_snapshot',      'col_coursename'],
+        ['courseshortname_snapshot', 'col_courseshortname'],
+        ['enroldate',                'col_enroldate'],
+        ['enroldays',                'col_enroldays'],
+        ['completiontime',           'col_completiondate'],
+        ['completiondays',           'col_completiondays'],
+        ['grade_decimal',            'col_grade'],
+        ['grade_passed',             'col_passed'],
+        ['exam_track',               'col_exam_track'],
+        ['attempts',                 'col_attempts'],
+        ['programs',                 'col_programs'],
+        ['source_component',         'col_source'],
+        ['timecreated',              'col_captured'],
+    ];
+
+    private const STUDENT_COLS = [
+        ['coursename_snapshot',      'col_coursename'],
+        ['courseshortname_snapshot', 'col_courseshortname'],
+        ['enroldate',                'col_enroldate'],
+        ['enroldays',                'col_enroldays'],
+        ['completiontime',           'col_completiondate'],
+        ['completiondays',           'col_completiondays'],
+        ['grade_decimal',            'col_grade'],
+        ['grade_passed',             'col_passed'],
+        ['exam_track',               'col_exam_track'],
+        ['attempts',                 'col_attempts'],
+        ['programs',                 'col_programs'],
+        ['source_component',         'col_source'],
+        ['timecreated',              'col_captured'],
+    ];
+
+    private const OPTIONAL_COLS = [
+        'courseidnumber_snapshot' => 'col_courseidnumber',
+        'source_event'            => 'col_source_event',
+        'artifacturl'             => 'col_artifact',
+    ];
+
+    public function __construct(
+        string $uniqueid,
+        bool $showuser = false,
+        array $visiblecols = []
+    ) {
         parent::__construct($uniqueid);
-        $this->showuser     = $showuser;
-        $this->optionalcols = $optionalcols;
+        $this->showuser = $showuser;
 
-        $columns = [];
-        $headers = [];
+        $allmap = self::all_col_labels($showuser);
 
-        if ($showuser) {
-            $columns[] = 'userid';
-            $headers[] = get_string('col_user', 'local_completionhistory');
+        if (empty($visiblecols)) {
+            $visiblecols = self::default_visible_cols($showuser);
         }
 
-        $columns = array_merge($columns, [
-            'coursename_snapshot',
-            'completiontime',
-            'grade_decimal',
-            'grade_passed',
-            'programs',
-            'source_component',
-            'timecreated',
-        ]);
-        $headers = array_merge($headers, [
-            get_string('col_coursename', 'local_completionhistory'),
-            get_string('col_completiondate', 'local_completionhistory'),
-            get_string('col_grade', 'local_completionhistory'),
-            get_string('col_passed', 'local_completionhistory'),
-            get_string('col_programs', 'local_completionhistory'),
-            get_string('col_source', 'local_completionhistory'),
-            get_string('col_captured', 'local_completionhistory'),
-        ]);
-
-        // Optional extra columns appended after the core set.
-        $optionalheadermap = [
-            'firstname_snapshot'       => get_string('col_firstname', 'local_completionhistory'),
-            'lastname_snapshot'        => get_string('col_lastname', 'local_completionhistory'),
-            'email_snapshot'           => get_string('col_email', 'local_completionhistory'),
-            'useridnumber_snapshot'    => get_string('col_useridnumber', 'local_completionhistory'),
-            'enrolledtime_snapshot'    => get_string('col_enrolleddate', 'local_completionhistory'),
-            'courseidnumber_snapshot'  => get_string('col_courseidnumber', 'local_completionhistory'),
-            'courseshortname_snapshot' => get_string('col_courseshortname', 'local_completionhistory'),
-            'source_event'             => get_string('col_source_event', 'local_completionhistory'),
-            'artifacturl'              => get_string('col_artifact', 'local_completionhistory'),
-        ];
-        foreach ($optionalcols as $col) {
-            if (isset($optionalheadermap[$col])) {
-                $columns[] = $col;
-                $headers[]  = $optionalheadermap[$col];
+        // Build ordered visible map, filtering unknown column names.
+        $defaultmap = [];
+        foreach ($visiblecols as $col) {
+            if (isset($allmap[$col])) {
+                $defaultmap[$col] = $allmap[$col];
+            }
+        }
+        // Safety net: if all columns were deselected, fall back to defaults
+        // so the table still renders.
+        if (empty($defaultmap)) {
+            foreach (self::default_visible_cols($showuser) as $col) {
+                $defaultmap[$col] = $allmap[$col];
             }
         }
 
-        $this->define_columns($columns);
-        $this->define_headers($headers);
-        $this->no_sorting('programs');
-        $this->no_sorting('artifacturl');
+        $this->define_columns(array_keys($defaultmap));
+        $this->define_headers(array_values($defaultmap));
+
+        foreach (self::NOSORT_COLS as $col) {
+            if (array_key_exists($col, $defaultmap)) {
+                $this->no_sorting($col);
+            }
+        }
         $this->sortable(true, 'completiontime', SORT_DESC);
     }
 
-    // -----------------------------------------------------------------------
-    // Core column formatters.
-    // -----------------------------------------------------------------------
-
-    public function col_userid($row): string {
-        global $DB;
-        if ((int) $row->userid === 0) {
-            return get_string('privacy:metadata:achievement:userid', 'local_completionhistory') . ' [anonymized]';
+    /**
+     * All known column names → translated label, for the view mode (staff/student).
+     * Includes default columns and optional columns.
+     */
+    public static function all_col_labels(bool $showuser = true): array {
+        $basedefs = $showuser ? self::STAFF_COLS : self::STUDENT_COLS;
+        $map = [];
+        foreach ($basedefs as [$col, $key]) {
+            $map[$col] = get_string($key, 'local_completionhistory');
         }
-        $user = $DB->get_record('user', ['id' => $row->userid], 'id, firstname, lastname, email');
-        if (!$user) {
-            return "User #{$row->userid} [deleted]";
+        foreach (self::OPTIONAL_COLS as $col => $key) {
+            $map[$col] = get_string($key, 'local_completionhistory');
         }
-        return fullname($user);
-    }
-
-    public function col_coursename_snapshot($row): string {
-        $name = format_string($row->coursename_snapshot);
-        if (!empty($row->courseidnumber_snapshot)) {
-            $name .= ' ' . html_writer::tag('small', '(' . s($row->courseidnumber_snapshot) . ')', ['class' => 'text-muted']);
-        }
-        return $name;
-    }
-
-    public function col_completiontime($row): string {
-        return userdate($row->completiontime, get_string('strftimedaydate', 'langconfig'));
-    }
-
-    public function col_grade_decimal($row): string {
-        if ($row->grade_decimal === null) {
-            return '-';
-        }
-        return format_float($row->grade_decimal, 2);
+        return $map;
     }
 
     /**
-     * Passed column rendered as a colour pill with a check or X icon.
+     * Default visible columns (staff defaults or student defaults) in canonical order.
      */
+    public static function default_visible_cols(bool $showuser = true): array {
+        $basedefs = $showuser ? self::STAFF_COLS : self::STUDENT_COLS;
+        return array_map(fn($def) => $def[0], $basedefs);
+    }
+
+    // ── User identity ────────────────────────────────────────────────────────
+
+    public function col_user_firstname($row): string {
+        if ((int) $row->userid === 0) {
+            return html_writer::tag('em', 'anonymized', ['class' => 'text-muted']);
+        }
+        return s($row->user_firstname ?? '');
+    }
+
+    public function col_user_lastname($row): string {
+        if ((int) $row->userid === 0) return '';
+        return s($row->user_lastname ?? '');
+    }
+
+    public function col_user_email($row): string {
+        if ((int) $row->userid === 0) return '';
+        $email = $row->user_email ?? '';
+        return $email ? html_writer::link('mailto:' . s($email), s($email)) : '-';
+    }
+
+    public function col_useridnumber_snapshot($row): string {
+        return s($row->useridnumber_snapshot ?? '');
+    }
+
+    // ── Course ───────────────────────────────────────────────────────────────
+
+    public function col_coursename_snapshot($row): string {
+        return format_string($row->coursename_snapshot);
+    }
+
+    public function col_courseshortname_snapshot($row): string {
+        return s($row->courseshortname_snapshot ?? '');
+    }
+
+    // ── Enrollment ───────────────────────────────────────────────────────────
+
+    public function col_enroldate($row): string {
+        return empty($row->enroldate) ? '-' : userdate((int) $row->enroldate, '%m/%d/%Y');
+    }
+
+    public function col_enroldays($row): string {
+        if (empty($row->enroldate)) return '-';
+        $days = (int) floor((time() - (int) $row->enroldate) / 86400);
+        if ($days < 0)  return '-';
+        if ($days === 0) return html_writer::tag('span', 'Today', ['class' => 'badge badge-primary', 'style' => 'font-size:0.82em']);
+        $label = $days === 1 ? '1 day ago' : number_format($days) . ' days ago';
+        return html_writer::tag('span', $label, ['class' => 'text-muted small']);
+    }
+
+    // ── Completion + grade ───────────────────────────────────────────────────
+
+    public function col_completiontime($row): string {
+        return userdate($row->completiontime, '%m/%d/%Y');
+    }
+
+    public function col_completiondays($row): string {
+        $enroll = (int) ($row->enroldate ?? 0);
+        if ($enroll === 0 && !empty($row->enrolledtime_snapshot)) {
+            $enroll = (int) $row->enrolledtime_snapshot;
+        }
+        $completed = (int) ($row->completiontime ?? 0);
+        if ($enroll === 0 || $completed === 0 || $completed < $enroll) {
+            return '-';
+        }
+        $days = (int) floor(($completed - $enroll) / 86400);
+        if ($days === 0) {
+            return html_writer::tag('span', 'Same day',
+                ['class' => 'badge badge-primary', 'style' => 'font-size:0.82em']);
+        }
+        $label = $days === 1 ? '1 day' : number_format($days) . ' days';
+        return html_writer::tag('span', $label, ['class' => 'text-muted small']);
+    }
+
+    public function col_grade_decimal($row): string {
+        return $row->grade_decimal === null ? '-' : format_float($row->grade_decimal, 2);
+    }
+
     public function col_grade_passed($row): string {
         if ($row->grade_passed === null) {
-            return html_writer::tag(
-                'span',
-                '&#8212; ' . get_string('gradeunknown', 'local_completionhistory'),
-                ['class' => 'badge badge-secondary', 'style' => 'font-size:0.85em']
-            );
+            return html_writer::tag('span', '&#8212; ' . get_string('gradeunknown', 'local_completionhistory'),
+                ['class' => 'badge badge-secondary', 'style' => 'font-size:0.85em']);
         }
         if ($row->grade_passed) {
-            return html_writer::tag(
-                'span',
-                '&#10003; ' . get_string('gradepassed', 'local_completionhistory'),
-                ['class' => 'badge badge-success', 'style' => 'font-size:0.85em']
-            );
+            return html_writer::tag('span', '&#10003; ' . get_string('gradepassed', 'local_completionhistory'),
+                ['class' => 'badge badge-success', 'style' => 'font-size:0.85em']);
         }
-        return html_writer::tag(
-            'span',
-            '&#10007; ' . get_string('gradefailed', 'local_completionhistory'),
-            ['class' => 'badge badge-danger', 'style' => 'font-size:0.85em']
-        );
+        return html_writer::tag('span', '&#10007; ' . get_string('gradefailed', 'local_completionhistory'),
+            ['class' => 'badge badge-danger', 'style' => 'font-size:0.85em']);
     }
+
+    // ── Exam track ───────────────────────────────────────────────────────────
+
+    public function col_exam_track($row): string {
+        if (empty($row->exam_track)) {
+            return html_writer::tag('span', '—', ['class' => 'text-muted']);
+        }
+
+        $labels = [
+            course_config_service::TRACK_PROGRAM_FINAL => ['Program Final', 'badge-primary'],
+            course_config_service::TRACK_DIRECT_CREDIT => ['Direct Credit', 'badge-info'],
+            course_config_service::TRACK_CERTIFICATE   => ['Certificate',   'badge-success'],
+        ];
+
+        [$label, $cls] = $labels[$row->exam_track] ?? [$row->exam_track, 'badge-secondary'];
+        return html_writer::tag('span', $label, ['class' => "badge {$cls}", 'style' => 'font-size:0.82em']);
+    }
+
+    /**
+     * Attempts column: shows "2 / 3" summary + an expand toggle button.
+     * Clicking the button fetches attempt detail via AJAX and injects a
+     * sub-row below the current table row.
+     */
+    public function col_attempts($row): string {
+        $used    = $row->attempts_used    ?? null;
+        $allowed = $row->attempts_allowed ?? null;
+
+        if ($used === null) {
+            // No attempt data recorded yet.
+            $summary = html_writer::tag('span', '—', ['class' => 'text-muted']);
+        } else {
+            $allowedlabel = ($allowed === null || (int) $allowed === 0) ? '∞' : (int) $allowed;
+            $summary = html_writer::tag('span', "{$used} / {$allowedlabel}",
+                ['class' => 'font-weight-bold mr-2']);
+        }
+
+        // Expand button — only shown when we have a userid to look up.
+        $btn = '';
+        if ((int) $row->userid !== 0 && !empty($row->courseid)) {
+            $btn = html_writer::tag('button', '&#9654; Details', [
+                'class'        => 'btn btn-outline-secondary btn-sm lch-expand-attempts',
+                'style'        => 'font-size:0.75em; padding:1px 6px;',
+                'data-userid'  => (int) $row->userid,
+                'data-courseid'=> (int) $row->courseid,
+                'data-rowid'   => (int) $row->id,
+                'type'         => 'button',
+            ]);
+        }
+
+        return $summary . $btn;
+    }
+
+    // ── Programs ─────────────────────────────────────────────────────────────
 
     public function col_programs($row): string {
         global $DB;
-
         if (!isset($this->programcache[$row->id])) {
             $this->programcache[$row->id] = $DB->get_records(
-                'local_completionhistory_ach_program',
-                ['achievementid' => $row->id]
+                'local_completionhistory_ach_program', ['achievementid' => $row->id]
             );
         }
-
         $programs = $this->programcache[$row->id];
-        if (empty($programs)) {
-            return '-';
-        }
-
+        if (empty($programs)) return '-';
         $names = [];
         foreach ($programs as $p) {
             $names[] = html_writer::tag('span', format_string($p->programname_snapshot), ['class' => 'badge badge-info']);
@@ -188,64 +302,22 @@ class achievements_table extends table_sql {
         return implode(' ', $names);
     }
 
-    public function col_source_component($row): string {
-        return s($row->source_component);
-    }
+    // ── Misc ─────────────────────────────────────────────────────────────────
+
+    public function col_source_component($row): string { return s($row->source_component); }
 
     public function col_timecreated($row): string {
-        return userdate($row->timecreated, get_string('strftimedatetimeshort', 'langconfig'));
+        return userdate($row->timecreated, '%m/%d/%Y');
     }
 
-    // -----------------------------------------------------------------------
-    // Optional column formatters.
-    // -----------------------------------------------------------------------
+    // ── Optional columns ─────────────────────────────────────────────────────
 
-    public function col_firstname_snapshot($row): string {
-        return s($row->firstname_snapshot ?? '');
-    }
-
-    public function col_lastname_snapshot($row): string {
-        return s($row->lastname_snapshot ?? '');
-    }
-
-    public function col_email_snapshot($row): string {
-        $email = $row->email_snapshot ?? '';
-        if ($email === '') {
-            return '-';
-        }
-        return html_writer::link('mailto:' . $email, s($email));
-    }
-
-    public function col_useridnumber_snapshot($row): string {
-        return s($row->useridnumber_snapshot ?? '');
-    }
-
-    public function col_enrolledtime_snapshot($row): string {
-        if (empty($row->enrolledtime_snapshot)) {
-            return '-';
-        }
-        return userdate($row->enrolledtime_snapshot, get_string('strftimedaydate', 'langconfig'));
-    }
-
-    public function col_courseidnumber_snapshot($row): string {
-        return s($row->courseidnumber_snapshot ?? '');
-    }
-
-    public function col_courseshortname_snapshot($row): string {
-        return s($row->courseshortname_snapshot ?? '');
-    }
-
-    public function col_source_event($row): string {
-        return s($row->source_event ?? '');
-    }
+    public function col_courseidnumber_snapshot($row): string { return s($row->courseidnumber_snapshot ?? ''); }
+    public function col_source_event($row): string            { return s($row->source_event ?? ''); }
 
     public function col_artifacturl($row): string {
-        if (empty($row->artifacturl)) {
-            return '-';
-        }
-        return html_writer::link($row->artifacturl, get_string('col_artifact', 'local_completionhistory'), [
-            'target' => '_blank',
-            'rel'    => 'noopener noreferrer',
-        ]);
+        if (empty($row->artifacturl)) return '-';
+        return html_writer::link($row->artifacturl, get_string('col_artifact', 'local_completionhistory'),
+            ['target' => '_blank', 'rel' => 'noopener noreferrer']);
     }
 }

@@ -53,6 +53,34 @@ $functions = [
         'ajax'         => true,
         'capabilities' => 'local/completionhistory:manage',
     ],
+    'local_completionhistory_get_unsynced_outbox' => [
+        'classname'    => 'local_completionhistory\external\get_unsynced_outbox',
+        'description'  => 'Retrieve unsynced outbox rows (durable SIS sync queue).',
+        'type'         => 'read',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:viewall',
+    ],
+    'local_completionhistory_mark_outbox_sent' => [
+        'classname'    => 'local_completionhistory\external\mark_outbox_sent',
+        'description'  => 'Acknowledge outbox rows after the SIS has consumed them.',
+        'type'         => 'write',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:manage',
+    ],
+    'local_completionhistory_provision_applicant' => [
+        'classname'    => 'local_completionhistory\external\provision_applicant',
+        'description'  => 'Create/find a user by email and allocate to a program (SIS admissions).',
+        'type'         => 'write',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:manage',
+    ],
+    'local_completionhistory_set_password' => [
+        'classname'    => 'local_completionhistory\external\set_password',
+        'description'  => 'Set a manual-auth user password by email and clear force-change (SIS welcome flow).',
+        'type'         => 'write',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:manage',
+    ],
 ];
 
 $services = [
@@ -62,6 +90,10 @@ $services = [
             'local_completionhistory_get_course_replacement',
             'local_completionhistory_get_recent_achievements',
             'local_completionhistory_get_purge_audit',
+            'local_completionhistory_get_unsynced_outbox',
+            'local_completionhistory_mark_outbox_sent',
+            'local_completionhistory_provision_applicant',
+            'local_completionhistory_set_password',
         ],
         'restrictedusers' => 1,
         'enabled'         => 0,

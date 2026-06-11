@@ -110,6 +110,14 @@ if ($hassiteconfig) {
         0
     ));
 
+    // Enable external SIS sync outbox (transactional outbox queue).
+    $settings->add(new admin_setting_configcheckbox(
+        'local_completionhistory/enableoutbox',
+        get_string('setting_enableoutbox', 'local_completionhistory'),
+        get_string('setting_enableoutbox_desc', 'local_completionhistory'),
+        0
+    ));
+
     $ADMIN->add('localplugins', $settings);
 
     // External pages for admin navigation.
@@ -125,5 +133,23 @@ if ($hassiteconfig) {
         get_string('coursemappings', 'local_completionhistory'),
         new moodle_url('/local/completionhistory/course_mappings.php'),
         'local/completionhistory:managecoursemap'
+    ));
+    $ADMIN->add('localplugins', new admin_externalpage(
+        'local_completionhistory_examconfig',
+        get_string('courseexamconfig', 'local_completionhistory'),
+        new moodle_url('/local/completionhistory/course_exam_config.php'),
+        'local/completionhistory:manage'
+    ));
+    $ADMIN->add('localplugins', new admin_externalpage(
+        'local_completionhistory_attemptlog',
+        get_string('examattemptlog', 'local_completionhistory'),
+        new moodle_url('/local/completionhistory/exam_attempt_log.php'),
+        'local/completionhistory:viewall'
+    ));
+    $ADMIN->add('localplugins', new admin_externalpage(
+        'local_completionhistory_manageflags',
+        get_string('manageflags', 'local_completionhistory'),
+        new moodle_url('/local/completionhistory/manage_flags.php'),
+        'local/completionhistory:manage'
     ));
 }

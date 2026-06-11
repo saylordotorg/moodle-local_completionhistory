@@ -22,6 +22,7 @@ use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\contextlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
+use local_completionhistory\local\ledger_service;
 
 /**
  * Privacy provider for local_completionhistory.
@@ -45,10 +46,14 @@ class provider implements
      */
     public static function get_metadata(collection $collection): collection {
         $collection->add_database_table('local_completionhistory_achievement', [
-            'userid' => 'privacy:metadata:achievement:userid',
+            'userid'              => 'privacy:metadata:achievement:userid',
+            'firstname_snapshot'  => 'privacy:metadata:achievement:firstname_snapshot',
+            'lastname_snapshot'   => 'privacy:metadata:achievement:lastname_snapshot',
+            'email_snapshot'      => 'privacy:metadata:achievement:email_snapshot',
             'coursename_snapshot' => 'privacy:metadata:achievement:coursename_snapshot',
-            'completiontime' => 'privacy:metadata:achievement:completiontime',
-            'grade_decimal' => 'privacy:metadata:achievement:grade_decimal',
+            'completiontime'      => 'privacy:metadata:achievement:completiontime',
+            'enrolledtime_snapshot' => 'privacy:metadata:achievement:enrolledtime_snapshot',
+            'grade_decimal'       => 'privacy:metadata:achievement:grade_decimal',
         ], 'privacy:metadata:achievement');
 
         $collection->add_database_table('local_completionhistory_ach_program', [
@@ -144,11 +149,12 @@ class provider implements
         }
 
         // Anonymize all achievement records.
-        $DB->execute(
-            "UPDATE {local_completionhistory_achievement}
-                SET userid = 0, useridnumber_snapshot = NULL, artifacturl = NULL
-              WHERE userid != 0"
+        $allusers = $DB->get_fieldset_sql(
+            "SELECT DISTINCT userid
+               FROM {local_completionhistory_achievement}
+              WHERE userid <> 0"
         );
+        ledger_service::anonymize_users($allusers);
 
         // Delete purge audit records (these are operational, not academic).
         $DB->delete_records('local_completionhistory_purge_audit');
@@ -165,12 +171,7 @@ class provider implements
         $userid = $contextlist->get_user()->id;
 
         // Anonymize achievement records.
-        $DB->execute(
-            "UPDATE {local_completionhistory_achievement}
-                SET userid = 0, useridnumber_snapshot = NULL, artifacturl = NULL
-              WHERE userid = :userid",
-            ['userid' => $userid]
-        );
+        ledger_service::anonymize_users([$userid]);
 
         // Delete purge audit records.
         $DB->delete_records('local_completionhistory_purge_audit', ['userid' => $userid]);
@@ -192,17 +193,11 @@ class provider implements
             return;
         }
 
-        [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
-
         // Anonymize achievement records.
-        $DB->execute(
-            "UPDATE {local_completionhistory_achievement}
-                SET userid = 0, useridnumber_snapshot = NULL, artifacturl = NULL
-              WHERE userid {$insql}",
-            $params
-        );
+        ledger_service::anonymize_users($userids);
 
         // Delete purge audit records.
+        [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
         $DB->execute(
             "DELETE FROM {local_completionhistory_purge_audit} WHERE userid {$insql}",
             $params

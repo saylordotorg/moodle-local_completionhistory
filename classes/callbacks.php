@@ -17,6 +17,9 @@
 namespace local_completionhistory;
 
 use local_completionhistory\local\ledger_service;
+use local_completionhistory\local\exam_attempt_service;
+use local_completionhistory\local\course_config_service;
+use local_completionhistory\local\artifact_service;
 use local_completionhistory\hook\course_completions_purged;
 
 /**
@@ -164,11 +167,152 @@ class callbacks {
 
         // Anonymize if configured.
         if (get_config('local_completionhistory', 'gdpranonymize')) {
-            $DB->execute(
-                "UPDATE {local_completionhistory_achievement}
-                    SET userid = 0, useridnumber_snapshot = NULL, artifacturl = NULL
-                  WHERE userid = :userid",
-                ['userid' => $userid]
+            ledger_service::anonymize_users([$userid]);
+        }
+    }
+
+    /**
+     * Observer for \mod_quiz\event\attempt_submitted.
+     *
+     * If the submitted quiz is configured as a tracked exam on the course,
+     * records a per-attempt row in local_completionhistory_exam_attempt.
+     *
+     * @param \mod_quiz\event\attempt_submitted $event
+     */
+    public static function quiz_attempt_submitted(\mod_quiz\event\attempt_submitted $event): void {
+        if (!get_config('local_completionhistory', 'enabled')) {
+            return;
+        }
+
+        global $DB;
+
+        $attempt = $DB->get_record('quiz_attempts',
+            ['id' => (int) $event->objectid],
+            'id, quiz, userid, sumgrades, timestart, timefinish, state'
+        );
+        if (!$attempt || $attempt->state !== 'finished') {
+            return;
+        }
+
+        $quizid   = (int) $attempt->quiz;
+        $userid   = (int) $attempt->userid;
+        $courseid = (int) $event->courseid;
+
+        // Only record if this quiz is a tracked exam for its course.
+        $trackinfo = course_config_service::get_track_for_quiz($quizid);
+        if (!$trackinfo) {
+            return;
+        }
+
+        $quiz = $DB->get_record('quiz', ['id' => $quizid], 'id, sumgrades, grade');
+        if (!$quiz) {
+            return;
+        }
+
+        // Normalise this attempt's grade to 0–100.
+        $grade = null;
+        if ($attempt->sumgrades !== null && $quiz->sumgrades > 0) {
+            $grade = ((float) $attempt->sumgrades / (float) $quiz->sumgrades) * 100.0;
+        }
+
+        // Pass threshold from the grade item, converted to the same 0–100 scale.
+        $passed = null;
+        if ($grade !== null) {
+            $gitem = $DB->get_record('grade_items', [
+                'itemtype'     => 'mod',
+                'itemmodule'   => 'quiz',
+                'iteminstance' => $quizid,
+                'courseid'     => $courseid,
+            ]);
+            if ($gitem && (float) $gitem->gradepass > 0 && (float) $quiz->grade > 0) {
+                $passthreshpct = ((float) $gitem->gradepass / (float) $quiz->grade) * 100.0;
+                $passed = ($grade >= $passthreshpct);
+            }
+        }
+
+        $timefinish = (int) ($attempt->timefinish ?: $event->timecreated);
+        $timestart  = (int) ($attempt->timestart ?: 0);
+        $duration   = ($timestart > 0 && $timefinish > $timestart)
+            ? ($timefinish - $timestart)
+            : null;
+
+        try {
+            exam_attempt_service::record_attempt(
+                $userid,
+                $courseid,
+                $quizid,
+                $trackinfo->track,
+                (int) $trackinfo->attempts_allowed,
+                $grade,
+                $passed,
+                $timefinish,
+                $duration
+            );
+        } catch (\Exception $e) {
+            debugging(
+                'local_completionhistory: Failed to record exam attempt for user '
+                . $userid . ', quiz ' . $quizid . ': ' . $e->getMessage(),
+                DEBUG_DEVELOPER
+            );
+        }
+    }
+
+    /**
+     * Observer for \tool_certificate\event\certificate_issued.
+     *
+     * Attaches Moodle Workplace course certificates to the matching immutable
+     * achievement row, then republishes that row through the SIS outbox.
+     *
+     * @param \core\event\base $event
+     */
+    public static function certificate_issued(\core\event\base $event): void {
+        if (!get_config('local_completionhistory', 'enabled')) {
+            return;
+        }
+
+        try {
+            artifact_service::attach_certificate_issue((int) $event->objectid);
+        } catch (\Exception $e) {
+            debugging(
+                'local_completionhistory: Failed to attach certificate issue '
+                . (int) $event->objectid . ': ' . $e->getMessage(),
+                DEBUG_DEVELOPER
+            );
+        }
+    }
+
+    /**
+     * Observer for \tool_certificate\event\certificate_revoked.
+     *
+     * Clears the certificate link from the matching achievement row and
+     * republishes that row so the SIS removes stale credential links.
+     *
+     * @param \core\event\base $event
+     */
+    public static function certificate_revoked(\core\event\base $event): void {
+        if (!get_config('local_completionhistory', 'enabled')) {
+            return;
+        }
+
+        try {
+            $issue = $event->get_record_snapshot('tool_certificate_issues', (int) $event->objectid);
+            $userid = (int) ($issue->userid ?? $event->relateduserid);
+            $courseid = (int) ($issue->courseid ?? 0);
+            if ($courseid <= 0 && $event->contextlevel === CONTEXT_COURSE) {
+                $courseid = (int) $event->contextinstanceid;
+            }
+            $code = (string) ($issue->code ?? ($event->other['code'] ?? ''));
+
+            artifact_service::clear_certificate_issue(
+                $userid,
+                $courseid,
+                $code
+            );
+        } catch (\Exception $e) {
+            debugging(
+                'local_completionhistory: Failed to clear certificate issue '
+                . (int) $event->objectid . ': ' . $e->getMessage(),
+                DEBUG_DEVELOPER
             );
         }
     }

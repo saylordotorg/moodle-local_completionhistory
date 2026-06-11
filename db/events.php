@@ -41,4 +41,16 @@ $observers = [
         'eventname' => '\core\event\user_deleted',
         'callback'  => '\local_completionhistory\callbacks::user_deleted',
     ],
+    [
+        'eventname' => '\mod_quiz\event\attempt_submitted',
+        'callback'  => '\local_completionhistory\callbacks::quiz_attempt_submitted',
+    ],
+    [
+        'eventname' => '\tool_certificate\event\certificate_issued',
+        'callback'  => '\local_completionhistory\callbacks::certificate_issued',
+    ],
+    [
+        'eventname' => '\tool_certificate\event\certificate_revoked',
+        'callback'  => '\local_completionhistory\callbacks::certificate_revoked',
+    ],
 ];

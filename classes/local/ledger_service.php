@@ -24,6 +24,10 @@ use stdClass;
  * All inserts are idempotent via a deterministic SHA-256 event hash.
  * Rows are never mutated or deleted after insertion.
  *
+ * When a course completion is triggered by a tracked exam attempt, callers
+ * should pass the optional exam context parameters to record which track
+ * and attempt count led to completion.
+ *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -33,16 +37,26 @@ class ledger_service {
     /**
      * Capture an achievement from a course completion record.
      *
-     * @param stdClass $completion A course_completions record (must have userid, course, timecompleted).
-     * @param string $sourcecomponent Component that triggered capture (e.g. 'core_completion', 'cli_backfill').
-     * @param string $sourceevent Event class name or CLI command identifier.
-     * @return int|null The new achievement ID, or null if already captured (idempotent skip).
+     * @param stdClass    $completion      A course_completions record (userid, course, timecompleted).
+     * @param string      $sourcecomponent Component that triggered capture.
+     * @param string      $sourceevent     Event class name or CLI identifier.
+     * @param string|null $exam_track      Exam track that completed the course, or null.
+     * @param int|null    $attempts_used   Attempts consumed on the completing track.
+     * @param int|null    $attempts_allowed Max attempts allowed on that track (0 = unlimited).
+     * @return int|null New achievement ID, or null if already captured (idempotent skip).
      */
-    public static function capture_achievement(stdClass $completion, string $sourcecomponent, string $sourceevent): ?int {
+    public static function capture_achievement(
+        stdClass $completion,
+        string $sourcecomponent,
+        string $sourceevent,
+        ?string $exam_track = null,
+        ?int $attempts_used = null,
+        ?int $attempts_allowed = null
+    ): ?int {
         global $DB;
 
-        $userid = (int) $completion->userid;
-        $courseid = (int) $completion->course;
+        $userid        = (int) $completion->userid;
+        $courseid      = (int) $completion->course;
         $timecompleted = (int) $completion->timecompleted;
 
         // Compute deterministic dedup hash.
@@ -54,17 +68,17 @@ class ledger_service {
         }
 
         // Snapshot course metadata.
-        $course = $DB->get_record('course', ['id' => $courseid]);
-        $coursename = $course ? $course->fullname : '[deleted]';
+        $course          = $DB->get_record('course', ['id' => $courseid]);
+        $coursename      = $course ? $course->fullname  : '[deleted]';
         $courseshortname = $course ? $course->shortname : null;
-        $courseidnumber = $course ? $course->idnumber : null;
+        $courseidnumber  = $course ? $course->idnumber  : null;
 
         // Snapshot user fields.
-        $user = $DB->get_record('user', ['id' => $userid], 'id, idnumber, firstname, lastname, email');
-        $useridnumber = $user ? $user->idnumber   : null;
-        $firstname    = $user ? $user->firstname  : null;
-        $lastname     = $user ? $user->lastname   : null;
-        $email        = $user ? $user->email      : null;
+        $user         = $DB->get_record('user', ['id' => $userid], 'id, idnumber, firstname, lastname, email');
+        $useridnumber = $user ? $user->idnumber  : null;
+        $firstname    = $user ? $user->firstname : null;
+        $lastname     = $user ? $user->lastname  : null;
+        $email        = $user ? $user->email     : null;
 
         // Snapshot earliest enrolment date for this user+course.
         $enrolments = $DB->get_records_sql(
@@ -76,7 +90,6 @@ class ledger_service {
         );
         $enrolledtime = null;
         foreach ($enrolments as $ue) {
-            // Prefer timestart when set (> 0), otherwise fall back to timecreated.
             $ts = ($ue->timestart > 0) ? (int) $ue->timestart : (int) $ue->timecreated;
             if ($enrolledtime === null || $ts < $enrolledtime) {
                 $enrolledtime = $ts;
@@ -91,47 +104,77 @@ class ledger_service {
 
         // Resolve program context.
         $programs = program_context_resolver::resolve($userid, $courseid);
+        $artifact = artifact_service::certificate_artifact_for_user_course($userid, $courseid);
+
+        // If no exam_track was explicitly provided, try to auto-detect from course config.
+        if ($exam_track === null) {
+            $config = course_config_service::get_config($courseid);
+            if ($config->course_type !== course_config_service::TYPE_STANDARD) {
+                // Infer from the most recent completing attempt if available.
+                $completing = $DB->get_record_select(
+                    'local_completionhistory_exam_attempt',
+                    'userid = :uid AND courseid = :cid AND resulted_in_completion = 1',
+                    ['uid' => $userid, 'cid' => $courseid],
+                    '*',
+                    IGNORE_MULTIPLE
+                );
+                if ($completing) {
+                    $exam_track       = $completing->exam_track;
+                    $attempts_used    = (int) $completing->attempt_number;
+                    $attempts_allowed = (int) $completing->attempts_allowed;
+                }
+            }
+        }
 
         // Build the achievement record.
-        $record = new stdClass();
-        $record->ledgeruuid = self::generate_uuid();
-        $record->userid = $userid;
-        $record->useridnumber_snapshot = $useridnumber ?: null;
-        $record->firstname_snapshot    = $firstname    ?: null;
-        $record->lastname_snapshot     = $lastname     ?: null;
-        $record->email_snapshot        = $email        ?: null;
-        $record->courseid = $courseid;
-        $record->courseidnumber_snapshot = $courseidnumber ?: null;
+        $record                           = new stdClass();
+        $record->ledgeruuid               = self::generate_uuid();
+        $record->userid                   = $userid;
+        $record->useridnumber_snapshot    = $useridnumber  ?: null;
+        $record->firstname_snapshot       = $firstname     ?: null;
+        $record->lastname_snapshot        = $lastname      ?: null;
+        $record->email_snapshot           = $email         ?: null;
+        $record->courseid                 = $courseid;
+        $record->courseidnumber_snapshot  = $courseidnumber  ?: null;
         $record->courseshortname_snapshot = $courseshortname;
-        $record->coursename_snapshot = $coursename;
-        $record->completiontime        = $timecompleted;
-        $record->enrolledtime_snapshot = $enrolledtime;
-        $record->grade_decimal = $gradedata ? $gradedata->finalgrade : null;
-        $record->grade_passed = $gradedata ? $gradedata->passed : null;
-        $record->grade_source = $gradedata ? 'gradebook' : null;
-        $record->artifacturl = null;
-        $record->artifactstorage = null;
-        $record->source_component = $sourcecomponent;
-        $record->source_event = $sourceevent;
-        $record->source_event_hash = $hash;
-        $record->timecreated = time();
+        $record->coursename_snapshot      = $coursename;
+        $record->completiontime           = $timecompleted;
+        $record->enrolledtime_snapshot    = $enrolledtime;
+        $record->grade_decimal            = $gradedata ? $gradedata->finalgrade : null;
+        $record->grade_passed             = $gradedata ? $gradedata->passed     : null;
+        $record->grade_source             = $gradedata ? 'gradebook'            : null;
+        $record->exam_track               = $exam_track;
+        $record->attempts_used            = $attempts_used;
+        $record->attempts_allowed         = $attempts_allowed;
+        $record->artifacturl              = $artifact['url'] ?? null;
+        $record->artifactstorage          = $artifact['storage'] ?? null;
+        $record->source_component         = $sourcecomponent;
+        $record->source_event             = $sourceevent;
+        $record->source_event_hash        = $hash;
+        $record->timecreated              = time();
 
         // Wrap in transaction: achievement + program rows.
         $transaction = $DB->start_delegated_transaction();
         try {
             $achievementid = $DB->insert_record('local_completionhistory_achievement', $record);
 
-            // Insert program association rows.
             foreach ($programs as $program) {
-                $progrecord = new stdClass();
-                $progrecord->achievementid = $achievementid;
-                $progrecord->allocationid = $program->allocationid ?? null;
-                $progrecord->programid = $program->programid ?? null;
-                $progrecord->programidnumber_snapshot = $program->idnumber ?? null;
-                $progrecord->programname_snapshot = $program->fullname;
-                $progrecord->timecreated = time();
+                $progrecord                           = new stdClass();
+                $progrecord->achievementid            = $achievementid;
+                $progrecord->allocationid             = $program->allocationid ?? null;
+                $progrecord->programid                = $program->programid    ?? null;
+                $progrecord->programidnumber_snapshot = $program->idnumber     ?? null;
+                $progrecord->programname_snapshot     = $program->fullname;
+                $progrecord->timecreated              = time();
                 $DB->insert_record('local_completionhistory_ach_program', $progrecord);
             }
+
+            // Enqueue this achievement for external SIS sync (transactional outbox).
+            // No-op unless the 'enableoutbox' setting is on. Performed inside the
+            // same transaction so the outbox row commits atomically with the ledger
+            // row — guaranteeing exactly-once capture with no lost/phantom events.
+            $record->id = $achievementid;
+            outbox_service::enqueue_achievement($record);
 
             $transaction->allow_commit();
         } catch (\Exception $e) {
@@ -143,21 +186,128 @@ class ledger_service {
     }
 
     /**
+     * Update the exam context on an existing achievement row.
+     * Used when the completing attempt is identified after the achievement
+     * was already written (e.g. backfill scenarios).
+     *
+     * @param int    $achievementid
+     * @param string $exam_track
+     * @param int    $attempts_used
+     * @param int    $attempts_allowed
+     */
+    public static function set_exam_context(
+        int $achievementid,
+        string $exam_track,
+        int $attempts_used,
+        int $attempts_allowed
+    ): void {
+        global $DB;
+
+        $DB->set_field('local_completionhistory_achievement', 'exam_track',       $exam_track,       ['id' => $achievementid]);
+        $DB->set_field('local_completionhistory_achievement', 'attempts_used',    $attempts_used,    ['id' => $achievementid]);
+        $DB->set_field('local_completionhistory_achievement', 'attempts_allowed', $attempts_allowed, ['id' => $achievementid]);
+    }
+
+    /**
+     * Scrub PII from achievement rows belonging to the given userids.
+     * Clears the userid (sets to 0) and nulls every field that can carry
+     * user-identifying data: useridnumber_snapshot, firstname_snapshot,
+     * lastname_snapshot, email_snapshot, artifacturl, artifactstorage.
+     *
+     * Academic payload (course, completion time, grade, exam track) is
+     * intentionally preserved — these rows remain institutional records.
+     *
+     * @param int[] $userids Userids whose achievements should be anonymized.
+     * @return int Number of achievement rows affected.
+     */
+    public static function anonymize_users(array $userids): int {
+        global $DB;
+
+        $userids = array_values(array_unique(array_filter(
+            array_map('intval', $userids),
+            fn($id) => $id > 0
+        )));
+        if (empty($userids)) {
+            return 0;
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
+
+        $count = $DB->count_records_select(
+            'local_completionhistory_achievement',
+            "userid {$insql}",
+            $params
+        );
+
+        $DB->execute(
+            "UPDATE {local_completionhistory_achievement}
+                SET userid                = 0,
+                    useridnumber_snapshot = NULL,
+                    firstname_snapshot    = NULL,
+                    lastname_snapshot     = NULL,
+                    email_snapshot        = NULL,
+                    artifacturl           = NULL,
+                    artifactstorage       = NULL
+              WHERE userid {$insql}",
+            $params
+        );
+
+        return $count;
+    }
+
+    /**
+     * Find achievement rows that reference a deleted or fully-purged user
+     * and anonymize them. Closes three gaps left by the user_deleted
+     * observer:
+     *   1. Rows captured after the user_deleted event fired (late events,
+     *      CLI backfill scanning stale course_completions).
+     *   2. Rows captured while the gdpranonymize setting was off and never
+     *      retroactively scrubbed after the admin enabled it.
+     *   3. Rows whose user record has since been fully purged from {user}.
+     *
+     * @return stdClass {candidates: int, anonymized: int}
+     */
+    public static function reconcile_deleted_users(): stdClass {
+        global $DB;
+
+        $stats = new stdClass();
+        $stats->candidates = 0;
+        $stats->anonymized = 0;
+
+        // Distinct achievement userids where the referenced user is either
+        // flagged deleted=1 or gone from the user table entirely.
+        $sql = "SELECT DISTINCT a.userid
+                  FROM {local_completionhistory_achievement} a
+             LEFT JOIN {user} u ON u.id = a.userid
+                 WHERE a.userid > 0
+                   AND (u.id IS NULL OR u.deleted = 1)";
+        $userids = $DB->get_fieldset_sql($sql);
+
+        $stats->candidates = count($userids);
+        if (empty($userids)) {
+            return $stats;
+        }
+
+        $stats->anonymized = self::anonymize_users($userids);
+        return $stats;
+    }
+
+    /**
      * Record a purge audit entry.
      *
-     * @param int $userid
-     * @param int|null $programid
-     * @param string $reason
+     * @param int         $userid
+     * @param int|null    $programid
+     * @param string      $reason
      * @param string|null $detailsjson
      * @return int The new purge_audit ID.
      */
     public static function record_purge_audit(int $userid, ?int $programid, string $reason, ?string $detailsjson = null): int {
         global $DB;
 
-        $record = new stdClass();
-        $record->userid = $userid;
-        $record->programid = $programid;
-        $record->reason = $reason;
+        $record              = new stdClass();
+        $record->userid      = $userid;
+        $record->programid   = $programid;
+        $record->reason      = $reason;
         $record->detailsjson = $detailsjson;
         $record->timecreated = time();
 
@@ -167,9 +317,9 @@ class ledger_service {
     /**
      * Compute deterministic SHA-256 hash for deduplication.
      *
-     * @param int $userid
-     * @param int $courseid
-     * @param int $timecompleted
+     * @param int    $userid
+     * @param int    $courseid
+     * @param int    $timecompleted
      * @param string $sourcecomponent
      * @return string 64-character hex hash.
      */
@@ -183,12 +333,9 @@ class ledger_service {
      * @return string 36-character UUID string.
      */
     public static function generate_uuid(): string {
-        $data = random_bytes(16);
-        // Set version to 0100 (UUID v4).
+        $data    = random_bytes(16);
         $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
-        // Set variant to 10xx.
         $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
-
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 }
