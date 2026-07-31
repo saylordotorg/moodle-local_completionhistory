@@ -62,20 +62,34 @@ class provision_applicant extends external_api {
         require_capability('local/completionhistory:manage', $systemcontext);
 
         $warning = '';
+        $usernamewarning = '';
         $created = false;
         $password = '';
 
-        // 1) Find or create the user by email.
-        $user = $DB->get_record('user', ['email' => \core_text::strtolower($params['email']), 'deleted' => 0, 'mnethostid' => $CFG->mnet_localhost_id]);
+        // 1) Find or create the user by email. An existing account is ADOPTED,
+        //    never duplicated and never password-reset: the email is the
+        //    identity key, so a match means a returning learner whose history
+        //    should attach to this application.
+        $emaillower = \core_text::strtolower($params['email']);
+        $user = $DB->get_record('user', ['email' => $emaillower, 'deleted' => 0, 'mnethostid' => $CFG->mnet_localhost_id]);
         if (!$user) {
-            $base = clean_param(strstr($params['email'], '@', true), PARAM_USERNAME);
-            if ($base === '') {
-                $base = 'sisuser';
+            // Username = the email address (SIS policy, 2026-06): one
+            // identifier across degrees.saylor.org, mySaylor, and the future
+            // Cognito SSO. clean_param may strip chars Moodle disallows
+            // (e.g. "+" unless extendedusernamechars) — use what survives.
+            $username = clean_param($emaillower, PARAM_USERNAME);
+            if ($username === '') {
+                $username = 'sisuser';
             }
-            $username = $base;
-            $suffix = 1;
-            while ($DB->record_exists('user', ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id])) {
-                $username = $base . (++$suffix);
+            if ($DB->record_exists('user', ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id])) {
+                // The exact username belongs to a DIFFERENT account (no user
+                // has this email, or we would have adopted it above).
+                $base = $username;
+                $suffix = 1;
+                while ($DB->record_exists('user', ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id])) {
+                    $username = $base . (++$suffix);
+                }
+                $usernamewarning = 'Username ' . $base . ' was taken by another account; created as ' . $username . '.';
             }
 
             $password = bin2hex(random_bytes(6)) . 'Aa1!';
@@ -83,7 +97,7 @@ class provision_applicant extends external_api {
             $new->username = $username;
             $new->firstname = $params['firstname'] !== '' ? $params['firstname'] : 'Applicant';
             $new->lastname = $params['lastname'] !== '' ? $params['lastname'] : 'User';
-            $new->email = \core_text::strtolower($params['email']);
+            $new->email = $emaillower;
             $new->auth = 'manual';
             $new->confirmed = 1;
             $new->mnethostid = $CFG->mnet_localhost_id;
@@ -121,7 +135,7 @@ class provision_applicant extends external_api {
             'created'   => $created,
             'allocated' => $allocated,
             'password'  => $password,
-            'warning'   => $warning,
+            'warning'   => trim($usernamewarning . ' ' . $warning),
         ];
     }
 
