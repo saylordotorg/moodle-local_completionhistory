@@ -109,6 +109,34 @@ $functions = [
         'ajax'         => true,
         'capabilities' => 'local/completionhistory:viewall',
     ],
+    'local_completionhistory_list_programs' => [
+        'classname'    => 'local_completionhistory\external\list_programs',
+        'description'  => 'List enrol_programs programs and their member courses (SIS program registry sync).',
+        'type'         => 'read',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:viewall',
+    ],
+    'local_completionhistory_get_user_inprogress_courses' => [
+        'classname'    => 'local_completionhistory\external\get_user_inprogress_courses',
+        'description'  => 'Courses a user has started but not completed (SIS requirements/teach-out engine).',
+        'type'         => 'read',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:viewall',
+    ],
+    'local_completionhistory_enrol_user_in_course' => [
+        'classname'    => 'local_completionhistory\external\enrol_user_in_course',
+        'description'  => 'Manually enrol a user into a course by email + idnumber (SIS course-window pacer / alumni enrolment).',
+        'type'         => 'write',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:manage',
+    ],
+    'local_completionhistory_set_program_deadline' => [
+        'classname'    => 'local_completionhistory\external\set_program_deadline',
+        'description'  => 'Set the timeend of a user program allocation (SIS time-to-completion clocks).',
+        'type'         => 'write',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:manage',
+    ],
 ];
 
 $services = [
@@ -125,6 +153,10 @@ $services = [
             'local_completionhistory_get_flagged_attempts',
             'local_completionhistory_list_courses',
             'local_completionhistory_get_user_activity',
+            'local_completionhistory_list_programs',
+            'local_completionhistory_get_user_inprogress_courses',
+            'local_completionhistory_enrol_user_in_course',
+            'local_completionhistory_set_program_deadline',
         ],
         'restrictedusers' => 1,
         'enabled'         => 0,
