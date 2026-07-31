@@ -91,6 +91,24 @@ $functions = [
         'ajax'         => true,
         'capabilities' => 'local/completionhistory:viewall',
     ],
+    // Course catalog, wrapping core reads the SIS token is deliberately not
+    // authorised for. Without this the SIS course sync had never worked (SIS-44).
+    'local_completionhistory_list_courses' => [
+        'classname'    => 'local_completionhistory\\external\\list_courses',
+        'description'  => 'Course catalog and category tree (SIS course mapping / catalog sync).',
+        'type'         => 'read',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:viewall',
+    ],
+    // Login and last-access timestamps, which are a different question from
+    // academic activity and could not be answered at all before (SIS-43).
+    'local_completionhistory_get_user_activity' => [
+        'classname'    => 'local_completionhistory\\external\\get_user_activity',
+        'description'  => 'Login and last-access timestamps for learners (SIS engagement / last-login reporting).',
+        'type'         => 'read',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:viewall',
+    ],
 ];
 
 $services = [
@@ -105,6 +123,8 @@ $services = [
             'local_completionhistory_provision_applicant',
             'local_completionhistory_set_password',
             'local_completionhistory_get_flagged_attempts',
+            'local_completionhistory_list_courses',
+            'local_completionhistory_get_user_activity',
         ],
         'restrictedusers' => 1,
         'enabled'         => 0,
