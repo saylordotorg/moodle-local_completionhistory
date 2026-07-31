@@ -15,128 +15,208 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Static check for the get_flagged_attempts paging cursor.
+ * Static check for the paging cursors on the SIS-facing read functions.
  *
- * WHAT THIS GUARDS. The first version of the endpoint paged on
- * `timetaken >= :since`. timetaken has one-second resolution and is not unique, so
- * when a full page of attempts shares one timestamp — simultaneous submissions, or
- * a bulk import via cli/normalize_exam_attempts.php — that predicate returns the
- * same lowest ids on every call. `truncated` stays true, the caller keeps calling,
- * and every attempt after the first page on that timestamp is NEVER REACHED. No
- * error, no empty response; just a sweep that runs forever and silently misses
- * flagged exams.
+ * WHAT THIS GUARDS. Two functions page through large tables, and the SAME CLASS of
+ * defect shipped in both:
  *
- * The fix is a keyset cursor on (timetaken, id). This exercises the advance step
- * against the exact scenario that broke, plus the empty-page case where the cursor
- * must hold still rather than resetting to zero.
+ *   get_flagged_attempts paged on `timetaken >= :since`. timetaken is not unique, so
+ *   a full page sharing one timestamp returns the same lowest ids forever — the sweep
+ *   runs indefinitely and never reaches the rest.
+ *
+ *   get_user_activity sorted `lastaccess DESC` and returned the highest timestamp as
+ *   the continuation bound. That cannot page at all: page one holds the newest users,
+ *   so passing its maximum back as a lower bound filters out every older user and
+ *   re-emits only the newest.
+ *
+ * Neither fails loudly. Both silently return an incomplete view of the data, which is
+ * why they get a mechanical check rather than a careful read. Both functions are
+ * covered here on purpose — a check over one file would have caught neither the
+ * second time.
  *
  * Standalone by necessity as much as by choice: next_cursor() is pure, so it can be
- * verified with no Moodle bootstrap, no database and no PHPUnit — which is the only
- * way any of this is checkable on a bare checkout.
+ * verified with no Moodle bootstrap, no database and no PHPUnit.
  *
  * Usage:  php tests/static/check_cursor_advance.php
- * Exit:   0 = all cases pass, 1 = a case failed.
+ * Exit:   0 = all checks pass, 1 = a check failed, 2 = the check itself is broken.
  *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// Warnings are FAILURES here. An earlier version of this file referenced an undefined
+// variable, checked nothing at all, and still exited 0 — a check that reports PASS
+// while doing no work is worse than no check.
+set_error_handler(static function (int $no, string $msg, string $file, int $line): bool {
+    fwrite(STDERR, "the check itself errored at {$file}:{$line}: {$msg}\n");
+    exit(2);
+});
+
 $root = dirname(__DIR__, 2);
-$src  = $root . '/classes/external/get_flagged_attempts.php';
-if (!is_readable($src)) {
-    fwrite(STDERR, "cannot read {$src}\n");
-    exit(2);
+
+/** Every paging function, with the column its cursor is keyed on. */
+$targets = [
+    'get_flagged_attempts' => [
+        'file' => $root . '/classes/external/get_flagged_attempts.php',
+        'ts'   => 'timetaken',
+    ],
+    'get_user_activity' => [
+        'file' => $root . '/classes/external/get_user_activity.php',
+        'ts'   => 'lastaccess',
+        // Scope promises the parameter contract makes and the SQL must keep. The
+        // first version documented "confirmed, undeleted users" but filtered only on
+        // deleted, so abandoned self-registrations would have entered the SIS
+        // activity feed indistinguishable from enrolled students who never signed in.
+        'extra' => [
+            'excludes unconfirmed' => '/u\.confirmed\s*=\s*1/',
+            'excludes deleted'     => '/u\.deleted\s*=\s*0/',
+        ],
+    ],
+];
+
+foreach ($targets as $name => $t) {
+    if (!is_readable($t['file'])) {
+        fwrite(STDERR, "cannot read {$t['file']}\n");
+        exit(2);
+    }
 }
 
-// Extract next_cursor() and eval it in isolation. The file itself cannot be
-// included — it extends core_external\external_api, which needs Moodle. Pulling
-// out the one pure method keeps this runnable anywhere.
-$code = file_get_contents($src);
-if (!preg_match('/public static function next_cursor\(array \$rows, int \$sincets, int \$sinceid\): array \{(.+?)\n    \}/s',
-        $code, $m)) {
-    fwrite(STDERR, "next_cursor() not found in the expected shape; update this check rather than deleting it.\n");
-    exit(2);
-}
-eval('function next_cursor(array $rows, int $sincets, int $sinceid): array {' . $m[1] . "\n}");
+$failed = 0;
 
-/** Build a row list from [id, timetaken] pairs, in query order. */
-$rows = static function (array $pairs): array {
+/* -- Part 1: the advance step, exercised ------------------------------- */
+
+/** Build a row list from [id, ts] pairs, keyed by id like $DB->get_records_sql(). */
+$rows = static function (array $pairs, string $field): array {
     $out = [];
     foreach ($pairs as [$id, $ts]) {
         $o = new stdClass();
         $o->id = $id;
-        $o->timetaken = $ts;
-        // Keyed by id, mirroring $DB->get_records_sql().
+        $o->{$field} = $ts;
         $out[$id] = $o;
     }
     return $out;
 };
 
-$cases = [
-    [
-        'name'   => 'ordinary page advances to the last row',
-        'rows'   => $rows([[10, 1000], [11, 1001], [12, 1002]]),
-        'since'  => [0, 0],
-        'expect' => [1002, 12],
-    ],
-    [
-        'name'   => 'THE BUG: a full page sharing one timestamp still advances by id',
-        'rows'   => $rows([[5, 1700000000], [6, 1700000000], [7, 1700000000]]),
-        'since'  => [0, 0],
-        'expect' => [1700000000, 7],
-    ],
-    [
-        'name'   => 'continuing that page moves past the ids already seen',
-        'rows'   => $rows([[8, 1700000000], [9, 1700000000]]),
-        'since'  => [1700000000, 7],
-        'expect' => [1700000000, 9],
-    ],
-    [
-        'name'   => 'empty page holds the cursor still, never resets it',
-        'rows'   => [],
-        'since'  => [1700000000, 9],
-        'expect' => [1700000000, 9],
-    ],
-    [
-        'name'   => 'empty first page stays at the origin',
-        'rows'   => [],
-        'since'  => [0, 0],
-        'expect' => [0, 0],
-    ],
-    [
-        'name'   => 'single row advances to itself',
-        'rows'   => $rows([[42, 1234]]),
-        'since'  => [0, 0],
-        'expect' => [1234, 42],
-    ],
-];
+foreach ($targets as $name => $t) {
+    $code = file_get_contents($t['file']);
+    if (!preg_match(
+        '/public static function next_cursor\(array \$rows, int \$sincets, int \$sinceid\): array \{(.+?)\n    \}/s',
+        $code,
+        $m
+    )) {
+        fwrite(STDERR, "{$name}: next_cursor() not found in the expected shape; "
+            . "update this check rather than deleting it.\n");
+        exit(2);
+    }
+    // Uniquely named so both functions can be evaluated in one process.
+    $fn = "next_cursor_{$name}";
+    eval("function {$fn}(array \$rows, int \$sincets, int \$sinceid): array {" . $m[1] . "\n}");
 
-$failed = 0;
-foreach ($cases as $c) {
-    [$ts, $id] = next_cursor($c['rows'], $c['since'][0], $c['since'][1]);
-    $ok = ([$ts, $id] === $c['expect']);
-    printf("  %-58s %s\n", $c['name'], $ok ? 'PASS' : sprintf('FAIL (got [%d, %d], want [%d, %d])',
-        $ts, $id, $c['expect'][0], $c['expect'][1]));
-    if (!$ok) {
-        $failed++;
+    $cases = [
+        [
+            'name'   => 'ordinary page advances to the last row',
+            'rows'   => $rows([[10, 1000], [11, 1001], [12, 1002]], $t['ts']),
+            'since'  => [0, 0],
+            'expect' => [1002, 12],
+        ],
+        [
+            'name'   => 'THE BUG: a full page on ONE timestamp still advances by id',
+            'rows'   => $rows([[5, 1700000000], [6, 1700000000], [7, 1700000000]], $t['ts']),
+            'since'  => [0, 0],
+            'expect' => [1700000000, 7],
+        ],
+        [
+            'name'   => 'continuing that page moves past the ids already seen',
+            'rows'   => $rows([[8, 1700000000], [9, 1700000000]], $t['ts']),
+            'since'  => [1700000000, 7],
+            'expect' => [1700000000, 9],
+        ],
+        [
+            'name'   => 'empty page holds the cursor still, never resets it',
+            'rows'   => [],
+            'since'  => [1700000000, 9],
+            'expect' => [1700000000, 9],
+        ],
+        [
+            'name'   => 'empty first page stays at the origin',
+            'rows'   => [],
+            'since'  => [0, 0],
+            'expect' => [0, 0],
+        ],
+        [
+            // Matters most for get_user_activity: a learner who has never signed in
+            // carries ts 0, and must still advance the cursor rather than pin it.
+            'name'   => 'a zero timestamp still advances by id',
+            'rows'   => $rows([[41, 0], [42, 0]], $t['ts']),
+            'since'  => [0, 0],
+            'expect' => [0, 42],
+        ],
+    ];
+
+    echo "{$name} - cursor advance:\n";
+    foreach ($cases as $c) {
+        [$ts, $id] = $fn($c['rows'], $c['since'][0], $c['since'][1]);
+        $ok = ([$ts, $id] === $c['expect']);
+        printf("  %-58s %s\n", $c['name'], $ok
+            ? 'PASS'
+            : sprintf('FAIL (got [%d, %d], want [%d, %d])', $ts, $id, $c['expect'][0], $c['expect'][1]));
+        if (!$ok) {
+            $failed++;
+        }
     }
 }
 
-// The cursor is only correct if the SQL predicate is strictly lexicographic and
-// the ORDER BY matches it. Checked textually, because a keyset cursor paired with
-// an inclusive predicate is precisely the original bug.
+/* -- Part 2: the query shape ------------------------------------------- */
+
+// A correct advance is worthless if the SQL disagrees with it. Descending order with
+// a lower-bound cursor is unpageable however carefully the advance is written.
 echo "\nquery shape:\n";
-$checks = [
-    'strict > on timetaken'        => (bool) preg_match('/ea\.timetaken\s*>\s*:since\b/', $code),
-    'id tie-break on equal ts'     => (bool) preg_match('/ea\.timetaken\s*=\s*:sincets\s+AND\s+ea\.id\s*>\s*:sinceid/i', $code),
-    'no inclusive >= predicate'    => !preg_match('/ea\.timetaken\s*>=\s*:/', $code),
-    'ORDER BY matches the cursor'  => (bool) preg_match('/ORDER BY ea\.timetaken ASC, ea\.id ASC/i', $code),
-];
-foreach ($checks as $label => $ok) {
-    printf("  %-58s %s\n", $label, $ok ? 'PASS' : 'FAIL');
-    if (!$ok) {
-        $failed++;
+/**
+ * Strip comments before matching, so prose ABOUT a fixed bug is not mistaken for the
+ * bug itself. The first version of this check failed get_flagged_attempts because its
+ * own docblock explains that the old predicate was `timetaken >= :since`. A check
+ * that flags its own documentation is a check people switch off.
+ */
+$stripcomments = static function (string $php): string {
+    $out = '';
+    foreach (token_get_all($php) as $tok) {
+        if (is_array($tok)) {
+            if (in_array($tok[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                continue;
+            }
+            $out .= $tok[1];
+        } else {
+            $out .= $tok;
+        }
+    }
+    return $out;
+};
+
+foreach ($targets as $name => $t) {
+    $code = $stripcomments(file_get_contents($t['file']));
+    $ts = preg_quote($t['ts'], '/');
+    $checks = [
+        'ascending ORDER BY'        => (bool) preg_match('/ORDER BY [a-z]+\.' . $ts . ' ASC/i', $code),
+        'no DESC on the cursor col' => !preg_match('/ORDER BY [a-z]+\.' . $ts . ' DESC/i', $code),
+        'strict > lower bound'      => (bool) preg_match('/' . $ts . '\s*>\s*:since\b/', $code),
+        'id tie-break on equal ts'  => (bool) preg_match(
+            '/' . $ts . '\s*=\s*:sincets\s+AND\s+[a-z]+\.id\s*>\s*:sinceid/i',
+            $code
+        ),
+        'no inclusive >= predicate' => !preg_match('/' . $ts . '\s*>=\s*:/', $code),
+        'returns a cursor PAIR'     => (bool) preg_match("/'next_since_id'/", $code),
+        'no unresumable max_*'      => !preg_match("/'max_(lastaccess|timetaken)'\s*=>/", $code),
+    ];
+    foreach (($t['extra'] ?? []) as $label => $re) {
+        $checks[$label] = (bool) preg_match($re, $code);
+    }
+    echo "  {$name}:\n";
+    foreach ($checks as $label => $ok) {
+        printf("    %-28s %s\n", $label, $ok ? 'PASS' : 'FAIL');
+        if (!$ok) {
+            $failed++;
+        }
     }
 }
 
@@ -144,5 +224,5 @@ if ($failed) {
     echo "\nFAIL: {$failed} problem(s)\n";
     exit(1);
 }
-echo "\nPASS: cursor advances correctly, including a full page on one timestamp.\n";
+echo "\nPASS: both paging functions ascend, use a keyset predicate, and advance correctly.\n";
 exit(0);

@@ -46,6 +46,25 @@ use core_external\external_value;
  * on `moodle_userid`. Returning identity here would duplicate a system of record
  * for no benefit and widen what a leaked token exposes.
  *
+ * PAGING IS ASCENDING, AND THAT IS THE WHOLE POINT. The first version sorted
+ * `lastaccess DESC` and returned the highest timestamp as the continuation bound.
+ * That cannot work: page one holds the NEWEST users, so passing its maximum back as
+ * a lower bound filters out every older user and re-emits only those at the newest
+ * timestamp. The sweep either stops immediately or loops on the same rows, and the
+ * users it was meant to find are never returned. This is the same defect the
+ * sibling get_flagged_attempts shipped and had corrected; ordering by recency reads
+ * nicer and is simply incompatible with a resumable cursor.
+ *
+ * So: ascending `(lastaccess, id)` with a strictly lexicographic keyset predicate,
+ * matching the ORDER BY exactly. `lastaccess` is not unique — thousands of users can
+ * share a timestamp, and a whole page of them easily can — so the id is part of the
+ * cursor rather than a tiebreak afterthought.
+ *
+ * Users who have NEVER accessed the site (`lastaccess = 0`) are included from the
+ * origin cursor rather than filtered. "Enrolled but never signed in" is exactly the
+ * engagement signal this function exists to surface, and excluding them silently
+ * would hide the worst case.
+ *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -63,7 +82,11 @@ class get_user_activity extends external_api {
                 VALUE_DEFAULT, []
             ),
             'since' => new external_value(PARAM_INT,
-                'Only users whose lastaccess is at or after this timestamp (0 for all)', VALUE_DEFAULT, 0),
+                'Return users whose lastaccess is AFTER this timestamp (0 for all). Pass back next_since.',
+                VALUE_DEFAULT, 0),
+            'since_id' => new external_value(PARAM_INT,
+                'Tie-break within `since`: include users at that timestamp only if id is greater. Pass back next_since_id.',
+                VALUE_DEFAULT, 0),
             'limit' => new external_value(PARAM_INT,
                 'Maximum users to return (capped at 1000)', VALUE_DEFAULT, 500),
             'includecourses' => new external_value(PARAM_BOOL,
@@ -72,19 +95,42 @@ class get_user_activity extends external_api {
     }
 
     /**
+     * Advance the paging cursor past a page of rows.
+     *
+     * Pure and static so the ordering bug this replaces is testable without a Moodle
+     * bootstrap — see tests/static/check_cursor_advance.php. Rows arrive ordered by
+     * (lastaccess, id); the cursor is the LAST row's pair, because a timestamp alone
+     * cannot separate rows that share it.
+     *
+     * @param array $rows Rows in query order, each with ->id and ->lastaccess.
+     * @param int $sincets Current cursor timestamp, returned unchanged when empty.
+     * @param int $sinceid Current cursor id, returned unchanged when empty.
+     * @return array{0:int,1:int} [next_since, next_since_id]
+     */
+    public static function next_cursor(array $rows, int $sincets, int $sinceid): array {
+        if (empty($rows)) {
+            return [$sincets, $sinceid];
+        }
+        $last = end($rows);
+        return [(int) $last->lastaccess, (int) $last->id];
+    }
+
+    /**
      * @param array $userids        Restrict to these user ids.
-     * @param int   $since          Lower bound on lastaccess.
+     * @param int   $since          Exclusive lower bound on lastaccess.
+     * @param int   $sinceid        Tie-break id within $since.
      * @param int   $limit          Maximum users.
      * @param bool  $includecourses Include per-course last access.
      * @return array
      */
-    public static function execute(array $userids = [], int $since = 0, int $limit = 500,
-            bool $includecourses = false): array {
+    public static function execute(array $userids = [], int $since = 0, int $sinceid = 0,
+            int $limit = 500, bool $includecourses = false): array {
         global $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'userids'        => $userids,
             'since'          => $since,
+            'since_id'       => $sinceid,
             'limit'          => $limit,
             'includecourses' => $includecourses,
         ]);
@@ -93,12 +139,17 @@ class get_user_activity extends external_api {
         self::validate_context($systemcontext);
         require_capability('local/completionhistory:viewall', $systemcontext);
 
-        $since = max(0, (int) $params['since']);
-        $limit = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
-        $ids   = array_values(array_unique(array_map('intval', $params['userids'])));
+        $since   = max(0, (int) $params['since']);
+        $sinceid = max(0, (int) $params['since_id']);
+        $limit   = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
+        $ids     = array_values(array_unique(array_map('intval', $params['userids'])));
 
-        // Guests and deleted users are not learners and would only add noise.
-        $where  = ['u.deleted = 0', 'u.username <> :guest'];
+        // Guests, deleted accounts and UNCONFIRMED accounts are not learners.
+        // Unconfirmed matters: abandoned self-registrations would otherwise enter the
+        // SIS activity feed as real people who have simply never been active, which is
+        // indistinguishable from an enrolled student who never signed in — the one
+        // signal this function exists to surface.
+        $where = ['u.deleted = 0', 'u.confirmed = 1', 'u.username <> :guest'];
         $sqlparams = ['guest' => 'guest'];
 
         if ($ids) {
@@ -106,19 +157,19 @@ class get_user_activity extends external_api {
             $where[] = "u.id {$insql}";
             $sqlparams += $inparams;
         }
-        if ($since > 0) {
-            // Strictly at-or-after, and only users who have ever accessed: a
-            // lastaccess of 0 means "never signed in", which is information, but not
-            // information that belongs in a "changed since" page.
-            $where[] = 'u.lastaccess >= :since AND u.lastaccess > 0';
-            $sqlparams['since'] = $since;
-        }
+
+        // Keyset cursor, strictly lexicographic, matching the ORDER BY exactly. From
+        // the origin (0, 0) this admits every user including those with lastaccess = 0.
+        $where[] = '(u.lastaccess > :since OR (u.lastaccess = :sincets AND u.id > :sinceid))';
+        $sqlparams['since']   = $since;
+        $sqlparams['sincets'] = $since;
+        $sqlparams['sinceid'] = $sinceid;
 
         $users = $DB->get_records_sql(
             'SELECT u.id, u.firstaccess, u.lastaccess, u.lastlogin, u.currentlogin, u.suspended
                FROM {user} u
               WHERE ' . implode(' AND ', $where) . '
-           ORDER BY u.lastaccess DESC, u.id ASC',
+           ORDER BY u.lastaccess ASC, u.id ASC',
             $sqlparams,
             0,
             $limit
@@ -143,9 +194,7 @@ class get_user_activity extends external_api {
         }
 
         $out = [];
-        $maxseen = $since;
         foreach ($users as $u) {
-            $maxseen = max($maxseen, (int) $u->lastaccess);
             $out[] = [
                 'userid'       => (int) $u->id,
                 'firstaccess'  => (int) ($u->firstaccess ?? 0),
@@ -158,11 +207,16 @@ class get_user_activity extends external_api {
             ];
         }
 
+        // Advances past every row SCANNED, so a page that yields nothing useful still
+        // moves forward instead of being re-read on the next call.
+        [$nextsince, $nextsinceid] = self::next_cursor($users, $since, $sinceid);
+
         return [
-            'users'          => $out,
-            'count'          => count($out),
-            'max_lastaccess' => $maxseen,
-            'truncated'      => count($out) >= $limit,
+            'users'         => $out,
+            'count'         => count($out),
+            'next_since'    => $nextsince,
+            'next_since_id' => $nextsinceid,
+            'truncated'     => count($out) >= $limit,
         ];
     }
 
@@ -185,11 +239,12 @@ class get_user_activity extends external_api {
                         VALUE_OPTIONAL
                     ),
                 ]),
-                'Users, most recently active first'
+                'Users, LEAST recently active first — ascending, so the cursor is resumable'
             ),
-            'count'          => new external_value(PARAM_INT,  'Users returned'),
-            'max_lastaccess' => new external_value(PARAM_INT,  'Highest lastaccess seen; pass back as `since`'),
-            'truncated'      => new external_value(PARAM_BOOL, 'True when more users remain beyond this page'),
+            'count'         => new external_value(PARAM_INT,  'Users returned'),
+            'next_since'    => new external_value(PARAM_INT,  'Pass back as `since` on the next call'),
+            'next_since_id' => new external_value(PARAM_INT,  'Pass back as `since_id` on the next call'),
+            'truncated'     => new external_value(PARAM_BOOL, 'True when more users remain beyond this page'),
         ]);
     }
 }
