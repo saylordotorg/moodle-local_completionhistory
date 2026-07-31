@@ -52,10 +52,20 @@ class get_user_inprogress_courses extends external_api {
 
         // Started = actively enrolled + has a course last-access row; in
         // progress = started AND not completed.
+        //
+        // ACTIVE means more than status = 0. An enrolment carries its own window, and
+        // status alone treats a not-yet-started or already-expired enrolment as
+        // current — so a course the learner cannot open would have been reported as in
+        // progress, and the SIS makes teach-out and pacing decisions on this answer.
+        // The timestart/timeend predicates mirror Moodle's own active-enrolment logic
+        // (0 means unbounded on either end).
+        $now = time();
         $sql = "SELECT DISTINCT c.id, c.idnumber, c.shortname, c.fullname
                   FROM {course} c
                   JOIN {enrol} e ON e.courseid = c.id AND e.status = 0
                   JOIN {user_enrolments} ue ON ue.enrolid = e.id AND ue.userid = :uid1 AND ue.status = 0
+                       AND (ue.timestart = 0 OR ue.timestart <= :now1)
+                       AND (ue.timeend = 0 OR ue.timeend > :now2)
                   JOIN {user_lastaccess} la ON la.courseid = c.id AND la.userid = :uid2
                  WHERE c.id <> :siteid
                    AND NOT EXISTS (
@@ -66,6 +76,8 @@ class get_user_inprogress_courses extends external_api {
             'uid1'   => $params['userid'],
             'uid2'   => $params['userid'],
             'uid3'   => $params['userid'],
+            'now1'   => $now,
+            'now2'   => $now,
             'siteid' => SITEID,
         ]);
 

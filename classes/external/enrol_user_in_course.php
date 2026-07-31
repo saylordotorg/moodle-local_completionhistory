@@ -89,7 +89,20 @@ class enrol_user_in_course extends external_api {
             }
         }
 
-        $studentroleid = (int) ($DB->get_field('role', 'id', ['shortname' => 'student']) ?: 5);
+        // Resolved by shortname, and a FAILURE if there is no such role. The previous
+        // `?: 5` fell back to a database-specific numeric id: on a site with customised
+        // roles, id 5 may be an unrelated role or none at all, so the endpoint would
+        // report a successful student enrolment while granting the wrong permissions —
+        // or none. Reporting success for an enrolment that did not grant student access
+        // is worse than refusing, because nobody goes looking.
+        $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+        if ($studentroleid <= 0) {
+            throw new \moodle_exception(
+                'No role with shortname "student" exists on this site, so the learner cannot be '
+                . 'enrolled with student permissions. Create or rename the role, or tell the SIS which '
+                . 'role to use.'
+            );
+        }
         enrol_get_plugin('manual')->enrol_user($instance, $user->id, $studentroleid, time(), 0, ENROL_USER_ACTIVE);
 
         return ['ok' => true, 'courseid' => (int) $course->id, 'already' => false, 'warning' => $warning];
