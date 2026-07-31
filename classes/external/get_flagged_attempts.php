@@ -53,9 +53,19 @@ use local_completionhistory\local\flag_service;
  * user_timecreated in particular yields a function that appears to work and
  * simply never reports one of the five flag types.
  *
- * Paging is by `since` on timetaken rather than by offset. An offset walk over a
- * table that is still being appended to skips rows, and skipping a flagged exam
+ * Paging is a keyset cursor on (timetaken, id), not an offset. An offset walk over
+ * a table that is still being appended to skips rows, and skipping a flagged exam
  * attempt is the one outcome this must not have.
+ *
+ * The id is part of the cursor because timetaken alone is NOT unique. It has
+ * one-second resolution, so simultaneous submissions — or a bulk import like
+ * cli/normalize_exam_attempts.php — can easily put more than one page of rows on a
+ * single timestamp. The first version used an inclusive `timetaken >= :since`,
+ * which in that situation returns the same lowest ids forever: `truncated` stays
+ * true, the caller keeps calling, and every attempt after the first page on that
+ * timestamp is never reached. The predicate is now strictly lexicographic —
+ * `timetaken > :since OR (timetaken = :since AND id > :since_id)` — matching the
+ * ORDER BY exactly.
  *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
@@ -66,10 +76,37 @@ class get_flagged_attempts extends external_api {
     /** Hard ceiling on rows per call, whatever the caller asks for. */
     private const MAX_LIMIT = 500;
 
+    /**
+     * Advance the paging cursor past a page of rows.
+     *
+     * Pure and static so the case that broke the first version can actually be
+     * tested without a Moodle bootstrap — see
+     * tests/static/check_cursor_advance.php.
+     *
+     * Rows arrive ordered by (timetaken, id). The cursor is the LAST row's pair
+     * rather than max(timetaken), because a timestamp alone cannot separate rows
+     * that share it.
+     *
+     * @param array $rows Rows in query order, each with ->id and ->timetaken.
+     * @param int   $sincets Current cursor timestamp, returned unchanged when empty.
+     * @param int   $sinceid Current cursor id, returned unchanged when empty.
+     * @return array{0:int,1:int} [next_since, next_since_id]
+     */
+    public static function next_cursor(array $rows, int $sincets, int $sinceid): array {
+        if (empty($rows)) {
+            return [$sincets, $sinceid];
+        }
+        $last = end($rows);
+        return [(int) $last->timetaken, (int) $last->id];
+    }
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'since' => new external_value(PARAM_INT,
-                'Return attempts taken at or after this Unix timestamp (0 for all)', VALUE_DEFAULT, 0),
+                'Return attempts taken AFTER this Unix timestamp (0 for all). Pass back next_since.', VALUE_DEFAULT, 0),
+            'since_id' => new external_value(PARAM_INT,
+                'Tie-break within `since`: return attempts with this timestamp only if id is greater. Pass back next_since_id.',
+                VALUE_DEFAULT, 0),
             'limit' => new external_value(PARAM_INT,
                 'Maximum attempts to scan (capped at 500)', VALUE_DEFAULT, 200),
             'onlyflagged' => new external_value(PARAM_BOOL,
@@ -78,16 +115,19 @@ class get_flagged_attempts extends external_api {
     }
 
     /**
-     * @param int  $since       Unix timestamp lower bound on timetaken.
+     * @param int  $since       Exclusive lower bound on timetaken.
+     * @param int  $sinceid     Tie-break id within $since.
      * @param int  $limit       Maximum attempts to scan.
      * @param bool $onlyflagged Omit unflagged attempts.
      * @return array
      */
-    public static function execute(int $since = 0, int $limit = 200, bool $onlyflagged = true): array {
+    public static function execute(int $since = 0, int $sinceid = 0, int $limit = 200,
+            bool $onlyflagged = true): array {
         global $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'since'       => $since,
+            'since_id'    => $sinceid,
             'limit'       => $limit,
             'onlyflagged' => $onlyflagged,
         ]);
@@ -98,8 +138,9 @@ class get_flagged_attempts extends external_api {
         // carries names and email addresses.
         require_capability('local/completionhistory:viewall', $systemcontext);
 
-        $since = max(0, (int) $params['since']);
-        $limit = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
+        $since   = max(0, (int) $params['since']);
+        $sinceid = max(0, (int) $params['since_id']);
+        $limit   = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
 
         // Every field flag_service::matches() reads must be present — see the note
         // in the class docblock. u.timecreated is aliased to user_timecreated
@@ -128,24 +169,35 @@ class get_flagged_attempts extends external_api {
                   FROM {local_completionhistory_exam_attempt} ea
              LEFT JOIN {user} u   ON u.id = ea.userid
              LEFT JOIN {course} c ON c.id = ea.courseid
-                 WHERE ea.timetaken >= :since
+                 WHERE ea.timetaken > :since
+                    OR (ea.timetaken = :sincets AND ea.id > :sinceid)
               ORDER BY ea.timetaken ASC, ea.id ASC";
 
-        $rows = $DB->get_records_sql($sql, ['since' => $since], 0, $limit);
+        $rows = $DB->get_records_sql(
+            $sql,
+            ['since' => $since, 'sincets' => $since, 'sinceid' => $sinceid],
+            0,
+            $limit
+        );
 
         // The duplicate-account check memoises per name key across a request; reset
         // so one call cannot inherit a cached answer from an earlier page.
         flag_service::reset_cache();
 
-        $out      = [];
-        $scanned  = 0;
-        $maxseen  = $since;
+        $out     = [];
+        $scanned = 0;
+        // Counted separately from $out because with onlyflagged=false $out also
+        // holds unflagged attempts, and `flagged` is documented as the number with
+        // at least one flag. Deriving it from count($out) inflated it.
+        $flaggedcount = 0;
 
         foreach ($rows as $row) {
             $scanned++;
-            $maxseen = max($maxseen, (int) $row->timetaken);
 
             $matches = flag_service::evaluate($row);
+            if (!empty($matches)) {
+                $flaggedcount++;
+            }
             if ($onlyflagged && empty($matches)) {
                 continue;
             }
@@ -185,24 +237,30 @@ class get_flagged_attempts extends external_api {
             ];
         }
 
+        // Cursor advances past every row SCANNED, not merely those returned, so a
+        // page of entirely unflagged attempts still moves forward instead of being
+        // re-scanned on every call.
+        [$nextsince, $nextsinceid] = self::next_cursor($rows, $since, $sinceid);
+
         return [
-            'scanned'   => $scanned,
-            'flagged'   => count($out),
-            // The caller passes this back as `since` next time. Reported even when
-            // nothing was flagged, so a sweep that finds nothing still advances.
-            'max_timetaken' => $maxseen,
+            'scanned'       => $scanned,
+            'flagged'       => $flaggedcount,
+            // Pass both back as `since` / `since_id` on the next call.
+            'next_since'    => $nextsince,
+            'next_since_id' => $nextsinceid,
             // True when the scan filled its page, so the caller knows to continue
             // rather than assuming it has seen everything.
-            'truncated' => $scanned >= $limit,
-            'attempts'  => $out,
+            'truncated'     => $scanned >= $limit,
+            'attempts'      => $out,
         ];
     }
 
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'scanned'       => new external_value(PARAM_INT, 'Attempts examined'),
-            'flagged'       => new external_value(PARAM_INT, 'Attempts returned with at least one flag'),
-            'max_timetaken' => new external_value(PARAM_INT, 'Highest timetaken seen; pass back as `since`'),
+            'flagged'       => new external_value(PARAM_INT, 'Attempts with at least one flag (independent of onlyflagged)'),
+            'next_since'    => new external_value(PARAM_INT, 'Pass back as `since` on the next call'),
+            'next_since_id' => new external_value(PARAM_INT, 'Pass back as `since_id` on the next call'),
             'truncated'     => new external_value(PARAM_BOOL, 'True when more attempts remain beyond this page'),
             'attempts'      => new external_multiple_structure(
                 new external_single_structure([
