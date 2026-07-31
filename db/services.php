@@ -81,6 +81,16 @@ $functions = [
         'ajax'         => true,
         'capabilities' => 'local/completionhistory:manage',
     ],
+    // Proctoring flags for the SIS exam-review queue. The plugin evaluates these
+    // rules at render time only, so without this the matches exist nowhere the SIS
+    // can see them (SIS-69).
+    'local_completionhistory_get_flagged_attempts' => [
+        'classname'    => 'local_completionhistory\external\get_flagged_attempts',
+        'description'  => 'Exam attempts matching the configured system flags (SIS exam-review case queue).',
+        'type'         => 'read',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:viewall',
+    ],
 ];
 
 $services = [
@@ -94,6 +104,7 @@ $services = [
             'local_completionhistory_mark_outbox_sent',
             'local_completionhistory_provision_applicant',
             'local_completionhistory_set_password',
+            'local_completionhistory_get_flagged_attempts',
         ],
         'restrictedusers' => 1,
         'enabled'         => 0,
