@@ -48,11 +48,21 @@ use stdClass;
  * also let the observer become idempotent; it is not added here because it needs a schema
  * upgrade, and this service is useful without one. That is a known trade, not an oversight.
  *
- * ORDER MATTERS. record_attempt() derives attempt_number from a COUNT of existing rows on
- * the track, so inserting out of order produces attempt numbers that do not match the
- * order the student actually sat the exams. Attempts are therefore processed oldest-first
- * per learner, and a backfill that runs after some attempts are already recorded continues
- * the existing numbering rather than restarting it.
+ * ORDER MATTERS, AND ORDERING THE INSERTS IS NOT ENOUGH. record_attempt() derives
+ * attempt_number from a COUNT of existing rows on the track, so it can only ever append.
+ * Processing candidates oldest-first is necessary but not sufficient: if the observer has
+ * already recorded a POST-configuration attempt, every older backfilled attempt is
+ * appended AFTER it. A 2026 attempt recorded live stays number 1 while backfilled 2024 and
+ * 2025 attempts become 2 and 3 — the sequence exposed to the SIS, and to any
+ * attempts-exhausted display, is then in the wrong order entirely.
+ *
+ * An earlier version of this docblock described that behaviour as "continues the existing
+ * numbering", as though appending were the intent. It is the defect.
+ *
+ * So after inserting, every touched (userid, courseid, exam_track) sequence is RENUMBERED
+ * by (timetaken, id). That is what makes attempt_number mean "the Nth exam this learner
+ * sat on this track" rather than "the Nth row we happened to write". It also repairs a
+ * sequence corrupted by an earlier run.
  *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
@@ -201,6 +211,56 @@ class exam_backfill_service {
     }
 
     /**
+     * Renumber one (userid, courseid, exam_track) sequence chronologically.
+     *
+     * attempt_number must mean "the Nth exam this learner sat on this track", not "the Nth
+     * row we happened to write". record_attempt() can only append, so any insert of an
+     * attempt older than an existing row leaves the sequence wrong; this is the step that
+     * makes the ordering true regardless of insertion order.
+     *
+     * Ordered by (timetaken, id) — the id breaks ties because two attempts can, in
+     * principle, share a submission second across different quizzes on one track.
+     *
+     * Rows already holding the right number are left alone, so the return value is the
+     * number of rows this actually had to move.
+     *
+     * @param int    $userid
+     * @param int    $courseid
+     * @param string $track
+     * @param bool   $dryrun Count what would change without writing.
+     * @return int Rows whose attempt_number was (or would be) corrected.
+     */
+    public static function renumber_group(int $userid, int $courseid, string $track, bool $dryrun = false): int {
+        global $DB;
+
+        // A recordSET, not get_records_sql: that keys its array by the first selected
+        // column and would silently collapse a learner's rows into one.
+        $rs = $DB->get_recordset_sql(
+            "SELECT id, attempt_number, timetaken
+               FROM {local_completionhistory_exam_attempt}
+              WHERE userid = :userid AND courseid = :courseid AND exam_track = :track
+           ORDER BY timetaken, id",
+            ['userid' => $userid, 'courseid' => $courseid, 'track' => $track]
+        );
+
+        $expected = 0;
+        $changed = 0;
+        foreach ($rs as $row) {
+            $expected++;
+            if ((int) $row->attempt_number !== $expected) {
+                $changed++;
+                if (!$dryrun) {
+                    $DB->set_field('local_completionhistory_exam_attempt',
+                        'attempt_number', $expected, ['id' => $row->id]);
+                }
+            }
+        }
+        $rs->close();
+
+        return $changed;
+    }
+
+    /**
      * Back-fill the candidates.
      *
      * @param bool     $dryrun   Report without writing.
@@ -208,7 +268,7 @@ class exam_backfill_service {
      * @param int|null $userid   Restrict to one user.
      * @param int      $limit    0 for no limit.
      * @param callable|null $log Called with a message per candidate when verbose.
-     * @return array{scanned:int,recorded:int,skipped:int,nograde:int,rows:array}
+     * @return array{scanned:int,recorded:int,skipped:int,nograde:int,renumbered:int,sequences:int,rows:array}
      */
     public static function run(
         bool $dryrun = true,
@@ -223,6 +283,10 @@ class exam_backfill_service {
         $skipped = 0;
         $nograde = 0;
         $rows = [];
+        // Every (userid, courseid, track) this run inserted into. Renumbered afterwards,
+        // because record_attempt can only APPEND and an older attempt inserted after a
+        // newer one would otherwise carry a higher number than the exam it preceded.
+        $touched = [];
 
         foreach ($candidates as $row) {
             $scanned++;
@@ -288,15 +352,40 @@ class exam_backfill_service {
                     $duration
                 );
             }
+            $touched[(int) $row->userid . '|' . (int) $row->courseid . '|' . $track] = [
+                (int) $row->userid, (int) $row->courseid, $track,
+            ];
             $recorded++;
         }
 
+        // Make attempt_number chronological for every sequence this run wrote into. Also
+        // repairs a sequence an earlier run left out of order.
+        //
+        // In a DRY RUN this figure means something different and weaker, so it must not be
+        // presented as a prediction: the candidate rows have not been inserted, so what it
+        // measures is disorder ALREADY present in the table, not the disorder the inserts
+        // would introduce. That cannot be predicted without simulating the writes.
+        $renumbered = 0;
+        foreach ($touched as [$u, $c, $t]) {
+            $moved = self::renumber_group($u, $c, $t, $dryrun);
+            $renumbered += $moved;
+            if ($moved > 0 && $log) {
+                $log($dryrun
+                    ? sprintf('note  user=%d course=%d %s: %d existing row(s) already out of '
+                        . 'chronological order (pre-insert)', $u, $c, $t, $moved)
+                    : sprintf('renum user=%d course=%d %s: %d row(s) moved into chronological order',
+                        $u, $c, $t, $moved));
+            }
+        }
+
         return [
-            'scanned'  => $scanned,
-            'recorded' => $recorded,
-            'skipped'  => $skipped,
-            'nograde'  => $nograde,
-            'rows'     => $rows,
+            'scanned'    => $scanned,
+            'recorded'   => $recorded,
+            'skipped'    => $skipped,
+            'nograde'    => $nograde,
+            'renumbered' => $renumbered,
+            'sequences'  => count($touched),
+            'rows'       => $rows,
         ];
     }
 }

@@ -144,6 +144,17 @@ cli_writeln(sprintf('%s: %d', $commit ? 'recorded' : 'would record', $result['re
 cli_writeln(sprintf('skipped:  %d (already recorded, or no submission time)', $result['skipped']));
 cli_writeln(sprintf('no grade: %d of those recorded had no usable grade (stored as null, not zero)',
     $result['nograde']));
+cli_writeln(sprintf('sequences touched: %d', $result['sequences']));
+if ($commit) {
+    // record_attempt can only APPEND, so an attempt older than one the observer already
+    // recorded would otherwise sit after it. Renumbering is what makes attempt_number mean
+    // "the Nth exam this learner sat" instead of "the Nth row we wrote".
+    cli_writeln(sprintf('renumbered: %d row(s) moved into chronological order', $result['renumbered']));
+} else {
+    cli_writeln(sprintf('already out of order: %d existing row(s) — NOT a prediction of what the',
+        $result['renumbered']));
+    cli_writeln('           inserts would need, which cannot be known without performing them');
+}
 
 if (!$commit && $result['recorded'] > 0) {
     cli_writeln('');
