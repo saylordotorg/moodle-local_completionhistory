@@ -88,6 +88,15 @@ $targets = [
             'does not page on raw timemodified' =>
                 '/^(?!.*gg\.timemodified\s*>\s*:since).*$/s',
             'withholds instructor feedback' => '/^(?!.*gg\.feedback).*$/s',
+            // Every field execute() can set to null must be declared NULL_ALLOWED, and
+            // must NOT be declared merely VALUE_OPTIONAL. The two are different and are
+            // easily confused: VALUE_OPTIONAL says the KEY may be absent, NULL_ALLOWED says
+            // the VALUE may be null. Only the second is true here — the keys are always
+            // supplied. A review read the original declaration as rejecting nulls, which it
+            // did not (NULL_ALLOWED is the constructor default), but the loose contract was
+            // what made that reading possible.
+            'nullable returns are NULL_ALLOWED' => '/NULL_ALLOWED/',
+            'no VALUE_OPTIONAL in returns'      => '/^(?!.*VALUE_OPTIONAL).*$/s',
         ],
     ],
 ];
