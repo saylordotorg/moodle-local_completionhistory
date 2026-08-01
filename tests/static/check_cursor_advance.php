@@ -73,6 +73,32 @@ $targets = [
             'excludes deleted'     => '/u\.deleted\s*=\s*0/',
         ],
     ],
+    'get_grade_items' => [
+        'file' => $root . '/classes/external/get_grade_items.php',
+        'ts'   => 'changed_at',
+        // This cursor key is a COMPUTED expression held in the $changed PHP variable,
+        // not a table-qualified column, because Moodle leaves grade_grades.timemodified
+        // NULL on a large share of rows — 834 of 3,170 on dev, with timecreated null too
+        // and BOTH null on those 834. Paging on the raw column would mis-order or skip a
+        // quarter of the table, so the source is matched against the expression.
+        'tsre' => '\{\$changed\}',
+        'extra' => [
+            'cursor coalesces null timestamps' =>
+                "/\\\$changed\s*=\s*'COALESCE\(gg\.timemodified, gg\.timecreated, 0\)'/",
+            'does not page on raw timemodified' =>
+                '/^(?!.*gg\.timemodified\s*>\s*:since).*$/s',
+            'withholds instructor feedback' => '/^(?!.*gg\.feedback).*$/s',
+            // Every field execute() can set to null must be declared NULL_ALLOWED, and
+            // must NOT be declared merely VALUE_OPTIONAL. The two are different and are
+            // easily confused: VALUE_OPTIONAL says the KEY may be absent, NULL_ALLOWED says
+            // the VALUE may be null. Only the second is true here — the keys are always
+            // supplied. A review read the original declaration as rejecting nulls, which it
+            // did not (NULL_ALLOWED is the constructor default), but the loose contract was
+            // what made that reading possible.
+            'nullable returns are NULL_ALLOWED' => '/NULL_ALLOWED/',
+            'no VALUE_OPTIONAL in returns'      => '/^(?!.*VALUE_OPTIONAL).*$/s',
+        ],
+    ],
 ];
 
 foreach ($targets as $name => $t) {
@@ -195,10 +221,13 @@ $stripcomments = static function (string $php): string {
 
 foreach ($targets as $name => $t) {
     $code = $stripcomments(file_get_contents($t['file']));
-    $ts = preg_quote($t['ts'], '/');
+    // A cursor key is usually a table-qualified column. get_grade_items keys on a computed
+    // COALESCE held in a PHP variable, so it supplies its own source pattern via `tsre`;
+    // the qualifier is therefore part of $ts rather than hardcoded into each regex.
+    $ts = $t['tsre'] ?? ('[a-z]+\.' . preg_quote($t['ts'], '/'));
     $checks = [
-        'ascending ORDER BY'        => (bool) preg_match('/ORDER BY [a-z]+\.' . $ts . ' ASC/i', $code),
-        'no DESC on the cursor col' => !preg_match('/ORDER BY [a-z]+\.' . $ts . ' DESC/i', $code),
+        'ascending ORDER BY'        => (bool) preg_match('/ORDER BY ' . $ts . ' ASC/i', $code),
+        'no DESC on the cursor col' => !preg_match('/ORDER BY ' . $ts . ' DESC/i', $code),
         'strict > lower bound'      => (bool) preg_match('/' . $ts . '\s*>\s*:since\b/', $code),
         'id tie-break on equal ts'  => (bool) preg_match(
             '/' . $ts . '\s*=\s*:sincets\s+AND\s+[a-z]+\.id\s*>\s*:sinceid/i',
@@ -224,5 +253,6 @@ if ($failed) {
     echo "\nFAIL: {$failed} problem(s)\n";
     exit(1);
 }
-echo "\nPASS: both paging functions ascend, use a keyset predicate, and advance correctly.\n";
+printf("\nPASS: all %d paging functions ascend, use a keyset predicate, and advance correctly.\n",
+    count($targets));
 exit(0);
