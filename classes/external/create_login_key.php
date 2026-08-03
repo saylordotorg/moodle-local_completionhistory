@@ -50,12 +50,17 @@ use core_external\external_value;
  *   student clicking twice cannot leave a spare valid key behind them.
  *
  * WHAT THIS FUNCTION IS, PLAINLY. Anyone holding a token with local/completionhistory:manage
- * can obtain a browser session as any student on this site. That is a real escalation over
- * the other sixteen functions in this service, which only read and write records, and it is
- * why the service definition marks it 'write' and refuses AJAX. It is NOT mitigated by
- * taking an email instead of a user id — a caller can name any email as easily as any id —
- * so the parameter is the user id, which is what the SIS session authoritatively holds and
- * what avoids a second lookup that could resolve to the wrong person.
+ * can obtain a browser session as any NON-PRIVILEGED user on this site. That is a real
+ * escalation over the other sixteen functions in this service, which only read and write
+ * records, and it is why the service definition marks it 'write' and refuses AJAX. It is NOT
+ * mitigated by taking an email instead of a user id — a caller can name any email as easily
+ * as any id — so the parameter is the user id, which is what the SIS session authoritatively
+ * holds and what avoids a second lookup that could resolve to the wrong person.
+ *
+ * The word "non-privileged" is doing real work there. An earlier version accepted any user
+ * id at all, which meant a leaked service token could name an administrator and be handed an
+ * administrator session — a service credential escalating to full site control. Site admins
+ * and accounts holding site:config / role:assign / user:loginas are now refused outright.
  *
  * The thing that actually constrains it is the caller: the SIS route passes only the
  * `uid` claim from the student's own signed session, never a value from the request body.
@@ -119,6 +124,25 @@ class create_login_key extends external_api {
         }
         if ($user->auth === 'nologin' || !is_enabled_auth($user->auth)) {
             return ['key' => '', 'expiresin' => 0, 'warning' => 'This account cannot sign in.'];
+        }
+
+        // PRIVILEGED ACCOUNTS ARE NOT VALID TARGETS. Without this, a token holding
+        // local/completionhistory:manage could name an administrator's user id and receive
+        // a browser session as them — turning a restricted service credential into a full
+        // administrator login. That is a categorically different power from the record
+        // access the rest of this service grants, and nothing about "student SSO" implies it.
+        //
+        // Checked by CAPABILITY rather than by role name, because a site can call its
+        // administrative role anything. The three below are the ones that let an account
+        // grant itself more: change site configuration, hand out roles, or log in as
+        // someone else. An account with any of them is not a learner.
+        if (is_siteadmin($user->id)) {
+            return ['key' => '', 'expiresin' => 0, 'warning' => 'This account is not eligible for single sign-on.'];
+        }
+        foreach (['moodle/site:config', 'moodle/role:assign', 'moodle/user:loginas'] as $capability) {
+            if (has_capability($capability, $systemcontext, $user->id)) {
+                return ['key' => '', 'expiresin' => 0, 'warning' => 'This account is not eligible for single sign-on.'];
+            }
         }
 
         // At most one live key per user. Two clicks must not leave a spare behind.

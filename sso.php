@@ -58,43 +58,93 @@ $PAGE->set_url(new moodle_url('/local/completionhistory/sso.php'));
 
 $destination = new moodle_url($wantsurl !== '' ? $wantsurl : '/my/');
 
-// FAILING HERE IS ORDINARY, NOT SUSPICIOUS. validate_user_key throws on an unknown,
-// expired, wrong-script or wrong-IP key, and the IP check in particular fires for honest
-// reasons: a dual-stack browser can reach the SIS over IPv6 and Moodle over IPv4, and a
-// phone can change address between the click and the redirect.
-//
-// So the failure path sends them to the login form CARRYING THE SAME DESTINATION, and the
-// worst case becomes "type your password, still land in your course" instead of a Moodle
-// error page. Nothing is granted on this path — it is the login form, not a session — so
-// degrading gracefully costs no safety. The specific reason goes to the developer log
-// rather than to the student, who cannot act on "ipmismatch".
-try {
-    $key = validate_user_key($keyvalue, create_login_key::SCRIPT, null);
-} catch (moodle_exception $e) {
-    debugging('local_completionhistory SSO key rejected: ' . $e->errorcode, DEBUG_DEVELOPER);
+/**
+ * Send an unauthenticated visitor to the login form, keeping where they were going.
+ *
+ * THE DESTINATION MUST GO IN THE SESSION, not in the query string. Moodle's login flow
+ * reads `$SESSION->wantsurl`; login/index.php only honours a `wantsurl` PARAMETER when
+ * BEHAT_SITE_RUNNING is defined, so on a real site the obvious
+ * `/login/index.php?wantsurl=...` is silently ignored and the student lands on the
+ * dashboard after signing in. The redirect looked right, and lost the course.
+ */
+function local_completionhistory_sso_send_to_login(moodle_url $destination, string $reason): void {
+    global $SESSION;
+    debugging('local_completionhistory SSO key rejected: ' . $reason, DEBUG_DEVELOPER);
+    $SESSION->wantsurl = $destination->out(false);
     redirect(
-        new moodle_url('/login/index.php', ['wantsurl' => $destination->out(false)]),
+        new moodle_url('/login/index.php'),
         get_string('sso_linkexpired', 'local_completionhistory'),
         null,
         \core\output\notification::NOTIFY_INFO
     );
 }
 
-$user = $DB->get_record('user', ['id' => $key->userid, 'deleted' => 0], '*', MUST_EXIST);
+/**
+ * CLAIM THE KEY UNDER A LOCK, so "single use" survives two simultaneous requests.
+ *
+ * validate_user_key() then delete_user_key() is a read followed by a write, and nothing
+ * joins them. Two requests presenting the same key from the same permitted address can
+ * both pass validation before either deletes, and both then get a session — which defeats
+ * the guarantee in exactly the replay scenario it exists to stop. A stolen key is most
+ * likely to be replayed immediately, so the race is the attack, not a curiosity.
+ *
+ * Moodle's lock API rather than SELECT ... FOR UPDATE: it is portable across database
+ * families, whereas the SQL is not. The lock is named for the key VALUE, so it serialises
+ * only the requests actually contending for the same key.
+ *
+ * The wait is short. A holder of this lock does a lookup and a delete, nothing more, and a
+ * caller that cannot get in within a couple of seconds is better told to log in than left
+ * waiting on a key that has 60 seconds to live.
+ */
+$lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_sso');
+$lock = $lockfactory->get_lock('key_' . $keyvalue, 2);
+if (!$lock) {
+    local_completionhistory_sso_send_to_login($destination, 'lock unavailable');
+}
 
-// SPEND THE KEY BEFORE ANYTHING ELSE CAN FAIL. If deletion came after the login, then a
-// failure in between would leave the key alive for the rest of its minute — having
-// already been used once, and having already appeared in a URL. Deleting first means the
-// worst case is a student who has to click again.
-delete_user_key(create_login_key::SCRIPT, $user->id);
+try {
+    // Throws on an unknown, expired, wrong-script or wrong-IP key.
+    $key = validate_user_key($keyvalue, create_login_key::SCRIPT, null);
+    $user = $DB->get_record('user', ['id' => $key->userid, 'deleted' => 0], '*', MUST_EXIST);
+
+    // SPENT INSIDE THE LOCK, and before anything else can fail. If deletion came after the
+    // login, a failure in between would leave the key alive for the rest of its minute —
+    // having already been used once, and having already appeared in a URL. Deleting here
+    // means the worst case is a student who has to click again, and it means the second of
+    // two concurrent requests finds nothing to validate.
+    delete_user_key(create_login_key::SCRIPT, $user->id);
+} catch (moodle_exception $e) {
+    // FAILING HERE IS ORDINARY, NOT SUSPICIOUS. The IP check in particular fires for honest
+    // reasons: a dual-stack browser can reach the SIS over IPv6 and Moodle over IPv4, and a
+    // phone can change address between the click and the redirect. So this degrades to the
+    // login form carrying the same destination — "type your password, still land in your
+    // course" — rather than to an error page. Nothing is granted on that path, so degrading
+    // gracefully costs no safety. The specific reason goes to the developer log rather than
+    // to the student, who cannot act on "ipmismatch".
+    //
+    // Note the key is NOT deleted on this path: burning a key that failed its IP check
+    // would let anyone holding a stolen copy deny the legitimate student their own link.
+    $lock->release();
+    local_completionhistory_sso_send_to_login($destination, $e->errorcode ?? 'invalidkey');
+}
+
+// Held only for the claim. Everything below — the eligibility re-checks, the login, the
+// event — concerns a key that is already deleted, so no other request can be contending.
+$lock->release();
 
 // Re-checked at USE time, not only at mint time. A minute is short, but an account
 // suspended or an auth method disabled in between must not still be walked through this
 // door by a key issued before it happened. is_enabled_auth covers the case where an
 // administrator turns off a whole auth plugin — the front door would refuse them, and so
 // does this one.
+// is_siteadmin is repeated from the mint deliberately. It is the check whose failure is
+// worst — a service token escalating to an administrator session — and a key minted before
+// the mint-side check existed, or by any future caller that forgets it, still has to get
+// past this door. Cheap, and it makes the guarantee a property of the endpoint rather than
+// of every caller remembering.
 if (!empty($user->suspended) || empty($user->confirmed)
-        || $user->auth === 'nologin' || !is_enabled_auth($user->auth)) {
+        || $user->auth === 'nologin' || !is_enabled_auth($user->auth)
+        || is_siteadmin($user->id)) {
     throw new moodle_exception('invaliduser', 'error');
 }
 
