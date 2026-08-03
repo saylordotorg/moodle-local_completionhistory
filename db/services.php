@@ -102,6 +102,13 @@ $functions = [
     ],
     // Login and last-access timestamps, which are a different question from
     // academic activity and could not be answered at all before (SIS-43).
+    'local_completionhistory_get_grade_items' => [
+        'classname'    => 'local_completionhistory\external\get_grade_items',
+        'description'  => 'Per-grade-item grades for SIS grade ingestion (SIS-42). Authorised alternative to the core gradereport_user_get_grade_items, which the SIS token cannot call.',
+        'type'         => 'read',
+        'ajax'         => true,
+        'capabilities' => 'local/completionhistory:viewall',
+    ],
     'local_completionhistory_get_user_activity' => [
         'classname'    => 'local_completionhistory\\external\\get_user_activity',
         'description'  => 'Login and last-access timestamps for learners (SIS engagement / last-login reporting).',
@@ -167,6 +174,7 @@ $services = [
             'local_completionhistory_get_flagged_attempts',
             'local_completionhistory_list_courses',
             'local_completionhistory_get_user_activity',
+            'local_completionhistory_get_grade_items',
             'local_completionhistory_list_programs',
             'local_completionhistory_get_user_inprogress_courses',
             'local_completionhistory_enrol_user_in_course',
