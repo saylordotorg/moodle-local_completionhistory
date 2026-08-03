@@ -137,6 +137,20 @@ $functions = [
         'ajax'         => true,
         'capabilities' => 'local/completionhistory:manage',
     ],
+    // The one function here that can produce a LOGGED-IN BROWSER SESSION rather than
+    // just data. 'write' rather than 'read' for that reason, even though it writes only
+    // a key: the type is what an administrator reads when deciding what a token can do,
+    // and calling this a read would understate it (SIS-29).
+    'local_completionhistory_create_login_key' => [
+        'classname'    => 'local_completionhistory\external\create_login_key',
+        'description'  => 'Mint a single-use, IP-bound, 60-second key that logs one student into Moodle in a browser (SIS "Open in Moodle" deep links).',
+        'type'         => 'write',
+        // Not callable from page JavaScript. An AJAX-exposed login-key minter would be
+        // reachable with any logged-in user's session cookie, which is a different and
+        // much larger attack surface than a server-to-server token.
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:manage',
+    ],
 ];
 
 $services = [
@@ -157,6 +171,7 @@ $services = [
             'local_completionhistory_get_user_inprogress_courses',
             'local_completionhistory_enrol_user_in_course',
             'local_completionhistory_set_program_deadline',
+            'local_completionhistory_create_login_key',
         ],
         'restrictedusers' => 1,
         'enabled'         => 0,

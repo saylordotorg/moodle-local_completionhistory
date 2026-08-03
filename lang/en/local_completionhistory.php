@@ -32,6 +32,12 @@ $string['completionhistory:manage']          = 'Manage achievement history';
 $string['completionhistory:managecoursemap'] = 'Manage course replacement mappings';
 $string['completionhistory:runbackfill']     = 'Run achievement backfill';
 
+// Events.
+$string['event_sso_login'] = 'Signed in from the SIS with a single-use key';
+
+// Single sign-on (SIS-29).
+$string['sso_linkexpired'] = 'That sign-in link has expired or was already used. Please sign in and you will be taken where you were going.';
+
 // Settings.
 $string['setting_enabled']               = 'Enable plugin';
 $string['setting_enabled_desc']          = 'Enable or disable the Completion History plugin.';
