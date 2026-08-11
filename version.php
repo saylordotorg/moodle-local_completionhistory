@@ -32,7 +32,7 @@ $plugin->component = 'local_completionhistory';
 // Ahead of main's 2026080100 (SIS-42, 0.4.0), which is what makes this merge an upgrade
 // rather than a no-op. Moodle only runs the upgrade when this number INCREASES, so taking
 // main's side here would have merged the function and registered nothing.
-$plugin->version   = 2026080301;
+$plugin->version   = 2026081100;
 $plugin->requires  = 2024100700; // Moodle 4.5.
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.4.2';
+$plugin->release   = '0.4.3';
