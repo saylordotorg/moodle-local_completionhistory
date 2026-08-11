@@ -81,6 +81,16 @@ $functions = [
         'ajax'         => true,
         'capabilities' => 'local/completionhistory:manage',
     ],
+    // Six contact fields and nothing else, so the SIS never needs core_user_update_users —
+    // which could also change auth, password, username and roles (SIS-33). Privileged
+    // accounts are refused, matching create_login_key.
+    'local_completionhistory_update_user_profile' => [
+        'classname'    => 'local_completionhistory\external\update_user_profile',
+        'description'  => 'Apply a SIS profile correction to whitelisted Moodle contact fields, by email.',
+        'type'         => 'write',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:manage',
+    ],
     // Proctoring flags for the SIS exam-review queue. The plugin evaluates these
     // rules at render time only, so without this the matches exist nowhere the SIS
     // can see them (SIS-69).
@@ -180,6 +190,7 @@ $services = [
             'local_completionhistory_enrol_user_in_course',
             'local_completionhistory_set_program_deadline',
             'local_completionhistory_create_login_key',
+            'local_completionhistory_update_user_profile',
         ],
         'restrictedusers' => 1,
         'enabled'         => 0,
