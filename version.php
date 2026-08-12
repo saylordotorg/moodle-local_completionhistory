@@ -32,7 +32,11 @@ $plugin->component = 'local_completionhistory';
 // Ahead of main's 2026080100 (SIS-42, 0.4.0), which is what makes this merge an upgrade
 // rather than a no-op. Moodle only runs the upgrade when this number INCREASES, so taking
 // main's side here would have merged the function and registered nothing.
-$plugin->version   = 2026081100;
+// Bumped again for the user_graded observer. Same rule as the note above, for the same reason:
+// Moodle caches the observer list from db/events.php in MUC and rebuilds it on upgrade, so until
+// this number increases the new observer sits in the file and never fires. A grade corrected after
+// completion would go on going nowhere, and nothing would look broken.
+$plugin->version   = 2026081200;
 $plugin->requires  = 2024100700; // Moodle 4.5.
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.4.3';
+$plugin->release   = '0.4.4';
