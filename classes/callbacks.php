@@ -34,6 +34,15 @@ use local_completionhistory\hook\course_completions_purged;
 class callbacks {
 
     /**
+     * Decimal places `local_completionhistory_achievement.grade_decimal` actually stores.
+     *
+     * Mirrors `DECIMALS="5"` on that field in db/install.xml. Comparing a stored grade to a fresh
+     * gradebook read needs a tolerance, and the only defensible one is the column's own precision:
+     * anything finer is comparing noise the database cannot hold.
+     */
+    private const GRADE_DECIMALS = 5;
+
+    /**
      * Observer for \core\event\course_completed.
      *
      * Captures an immutable achievement record when a user completes a course.
@@ -404,17 +413,16 @@ class callbacks {
         // Only an existing ledger row can be corrected. Newest first, so a course completed more than
         // once has its most recent record corrected rather than an older one.
         //
-        // THE WHOLE ROW, not the four columns this method writes. `build_achievement_payload` reads
-        // every snapshot field straight off the record it is handed and coalesces anything absent to
-        // '' or 0 rather than loading it — so a partial select would have published a correction with
-        // an empty `ledgeruuid`, which is the key the SIS matches on, and blanked the student's name,
-        // email and course idnumber on the way through.
+        // THIS READ ONLY DECIDES WHETHER THERE IS WORK TO DO — it is never the row that gets written,
+        // and it is not what the outbox payload is built from. Both of those happen inside the
+        // transaction, from a row read there; see apply_grade_correction. So the four columns the
+        // decision needs are all it selects.
         $rows = $DB->get_records_select(
             'local_completionhistory_achievement',
             'userid = :userid AND courseid = :courseid',
             ['userid' => $userid, 'courseid' => $courseid],
             'completiontime DESC, id DESC',
-            '*',
+            'id, completiontime, grade_decimal, grade_passed',
             0,
             1
         );
@@ -433,26 +441,132 @@ class callbacks {
         // NOTHING TO DO WHEN NOTHING CHANGED. Moodle recalculates and re-fires this event freely —
         // saving one gradebook page can emit it for every enrolled user — so an unconditional write
         // would enqueue a sync per event and re-send an identical grade on every recalculation.
-        $samegrade = (string) $achievement->grade_decimal === (string) $snapshot->finalgrade;
-        $samepassed = (string) $achievement->grade_passed === (string) $snapshot->passed;
-        if ($samegrade && $samepassed) {
+        if (!self::grade_differs($achievement, $snapshot)) {
             return;
         }
 
-        $achievement->grade_decimal = $snapshot->finalgrade;
-        $achievement->grade_passed = $snapshot->passed;
-        $achievement->grade_source = 'gradebook';
-
-        // The update and the outbox row commit together, so the SIS is never left unaware of a
-        // correction the ledger has already accepted. Same reasoning as capture_achievement.
+        // EVERYTHING BELOW RE-READS AND RE-DECIDES INSIDE THE TRANSACTION. The row above was loaded
+        // to decide whether there is anything to do; it must not be the row that gets written. See
+        // apply_grade_correction.
         $transaction = $DB->start_delegated_transaction();
         try {
-            $DB->update_record('local_completionhistory_achievement', $achievement);
-            outbox_service::enqueue_achievement($achievement);
+            $enqueued = self::apply_grade_correction((int) $achievement->id, $snapshot);
             $transaction->allow_commit();
         } catch (\Throwable $e) {
             $transaction->rollback($e);
             throw $e;
         }
+
+        // AFTER the commit, so a rolled-back attempt cannot complain about transport.
+        //
+        // `enqueue_achievement` returns 0 when `enableoutbox` is off, which is the SHIPPED DEFAULT,
+        // and the outbox is the only channel a correction can travel on: `get_recent_achievements`
+        // pages on `timecreated > :since`, and a correction deliberately preserves `timecreated` so
+        // the ledger row keeps the identity of the completion it came from. So with the outbox
+        // disabled the ledger is corrected and the SIS is never told. That is a real gap in the pull
+        // contract rather than something to paper over here — tracked as SIS-125 — but it must at
+        // least be audible instead of silent. Raised in developer mode only: on a site that has
+        // deliberately left the outbox off, this would otherwise be noise on every regrade.
+        if ($enqueued === 0) {
+            debugging(
+                'local_completionhistory: corrected the stored grade for achievement '
+                . (int) $achievement->id . ' but could not queue it for the SIS because the '
+                . '"enableoutbox" setting is off. The timestamp pull endpoint cannot see corrections '
+                . '(it filters on timecreated, which a correction preserves), so this change will not '
+                . 'reach the SIS until the outbox is enabled.',
+                DEBUG_DEVELOPER
+            );
+        }
+    }
+
+    /**
+     * Has the course total actually moved?
+     *
+     * COMPARED AS NUMBERS AT THE COLUMN'S OWN PRECISION, not as strings. `grade_decimal` is
+     * `number(10,5)`, and Moodle's database layer hands a numeric column back as a padded decimal
+     * STRING — '88.50000' — while `grade_snapshot_service::get_course_total` casts the gradebook
+     * value to a float, whose string form is '88.5'. The first version of this compared
+     * `(string) $a->grade_decimal === (string) $snapshot->finalgrade`, so two numerically identical
+     * grades never matched and the guard above inverted into its opposite: every subsequent course
+     * total event rewrote the row and appended another outbox message, which is precisely the
+     * flood the guard exists to prevent. It passed the behavioural harness only because the fixture
+     * held PHP floats rather than the strings a real read returns. Found in review on PR #8.
+     *
+     * `grade_passed` is compared as a nullable int so that NULL (never captured) stays distinct
+     * from 0 (captured as a fail) — under the old string cast both became ''.
+     *
+     * @param \stdClass $a        The stored achievement row.
+     * @param \stdClass $snapshot The current gradebook total.
+     * @return bool
+     */
+    private static function grade_differs(\stdClass $a, \stdClass $snapshot): bool {
+        // Half a unit in the last place the column can actually store.
+        $epsilon = 0.5 * (10 ** -self::GRADE_DECIMALS);
+
+        $stored = $a->grade_decimal === null ? null : (float) $a->grade_decimal;
+        $fresh = (float) $snapshot->finalgrade;
+        if ($stored === null || abs($stored - $fresh) >= $epsilon) {
+            return true;
+        }
+
+        $storedpassed = $a->grade_passed === null ? null : (int) $a->grade_passed;
+        $freshpassed = $snapshot->passed === null ? null : (int) $snapshot->passed;
+        return $storedpassed !== $freshpassed;
+    }
+
+    /**
+     * Write the correction and queue it, deciding again from a row read inside the transaction.
+     *
+     * WHY THE ROW IS RE-READ AND ONLY FOUR COLUMNS ARE WRITTEN. `update_record` writes every
+     * property present on the object it is given, and the row used for the decision above was read
+     * BEFORE the transaction opened. If anything else mutated that row in between, passing the
+     * stale copy back would silently revert it — and the mutation that matters is
+     * `ledger_service::anonymize_users()`, which sets `userid = 0` and NULLs
+     * `useridnumber_snapshot`, `firstname_snapshot`, `lastname_snapshot`, `email_snapshot`,
+     * `artifacturl` and `artifactstorage` when a user is deleted. A regrade landing in that window
+     * would have restored a deleted student's identity AND published it to the SIS through the
+     * outbox payload. Found in review on PR #8.
+     *
+     * So: re-read, refuse if the row is gone or has been anonymized, write only the grade columns,
+     * and build the outbox payload from a row read back after the write — never from the copy this
+     * method was reasoning about.
+     *
+     * @param int       $id       Achievement id.
+     * @param \stdClass $snapshot The gradebook total to store.
+     * @return int Outbox row id, or 0 when nothing was queued.
+     */
+    private static function apply_grade_correction(int $id, \stdClass $snapshot): int {
+        global $DB;
+
+        $current = $DB->get_record('local_completionhistory_achievement', ['id' => $id]);
+        if (!$current) {
+            // Deleted between the read and here — a purge, most likely. Nothing to correct.
+            return 0;
+        }
+        if ((int) $current->userid === 0) {
+            // Anonymized while this observer was deciding. The student has been deleted; correcting
+            // and re-publishing their grade is not something to do on the way past.
+            return 0;
+        }
+        if (!self::grade_differs($current, $snapshot)) {
+            // Another event already applied it. Not an error, and not worth a second outbox row.
+            return 0;
+        }
+
+        // Only the grade. Every other column stays exactly as the row currently holds it.
+        $DB->update_record('local_completionhistory_achievement', (object) [
+            'id' => $id,
+            'grade_decimal' => $snapshot->finalgrade,
+            'grade_passed' => $snapshot->passed,
+            'grade_source' => 'gradebook',
+        ]);
+
+        // Read back rather than reusing $current: the payload must describe what is now stored,
+        // and build_achievement_payload reads the snapshot fields straight off whatever it is given.
+        $stored = $DB->get_record('local_completionhistory_achievement', ['id' => $id]);
+        if (!$stored) {
+            return 0;
+        }
+        return outbox_service::enqueue_achievement($stored);
     }
 }
