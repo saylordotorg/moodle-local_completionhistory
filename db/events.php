@@ -29,6 +29,22 @@ $observers = [
         'eventname' => '\core\event\course_completed',
         'callback'  => '\local_completionhistory\callbacks::course_completed',
     ],
+    /*
+     * A GRADE CORRECTED AFTER COMPLETION USED TO GO NOWHERE.
+     *
+     * `course_completed` fires once and snapshots the gradebook total at that moment. Nothing
+     * observed a later change, so a teacher regrading an exam left the SIS -- and therefore the
+     * student's record page and any transcript printed from it -- showing the original figure for
+     * ever. `reconcile_ledger` did not save it either: `backfill_service` is insert-only and counts
+     * an existing row as `skipped`, so it fills gaps and never revises.
+     *
+     * Only the COURSE TOTAL is acted on; see the callback. Reacting to every activity grade would
+     * enqueue a sync per quiz question edit.
+     */
+    [
+        'eventname' => '\core\event\user_graded',
+        'callback'  => '\local_completionhistory\callbacks::user_graded',
+    ],
     [
         'eventname' => '\core\event\course_deleted',
         'callback'  => '\local_completionhistory\callbacks::course_deleted',

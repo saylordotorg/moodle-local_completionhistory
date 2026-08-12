@@ -20,6 +20,8 @@ use local_completionhistory\local\ledger_service;
 use local_completionhistory\local\exam_attempt_service;
 use local_completionhistory\local\course_config_service;
 use local_completionhistory\local\artifact_service;
+use local_completionhistory\local\grade_snapshot_service;
+use local_completionhistory\local\outbox_service;
 use local_completionhistory\hook\course_completions_purged;
 
 /**
@@ -343,5 +345,114 @@ class callbacks {
                 'purged_completion_ids' => $hook->purgedids,
             ])
         );
+    }
+
+    /**
+     * A course grade changed after the completion was already recorded.
+     *
+     * WHAT THIS CLOSES. `course_completed` snapshots the gradebook total once, at the moment
+     * completion fires. Nothing observed a later change, so a teacher regrading an exam left the SIS
+     * — and the student's record page, and any transcript printed from it — showing the original
+     * figure indefinitely. `reconcile_ledger` did not help: `backfill_service` is insert-only and
+     * counts an existing row as skipped, so it fills gaps and never revises one.
+     *
+     * THE COURSE TOTAL ONLY. `user_graded` fires for every grade item — each quiz, each assignment —
+     * and the SIS holds one grade per completed course, taken from the course total. Acting on the
+     * others would enqueue a sync per marked question and could overwrite the course figure with an
+     * activity's.
+     *
+     * ONLY FOR AN ALREADY-LEDGERED COMPLETION. With no ledger row there is nothing to correct: the
+     * course is not complete, and `course_completed` will capture the grade when it becomes so. That
+     * also keeps this observer silent for the ordinary case of marking coursework in progress.
+     *
+     * REVISES THE LEDGER ROW RATHER THAN ADDING ONE. A second row for one completion would make the
+     * ledger contradict itself, and the SIS keys on `ledgeruuid`, so a correction has to travel under
+     * the same identity. `source_event_hash` is deliberately untouched: the row's identity is still
+     * the completion it came from, and rewriting it would let the backfill later insert a duplicate
+     * for that same completion.
+     *
+     * @param \core\event\user_graded $event
+     */
+    public static function user_graded(\core\event\user_graded $event): void {
+        if (!get_config('local_completionhistory', 'enabled')) {
+            return;
+        }
+        // The same switch that governs whether a grade was ever snapshotted. With grade capture off
+        // the ledger holds no grade to correct.
+        if (!get_config('local_completionhistory', 'capturegrades')) {
+            return;
+        }
+
+        global $DB;
+
+        $userid = (int) $event->relateduserid;
+        $courseid = (int) $event->courseid;
+        if ($userid <= 0 || $courseid <= 0) {
+            return;
+        }
+
+        // The course total, or nothing at all.
+        $itemid = (int) ($event->other['itemid'] ?? 0);
+        if ($itemid <= 0) {
+            return;
+        }
+        $item = $DB->get_record('grade_items', ['id' => $itemid], 'id, courseid, itemtype');
+        if (!$item || $item->itemtype !== 'course' || (int) $item->courseid !== $courseid) {
+            return;
+        }
+
+        // Only an existing ledger row can be corrected. Newest first, so a course completed more than
+        // once has its most recent record corrected rather than an older one.
+        //
+        // THE WHOLE ROW, not the four columns this method writes. `build_achievement_payload` reads
+        // every snapshot field straight off the record it is handed and coalesces anything absent to
+        // '' or 0 rather than loading it — so a partial select would have published a correction with
+        // an empty `ledgeruuid`, which is the key the SIS matches on, and blanked the student's name,
+        // email and course idnumber on the way through.
+        $rows = $DB->get_records_select(
+            'local_completionhistory_achievement',
+            'userid = :userid AND courseid = :courseid',
+            ['userid' => $userid, 'courseid' => $courseid],
+            'completiontime DESC, id DESC',
+            '*',
+            0,
+            1
+        );
+        $achievement = $rows ? reset($rows) : null;
+        if (!$achievement) {
+            return;
+        }
+
+        $snapshot = grade_snapshot_service::get_course_total($userid, $courseid);
+        if ($snapshot === null) {
+            // The total was cleared rather than changed. Left alone deliberately: erasing a grade a
+            // student has already been told they earned is not a correction to make unattended.
+            return;
+        }
+
+        // NOTHING TO DO WHEN NOTHING CHANGED. Moodle recalculates and re-fires this event freely —
+        // saving one gradebook page can emit it for every enrolled user — so an unconditional write
+        // would enqueue a sync per event and re-send an identical grade on every recalculation.
+        $samegrade = (string) $achievement->grade_decimal === (string) $snapshot->finalgrade;
+        $samepassed = (string) $achievement->grade_passed === (string) $snapshot->passed;
+        if ($samegrade && $samepassed) {
+            return;
+        }
+
+        $achievement->grade_decimal = $snapshot->finalgrade;
+        $achievement->grade_passed = $snapshot->passed;
+        $achievement->grade_source = 'gradebook';
+
+        // The update and the outbox row commit together, so the SIS is never left unaware of a
+        // correction the ledger has already accepted. Same reasoning as capture_achievement.
+        $transaction = $DB->start_delegated_transaction();
+        try {
+            $DB->update_record('local_completionhistory_achievement', $achievement);
+            outbox_service::enqueue_achievement($achievement);
+            $transaction->allow_commit();
+        } catch (\Throwable $e) {
+            $transaction->rollback($e);
+            throw $e;
+        }
     }
 }
