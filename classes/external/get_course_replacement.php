@@ -42,8 +42,8 @@ class get_course_replacement extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
+        \local_completionhistory\local\security::require_enabled();
         require_capability('local/completionhistory:viewown', $systemcontext);
-
         $mapping = replacement_service::get_replacement($params['courseid']);
 
         if (!$mapping) {

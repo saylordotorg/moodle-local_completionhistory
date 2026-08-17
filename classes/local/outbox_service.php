@@ -71,7 +71,7 @@ class outbox_service {
         $row = new stdClass();
         $row->entitytype  = $entitytype;
         $row->entityid    = $entityid;
-        $row->payloadjson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $row->payloadjson = self::encode_payload($payload);
         $row->status      = self::STATUS_PENDING;
         $row->retrycount  = 0;
         $row->lasterror   = null;
@@ -79,6 +79,70 @@ class outbox_service {
         $row->timemodified = $now;
 
         return (int) $DB->insert_record('local_completionhistory_outbox', $row);
+    }
+
+    /**
+     * Rewrite queued copies after their source achievements are anonymized.
+     *
+     * @param int[] $achievementids Achievement ids.
+     * @return int Number of outbox rows rewritten.
+     */
+    public static function anonymize_achievement_payloads(array $achievementids): int {
+        global $DB;
+
+        $achievementids = array_values(array_unique(array_filter(
+            array_map('intval', $achievementids),
+            fn($id) => $id > 0
+        )));
+        if (!$achievementids) {
+            return 0;
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($achievementids, SQL_PARAMS_NAMED, 'achievement');
+        $params['entitytype'] = self::ENTITY_ACHIEVEMENT;
+        $rows = $DB->get_records_select(
+            'local_completionhistory_outbox',
+            "entitytype = :entitytype AND entityid {$insql}",
+            $params,
+            'id ASC'
+        );
+
+        $payloads = [];
+        $updated = 0;
+        foreach ($rows as $row) {
+            $entityid = (int) $row->entityid;
+            if (!array_key_exists($entityid, $payloads)) {
+                $achievement = $DB->get_record('local_completionhistory_achievement', ['id' => $entityid]);
+                $payloads[$entityid] = $achievement ? self::build_achievement_payload($achievement) : null;
+            }
+            if ($payloads[$entityid] === null) {
+                continue;
+            }
+
+            $DB->update_record('local_completionhistory_outbox', (object) [
+                'id' => $row->id,
+                'payloadjson' => self::encode_payload($payloads[$entityid]),
+                // Remote errors can echo identifiers from a rejected payload.
+                'lasterror' => null,
+                'timemodified' => time(),
+            ]);
+            $updated++;
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Encode a payload without silently storing false on invalid UTF-8.
+     *
+     * @param array $payload Payload.
+     * @return string
+     */
+    private static function encode_payload(array $payload): string {
+        return json_encode(
+            $payload,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+        );
     }
 
     /**
@@ -110,9 +174,17 @@ class outbox_service {
      * @return array
      */
     public static function build_achievement_payload(stdClass $a): array {
-        global $DB;
+        global $CFG, $DB;
 
         $artifactstorage = (string) ($a->artifactstorage ?? '');
+
+        // The setting may be unset (fresh install before upgrade stamps the default)
+        // or blanked by an admin; either way the payload must still say where it
+        // came from, so fall back to the site URL at build time.
+        $sourcesite = trim((string) get_config('local_completionhistory', 'sourcesite'));
+        if ($sourcesite === '') {
+            $sourcesite = (string) $CFG->wwwroot;
+        }
 
         $programs = [];
         if (!empty($a->id)) {
@@ -151,6 +223,7 @@ class outbox_service {
             'artifactcode'    => artifact_service::certificate_code_from_storage($artifactstorage),
             'sourcecomponent' => (string) ($a->source_component ?? ''),
             'sourceevent'     => (string) ($a->source_event ?? ''),
+            'sourcesite'      => $sourcesite,
             'timecreated'     => (int) ($a->timecreated ?? 0),
             'programs'        => $programs,
         ];
@@ -190,7 +263,7 @@ class outbox_service {
             return 0;
         }
         if (!in_array($status, [self::STATUS_SENT, self::STATUS_FAILED, self::STATUS_CANCELLED], true)) {
-            $status = self::STATUS_SENT;
+            throw new \invalid_parameter_exception('Unknown outbox status.');
         }
 
         [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED);

@@ -162,22 +162,25 @@ class callbacks {
 
         $userid = (int) $event->objectid;
 
-        // Always log the deletion as audit.
+        $anonymize = (bool) get_config('local_completionhistory', 'gdpranonymize');
+
+        // Always log the deletion as audit. Do not reintroduce a direct user id
+        // into the audit table when this event is also anonymizing the records.
         if (get_config('local_completionhistory', 'enablepurgeaudit')) {
             $count = $DB->count_records('local_completionhistory_achievement', ['userid' => $userid]);
             ledger_service::record_purge_audit(
-                $userid,
+                $anonymize ? 0 : $userid,
                 null,
                 'user_deleted',
                 json_encode([
                     'achievement_rows_affected' => $count,
-                    'anonymized' => (bool) get_config('local_completionhistory', 'gdpranonymize'),
+                    'anonymized' => $anonymize,
                 ])
             );
         }
 
         // Anonymize if configured.
-        if (get_config('local_completionhistory', 'gdpranonymize')) {
+        if ($anonymize) {
             ledger_service::anonymize_users([$userid]);
         }
     }

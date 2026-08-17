@@ -128,17 +128,31 @@ class course_mappings_table extends table_sql {
             'id' => $row->id,
         ]);
         $deleteurl = new moodle_url('/local/completionhistory/course_mappings.php', [
-            'action' => 'delete',
-            'id' => $row->id,
-            'sesskey' => sesskey(),
         ]);
 
         $actions = html_writer::link($editurl, get_string('edit'), ['class' => 'btn btn-sm btn-secondary mr-1']);
-        $actions .= html_writer::link($deleteurl, get_string('delete'), [
-            'class' => 'btn btn-sm btn-danger',
-            'onclick' => "return confirm('" . get_string('confirmdeletemapping', 'local_completionhistory') . "');",
+        $actions .= html_writer::start_tag('form', [
+            'method' => 'post',
+            'action' => $deleteurl->out(false),
+            'class' => 'd-inline',
         ]);
-
+        $actions .= html_writer::empty_tag('input', [
+            'type' => 'hidden', 'name' => 'action', 'value' => 'delete',
+        ]);
+        $actions .= html_writer::empty_tag('input', [
+            'type' => 'hidden', 'name' => 'id', 'value' => (int) $row->id,
+        ]);
+        $actions .= html_writer::empty_tag('input', [
+            'type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey(),
+        ]);
+        $actions .= html_writer::tag('button', get_string('delete'), [
+            'type' => 'submit',
+            'class' => 'btn btn-sm btn-danger',
+            'onclick' => 'return confirm(' . json_encode(
+                get_string('confirmdeletemapping', 'local_completionhistory')
+            ) . ');',
+        ]);
+        $actions .= html_writer::end_tag('form');
         return $actions;
     }
 }

@@ -27,7 +27,6 @@ use local_completionhistory\local\ledger_service;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_completionhistory\callbacks
  */
 class observer_test extends advanced_testcase {
 
@@ -124,6 +123,9 @@ class observer_test extends advanced_testcase {
         $this->assertNull($record->artifacturl);
         // Course snapshot preserved.
         $this->assertNotEmpty($record->coursename_snapshot);
+
+        $audit = $DB->get_record('local_completionhistory_purge_audit', ['reason' => 'user_deleted'], '*', MUST_EXIST);
+        $this->assertEquals(0, $audit->userid);
     }
 
     /**

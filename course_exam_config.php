@@ -24,8 +24,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$dir = dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'] ?? __DIR__)));
-require($dir . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_login();
 
 use local_completionhistory\local\course_config_service;
@@ -48,7 +47,11 @@ $PAGE->set_heading(get_string('courseexamconfig', 'local_completionhistory'));
 $PAGE->set_pagelayout('admin');
 
 // ── Handle form save ─────────────────────────────────────────────────────────
-if ($action === 'save' && confirm_sesskey()) {
+if ($action === 'save') {
+    if (!data_submitted()) {
+        throw new moodle_exception('invalidrequest');
+    }
+    require_sesskey();
     $cid = required_param('courseid', PARAM_INT);
 
     $config                           = new stdClass();
@@ -73,7 +76,11 @@ if ($action === 'save' && confirm_sesskey()) {
 }
 
 // ── Handle delete ─────────────────────────────────────────────────────────────
-if ($action === 'delete' && $courseid && confirm_sesskey()) {
+if ($action === 'delete' && $courseid) {
+    if (!data_submitted()) {
+        throw new moodle_exception('invalidrequest');
+    }
+    require_sesskey();
     course_config_service::delete_config($courseid);
     redirect(
         new moodle_url('/local/completionhistory/course_exam_config.php'),
@@ -107,7 +114,7 @@ if ($action === 'edit') {
 
     $type_options = course_config_service::type_labels();
 
-    $formurl = new moodle_url('/local/completionhistory/course_exam_config.php', ['action' => 'save', 'sesskey' => sesskey()]);
+    $formurl = new moodle_url('/local/completionhistory/course_exam_config.php', ['action' => 'save']);
     $listurl = new moodle_url('/local/completionhistory/course_exam_config.php');
 
     echo html_writer::start_tag('form', ['method' => 'post', 'action' => $formurl->out(false), 'id' => 'exam-config-form']);
@@ -121,7 +128,9 @@ if ($action === 'edit') {
     echo html_writer::tag('label', get_string('course'), ['class' => 'col-sm-3 col-form-label font-weight-bold', 'for' => 'courseid_input']);
     echo html_writer::start_div('col-sm-9');
     if ($courseid) {
-        echo html_writer::tag('p', format_string($course->fullname) . ' (' . $course->shortname . ')', ['class' => 'form-control-plaintext']);
+        echo html_writer::tag('p', format_string($course->fullname) . ' (' . s($course->shortname) . ')', [
+            'class' => 'form-control-plaintext',
+        ]);
         echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]);
     } else {
         echo html_writer::empty_tag('input', [
@@ -295,8 +304,7 @@ if (empty($configs)) {
 
         $editurl   = new moodle_url('/local/completionhistory/course_exam_config.php',
             ['action' => 'edit',   'courseid' => $cfg->courseid]);
-        $deleteurl = new moodle_url('/local/completionhistory/course_exam_config.php',
-            ['action' => 'delete', 'courseid' => $cfg->courseid, 'sesskey' => sesskey()]);
+        $deleteurl = new moodle_url('/local/completionhistory/course_exam_config.php');
 
         $quiz_name = function(?int $qid) use ($DB): string {
             if (!$qid) return '—';
@@ -315,7 +323,7 @@ if (empty($configs)) {
         ];
         $badge_cls = $type_badge_map[$cfg->course_type] ?? 'secondary';
         $type_html = html_writer::tag('span',
-            $type_labels[$cfg->course_type] ?? $cfg->course_type,
+            s($type_labels[$cfg->course_type] ?? $cfg->course_type),
             ['class' => "badge badge-{$badge_cls}"]
         );
 
@@ -327,12 +335,30 @@ if (empty($configs)) {
         echo html_writer::tag('td', $quiz_name($cfg->dc_quizid));
         echo html_writer::tag('td', $quiz_name($cfg->cert_quizid));
         echo html_writer::tag('td', $attempts_summary);
-        echo html_writer::tag('td',
-            html_writer::link($editurl->out(false), get_string('edit'), ['class' => 'btn btn-sm btn-outline-primary mr-1']) .
-            html_writer::link($deleteurl->out(false), get_string('delete'),
-                ['class' => 'btn btn-sm btn-outline-danger',
-                 'onclick' => "return confirm('" . get_string('examconfig_confirmdelete', 'local_completionhistory') . "')"])
-        );
+        $actions = html_writer::link($editurl->out(false), get_string('edit'), [
+            'class' => 'btn btn-sm btn-outline-primary mr-1',
+        ]);
+        $actions .= html_writer::start_tag('form', [
+            'method' => 'post', 'action' => $deleteurl->out(false), 'class' => 'd-inline',
+        ]);
+        $actions .= html_writer::empty_tag('input', [
+            'type' => 'hidden', 'name' => 'action', 'value' => 'delete',
+        ]);
+        $actions .= html_writer::empty_tag('input', [
+            'type' => 'hidden', 'name' => 'courseid', 'value' => (int) $cfg->courseid,
+        ]);
+        $actions .= html_writer::empty_tag('input', [
+            'type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey(),
+        ]);
+        $actions .= html_writer::tag('button', get_string('delete'), [
+            'type' => 'submit',
+            'class' => 'btn btn-sm btn-outline-danger',
+            'onclick' => 'return confirm(' . json_encode(
+                get_string('examconfig_confirmdelete', 'local_completionhistory')
+            ) . ');',
+        ]);
+        $actions .= html_writer::end_tag('form');
+        echo html_writer::tag('td', $actions);
         echo html_writer::end_tag('tr');
     }
 

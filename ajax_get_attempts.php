@@ -31,8 +31,7 @@
 
 define('AJAX_SCRIPT', true);
 
-$dir = dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'] ?? __DIR__)));
-require($dir . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_login();
 
 use local_completionhistory\local\exam_attempt_service;
@@ -40,6 +39,10 @@ use local_completionhistory\local\course_config_service;
 
 $systemcontext = context_system::instance();
 require_capability('local/completionhistory:viewall', $systemcontext);
+
+if (!get_config('local_completionhistory', 'enabled')) {
+    throw new moodle_exception('plugindisabled', 'local_completionhistory');
+}
 
 $userid   = required_param('userid',   PARAM_INT);
 $courseid = required_param('courseid', PARAM_INT);

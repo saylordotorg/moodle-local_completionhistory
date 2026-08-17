@@ -215,7 +215,7 @@ class exam_attempts_table extends table_sql {
 
     public function col_exam_track($row): string {
         [$label, $cls] = self::TRACK_BADGE[$row->exam_track] ?? [$row->exam_track, 'badge-secondary'];
-        return html_writer::tag('span', $label, [
+        return html_writer::tag('span', s($label), [
             'class' => "badge {$cls}",
             'style' => 'font-size:0.82em',
         ]);

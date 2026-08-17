@@ -31,6 +31,11 @@ use core_external\external_value;
  */
 class get_user_achievements extends external_api {
 
+    /** Hard ceiling on rows per call. */
+    private const MAX_LIMIT = 500;
+
+    /** Prevent pathological deep offsets from causing expensive scans. */
+    private const MAX_OFFSET = 100000;
     /**
      * Parameters definition.
      */
@@ -56,6 +61,7 @@ class get_user_achievements extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
+        \local_completionhistory\local\security::require_enabled();
 
         // Access control.
         if ($params['userid'] == $USER->id) {
@@ -64,15 +70,17 @@ class get_user_achievements extends external_api {
             require_capability('local/completionhistory:viewall', $systemcontext);
         }
 
+        $limit = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
+        $offset = max(0, min(self::MAX_OFFSET, (int) $params['offset']));
+
         $achievements = $DB->get_records(
             'local_completionhistory_achievement',
             ['userid' => $params['userid']],
             'completiontime DESC',
             '*',
-            $params['offset'],
-            $params['limit']
+            $offset,
+            $limit
         );
-
         $result = [];
         foreach ($achievements as $a) {
             // Get associated programs.

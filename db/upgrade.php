@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 function xmldb_local_completionhistory_upgrade($oldversion) {
-    global $DB;
+    global $CFG, $DB;
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2026041701) {
@@ -199,6 +199,90 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
         }
 
         upgrade_plugin_savepoint(true, 2026041707, 'local', 'completionhistory');
+    }
+
+    if ($oldversion < 2026081700) {
+        // Replace enumerable hashes with site-keyed hashes. Retaining a stable
+        // deduplication key prevents later backfills from recreating anonymized rows.
+        $hashsecret = (string) get_config('local_completionhistory', 'hashsecret');
+        if (strlen($hashsecret) < 32) {
+            $hashsecret = bin2hex(random_bytes(32));
+            set_config('hashsecret', $hashsecret, 'local_completionhistory');
+        }
+        $lastid = 0;
+        do {
+            $records = $DB->get_records_select(
+                'local_completionhistory_achievement',
+                'id > :lastid',
+                ['lastid' => $lastid],
+                'id ASC',
+                'id, userid, courseid, completiontime, source_component, source_event_hash',
+                0,
+                1000
+            );
+            foreach ($records as $record) {
+                if ((int) $record->userid > 0) {
+                    $source = $record->userid . '|' . $record->courseid . '|' .
+                        $record->completiontime . '|' . $record->source_component;
+                } else {
+                    // The original userid is no longer available. Key the prior
+                    // unique digest so anonymous rows cannot collapse onto one
+                    // another when course and completion timestamps coincide.
+                    $source = 'anonymized|' . $record->source_event_hash;
+                }
+                $DB->set_field(
+                    'local_completionhistory_achievement',
+                    'source_event_hash',
+                    hash_hmac('sha256', $source, $hashsecret),
+                    ['id' => $record->id]
+                );
+                $lastid = (int) $record->id;
+            }
+        } while (count($records) === 1000);
+
+        // Older anonymization code cleared the ledger row but left its
+        // denormalized outbox copy intact. Rewrite those legacy payloads now.
+        $lastid = 0;
+        do {
+            $anonymous = $DB->get_records_select(
+                'local_completionhistory_achievement',
+                'userid = 0 AND id > :lastid',
+                ['lastid' => $lastid],
+                'id ASC',
+                'id',
+                0,
+                1000
+            );
+            if ($anonymous) {
+                $anonymousids = array_keys($anonymous);
+                [$anonymousinsql, $anonymousparams] = $DB->get_in_or_equal(
+                    $anonymousids,
+                    SQL_PARAMS_NAMED,
+                    'anonymousachievement'
+                );
+                $DB->execute(
+                    "UPDATE {local_completionhistory_ach_program}
+                        SET allocationid = NULL
+                      WHERE achievementid {$anonymousinsql}",
+                    $anonymousparams
+                );
+                \local_completionhistory\local\outbox_service::anonymize_achievement_payloads($anonymousids);
+                $lastid = (int) array_key_last($anonymous);
+            }
+        } while (count($anonymous) === 1000);
+
+        // Close the historical exam-attempt gap for sites which had already
+        // opted into automatic anonymization before this release.
+        if (get_config('local_completionhistory', 'gdpranonymize')) {
+            \local_completionhistory\local\ledger_service::reconcile_deleted_users();
+        }
+
+        // Apply the sourcesite default on upgrades as well as fresh installs.
+        if (get_config('local_completionhistory', 'sourcesite') === false) {
+            set_config('sourcesite', $CFG->wwwroot, 'local_completionhistory');
+        }
+
+        upgrade_plugin_savepoint(true, 2026081700, 'local', 'completionhistory');
     }
 
     return true;

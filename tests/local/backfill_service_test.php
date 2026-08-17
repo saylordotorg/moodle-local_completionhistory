@@ -25,7 +25,6 @@ use stdClass;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_completionhistory\local\backfill_service
  */
 class backfill_service_test extends advanced_testcase {
 

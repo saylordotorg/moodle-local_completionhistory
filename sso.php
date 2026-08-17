@@ -48,7 +48,9 @@
 require_once(__DIR__ . '/../../config.php');
 
 use local_completionhistory\external\create_login_key;
+use local_completionhistory\local\security;
 
+security::require_enabled();
 $keyvalue = required_param('key', PARAM_ALPHANUM);
 // PARAM_LOCALURL strips anything that is not local to this Moodle. See above.
 $wantsurl = optional_param('wantsurl', '', PARAM_LOCALURL);
@@ -97,7 +99,7 @@ function local_completionhistory_sso_send_to_login(moodle_url $destination, stri
  * waiting on a key that has 60 seconds to live.
  */
 $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_sso');
-$lock = $lockfactory->get_lock('key_' . $keyvalue, 2);
+$lock = $lockfactory->get_lock('key_' . hash('sha256', $keyvalue), 2);
 if (!$lock) {
     local_completionhistory_sso_send_to_login($destination, 'lock unavailable');
 }
@@ -105,8 +107,11 @@ if (!$lock) {
 try {
     // Throws on an unknown, expired, wrong-script or wrong-IP key.
     $key = validate_user_key($keyvalue, create_login_key::SCRIPT, null);
-    $user = $DB->get_record('user', ['id' => $key->userid, 'deleted' => 0], '*', MUST_EXIST);
-
+    $user = $DB->get_record('user', [
+        'id' => $key->userid,
+        'deleted' => 0,
+        'mnethostid' => $CFG->mnet_localhost_id,
+    ], '*', MUST_EXIST);
     // SPENT INSIDE THE LOCK, and before anything else can fail. If deletion came after the
     // login, a failure in between would leave the key alive for the rest of its minute —
     // having already been used once, and having already appeared in a URL. Deleting here
@@ -137,15 +142,25 @@ $lock->release();
 // door by a key issued before it happened. is_enabled_auth covers the case where an
 // administrator turns off a whole auth plugin — the front door would refuse them, and so
 // does this one.
-// is_siteadmin is repeated from the mint deliberately. It is the check whose failure is
-// worst — a service token escalating to an administrator session — and a key minted before
-// the mint-side check existed, or by any future caller that forgets it, still has to get
-// past this door. Cheap, and it makes the guarantee a property of the endpoint rather than
-// of every caller remembering.
+// Learner eligibility is repeated from the mint deliberately. It is the check whose failure
+// is worst — a service token escalating to a staff or administrator session — and a key
+// minted by old or future code still has to get past this door. This makes the guarantee a
+// property of the endpoint rather than of every caller remembering it.
 if (!empty($user->suspended) || empty($user->confirmed)
         || $user->auth === 'nologin' || !is_enabled_auth($user->auth)
-        || is_siteadmin($user->id)) {
+        || !security::is_learner_account($user)) {
     throw new moodle_exception('invaliduser', 'error');
+}
+
+// Never replace an existing authenticated session with another user's identity.
+// That would make a valid SSO URL a login-CSRF primitive. A user already signed in
+// as the intended learner needs no new login; a different user stays themselves.
+if (isloggedin() && !isguestuser()) {
+    if ((int) $USER->id !== (int) $user->id) {
+        \core\notification::warning(get_string('sso_alreadysignedin', 'local_completionhistory'));
+        redirect(new moodle_url('/my/'));
+    }
+    redirect($destination);
 }
 
 // Triggers \core\event\user_loggedin itself, so this file does not log that again.

@@ -32,6 +32,12 @@ use core_external\external_value;
  */
 class list_programs extends external_api {
 
+    /** Maximum programs returned in one registry snapshot. */
+    private const MAX_PROGRAMS = 1000;
+
+    /** Maximum total program-to-course links returned in one snapshot. */
+    private const MAX_COURSE_LINKS = 10000;
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([]);
     }
@@ -41,10 +47,29 @@ class list_programs extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:viewall', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+
+        $dbman = $DB->get_manager();
+        if (!$dbman->table_exists(new \xmldb_table('enrol_programs_programs')) ||
+                !$dbman->table_exists(new \xmldb_table('enrol_programs_items'))) {
+            return ['programs' => []];
+        }
 
         $out = [];
-        $programs = $DB->get_records('enrol_programs_programs', null, 'idnumber ASC');
+        $programs = $DB->get_records(
+            'enrol_programs_programs',
+            null,
+            'idnumber ASC',
+            '*',
+            0,
+            self::MAX_PROGRAMS + 1
+        );
+        if (count($programs) > self::MAX_PROGRAMS) {
+            throw new \moodle_exception('programregistrytoolarge', 'local_completionhistory');
+        }
+
+        $linkcount = 0;
         foreach ($programs as $p) {
             $courses = [];
             // Items with a courseid are the program's member courses; structural
@@ -53,8 +78,15 @@ class list_programs extends external_api {
                 'enrol_programs_items',
                 'programid = :pid AND courseid IS NOT NULL',
                 ['pid' => $p->id],
-                'id ASC'
+                'id ASC',
+                '*',
+                0,
+                self::MAX_COURSE_LINKS - $linkcount + 1
             );
+            $linkcount += count($items);
+            if ($linkcount > self::MAX_COURSE_LINKS) {
+                throw new \moodle_exception('programregistrytoolarge', 'local_completionhistory');
+            }
             foreach ($items as $item) {
                 $course = $DB->get_record('course', ['id' => $item->courseid], 'id, idnumber, shortname, fullname');
                 if (!$course) {

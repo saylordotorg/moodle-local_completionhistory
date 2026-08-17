@@ -52,7 +52,17 @@ class set_program_deadline extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+        require_capability('local/completionhistory:setdeadlines', $systemcontext);
+        if ($params['timeend'] < 0) {
+            throw new \invalid_parameter_exception('The program deadline must be zero or a positive Unix timestamp.');
+        }
+
+        $user = $DB->get_record('user', ['id' => $params['userid'], 'deleted' => 0]);
+        if (!$user || !\local_completionhistory\local\security::is_learner_account($user)) {
+            throw new \moodle_exception('invaliduser', 'error');
+        }
 
         $program = $DB->get_record('enrol_programs_programs', ['idnumber' => $params['programidnumber']], '*', MUST_EXIST);
         $allocation = $DB->get_record('enrol_programs_allocations', [

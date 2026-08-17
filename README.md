@@ -1,151 +1,117 @@
 # Completion History (`local_completionhistory`)
 
-A Moodle local plugin that provides a durable, immutable academic-history ledger. It preserves course achievement records permanently, even when courses are renamed, archived, deleted, or when `enrol_programs` purges completion records.
-
-## What This Plugin Is
-
-- An **append-only academic ledger** that snapshots course completions at the moment they occur.
-- A **read API surface** for a future external Saylor SIS.
-- A **course replacement mapping** system for tracking retired/legacy courses.
-- A **purge audit trail** that logs when other plugins (e.g., `enrol_programs`) purge Moodle's native completion records.
-
-## What This Plugin Is NOT
-
-- Not a full Student Information System (SIS).
-- Not a replacement for Moodle's built-in course completion system.
-- Does not modify Moodle core or fork `enrol_programs`.
-- Does not handle admissions, enrollment agreements, transcript review, exam attempts, or billing.
+A Moodle local plugin providing a durable academic-history ledger, exam-attempt audit data, course-replacement mappings, and a deliberately narrow integration surface for the Saylor SIS.
 
 ## Requirements
 
-- Moodle 4.5+ (2024100700)
+- Moodle 4.5 through 5.2
 - PHP 8.1+
-- Optional: `enrol_programs` plugin for program association snapshots
+- Optional for the core ledger: `enrol_programs` and Moodle Workplace certificate tooling
+- Required for SIS program provisioning/deadline operations: `enrol_programs`
 
-## Installation
+## Installation and upgrade
 
-1. Copy or symlink this directory to `local/completionhistory/` in your Moodle installation.
-2. Visit **Site Administration > Notifications** to trigger the database install.
-3. Configure at **Site Administration > Plugins > Local plugins > Completion History**.
+1. Install this directory as `local/completionhistory`.
+2. Visit **Site administration > Notifications** or run the standard Moodle CLI upgrade.
+3. Review the settings under **Plugins > Local plugins > Completion History**.
+4. If the SIS service is used, update its dedicated role for the capabilities described below. New integration capabilities intentionally have no archetype grants.
+
+Database and cached service/event changes are applied through `db/install.xml`, `db/install.php`, and `db/upgrade.php`. Do not deploy updated files without completing the Moodle upgrade.
 
 ## Configuration
 
 | Setting | Default | Description |
+|---|---:|---|
+| Enable plugin | On | Master switch, enforced by browser, AJAX, task, observer, and external entry points |
+| Auto-capture completions | On | Capture `course_completed` events |
+| Capture grade snapshots | On | Store the course-total grade with an achievement |
+| Backfill batch size | 1000 | Completion rows scanned per backfill batch |
+| Enable purge audit | On | Record relevant completion purge events |
+| Enable user achievements page | On | Show the learner-facing achievement page |
+| Artifact storage mode | None | Controls certificate/artifact references |
+| Replacement notification | Badge | Learner-facing replacement-course behavior |
+| Anonymize on user deletion | Off | Automatically anonymize academic records on the core deletion event |
+| Enable SIS outbox | Off | Create denormalized achievement messages for SIS synchronization |
+| Source site | Site URL | Stable source identifier included in SIS achievement payloads |
+
+## Security model
+
+The bundled **Completion History SIS** external service is disabled and restricted to explicitly authorized users by default. Use a dedicated, non-human service account and a dedicated system role. Do not use an administrator account or grant broad core capabilities to the service account.
+
+`local/completionhistory:integrate` permits the curated integration reads and outbox acknowledgements. Grant the following additional capabilities only when that operation is required:
+
+| Capability | Purpose | Default grant |
 |---|---|---|
-| Enable plugin | On | Master switch |
-| Auto-capture completions | On | Capture achievement on `course_completed` event |
-| Capture grade snapshots | On | Include course total grade in achievement records |
-| Backfill batch size | 1000 | Records per backfill batch |
-| Enable purge audit | On | Log when completions are purged |
-| Enable user achievements page | On | Show "My Achievements" in user navigation |
-| Artifact storage mode | None | How certificate URLs are stored (none/url/pluginfile) |
-| Replacement notification | Badge | How to show course replacement recommendations |
-| Anonymize on user deletion | Off | Anonymize (not delete) achievements on GDPR erasure |
+| `local/completionhistory:provisionusers` | Create learner accounts and allocate programs | None |
+| `local/completionhistory:resetpasswords` | Complete the one-time initial password flow | None |
+| `local/completionhistory:createloginkeys` | Mint short-lived learner SSO keys | None |
+| `local/completionhistory:updateprofiles` | Change the six whitelisted learner contact fields | None |
+| `local/completionhistory:enrolusers` | Create manual learner enrolments | None |
+| `local/completionhistory:setdeadlines` | Change learner program deadlines | None |
 
-## Backfill Existing Completions
+The initial-password endpoint is not a general reset API: it accepts only local manual-auth learner accounts carrying Moodle's force-change marker, enforces the site password policy, and consumes the marker after one successful call. Email identity lookups reject duplicate/ambiguous addresses.
 
-After initial install, run the backfill to capture all historical completions:
+SSO keys are IP-bound, single-use, scoped to this plugin, and valid for 60 seconds. Both minting and consumption refuse administrators, managers, teachers, and other staff-role accounts. The consumer will not replace an already authenticated session belonging to another user.
+
+Browser mutations require POST plus a valid session key. SIS-only functions are not AJAX-callable. Bulk external requests and snapshot responses have defensive ceilings. Use HTTPS, restrict and rotate web-service tokens, and apply network restrictions supported by the hosting platform.
+
+## Privacy
+
+The Privacy API provider declares and exports achievement snapshots, program associations, exam attempts, outbox copies, purge-audit data, and saved table preferences. It also declares the Saylor SIS as an external data location.
+
+On an approved erasure request, direct identifiers are removed from achievements and exam attempts, queued/sent outbox copies are rewritten, delivery errors are cleared, and user-specific purge-audit rows are deleted. Course, date, grade, and assessment data remain as anonymized institutional academic records. The automatic core `user_deleted` behavior is controlled separately by the **Anonymize on user deletion** setting and should be chosen according to institutional retention policy.
+
+Deduplication uses a plugin-specific 256-bit secret and HMAC-SHA-256 so a retained hash cannot be reversed by enumerating Moodle user IDs. The secret is generated on installation/upgrade and is not exposed as an admin setting.
+
+Data already delivered to an external SIS is outside Moodle's erasure boundary and must be handled under that system's retention and data-subject procedures.
+
+## Backfill and audit
+
+Run commands from the Moodle root:
 
 ```bash
-# Dry run first
 php local/completionhistory/cli/backfill_achievements.php --dry-run
-
-# Actual backfill
 php local/completionhistory/cli/backfill_achievements.php --verbose
-
-# Backfill a specific user
 php local/completionhistory/cli/backfill_achievements.php --userid=42
-
-# Audit the ledger
 php local/completionhistory/cli/audit_achievements.php
+php local/completionhistory/cli/reconcile_anonymization.php --dryrun
 ```
 
-## Cron / Scheduled Tasks
+The completion-ledger reconciliation task runs daily. Outbox processing and deleted-user reconciliation tasks ship disabled and must be enabled deliberately in Scheduled tasks.
 
-- **Reconcile achievement ledger**: Runs daily at 02:15. Catches any completions that the observer missed.
-- **Process SIS sync outbox**: Disabled by default. Stub for future external SIS integration.
+## Stored data
 
-## Upgrade Path
+| Table | Purpose |
+|---|---|
+| `local_completionhistory_achievement` | Durable achievement and identity/course snapshots |
+| `local_completionhistory_ach_program` | Program snapshots associated with an achievement |
+| `local_completionhistory_exam_attempt` | Per-attempt academic/proctoring history |
+| `local_completionhistory_course_exam_config` | Admin exam-track configuration |
+| `local_completionhistory_course_map` | Retired-to-replacement course mappings |
+| `local_completionhistory_flag_def` | Admin-defined attempt review rules |
+| `local_completionhistory_purge_audit` | Operational purge history |
+| `local_completionhistory_outbox` | Denormalized SIS synchronization messages |
 
-Database changes use Moodle's standard `db/install.xml` and `db/upgrade.php` mechanism. Always run the Moodle upgrade process after updating the plugin files.
+Achievement capture is transactional with program snapshots and the optional outbox row. A deterministic keyed event digest makes observer and backfill processing idempotent. Academic snapshots intentionally do not use foreign keys to live user, course, or program records because they must survive source-record retirement.
 
-## Architecture
+## Other capabilities
 
-### Tables
+| Capability | Default |
+|---|---|
+| `local/completionhistory:viewown` | Authenticated user, student, teacher, manager |
+| `local/completionhistory:viewall` | Manager |
+| `local/completionhistory:manage` | Manager |
+| `local/completionhistory:managecoursemap` | Manager |
+| `local/completionhistory:runbackfill` | None |
+| `local/completionhistory:integrate` | None |
 
-| Table | Purpose | Mutable? |
-|---|---|---|
-| `local_completionhistory_achievement` | Immutable achievement ledger | No (append-only) |
-| `local_completionhistory_ach_program` | Program associations per achievement | No (append-only) |
-| `local_completionhistory_course_map` | Course replacement mappings | Yes (admin CRUD) |
-| `local_completionhistory_purge_audit` | Audit trail for purge events | No (append-only) |
-| `local_completionhistory_outbox` | Future SIS sync queue | Yes (status updates) |
+## Known limitations
 
-### Key Design Decisions
-
-1. **No foreign keys to `course`, `user`, or `enrol_programs` tables.** Achievement rows must survive rename/delete/archive/reset of the referenced entities.
-2. **Snapshot fields are immutable.** Course names, user ID numbers, and program names are captured at insert time and never updated.
-3. **Idempotent inserts.** A deterministic SHA-256 hash (`userid|courseid|timecompleted|source_component`) ensures the observer and backfill job never create duplicate records.
-4. **enrol_programs is optional.** If the plugin is not installed, program associations are simply empty. The `program_context_resolver` checks for table existence before querying.
-5. **Privacy by anonymization.** On GDPR erasure, achievement records have `userid` set to 0 and PII cleared, but the academic record (course name, grade, date) is preserved.
-
-### Event Flow
-
-```
-course_completed event
-  → callbacks::course_completed()
-    → ledger_service::capture_achievement()
-      → grade_snapshot_service (optional)
-      → program_context_resolver (optional, if enrol_programs installed)
-      → INSERT achievement + ach_program rows (in transaction)
-```
-
-### Moodle Components Read From
-
-- `{course_completions}` — completion records
-- `{course}` — course metadata snapshots
-- `{user}` — user idnumber snapshots
-- `{grade_items}` — course total grade item
-- `{grade_grades}` — user's grade for course total
-- `{enrol_programs_items}` — course-to-program mapping (optional)
-- `{enrol_programs_programs}` — program metadata (optional)
-- `{enrol_programs_allocations}` — user-to-program allocation (optional)
-
-## Web Services
-
-A pre-configured external service "Completion History SIS" is available (disabled by default):
-
-- `local_completionhistory_get_user_achievements` — Get achievements for a user
-- `local_completionhistory_get_course_replacement` — Get replacement mapping for a course
-- `local_completionhistory_get_recent_achievements` — Get recent achievements (for SIS sync)
-- `local_completionhistory_get_purge_audit` — Get purge audit records
-
-Enable the service at **Site Administration > Server > Web services > External services**.
-
-## Capabilities
-
-| Capability | Type | Default |
-|---|---|---|
-| `local/completionhistory:viewown` | Read | Student, Teacher, Manager |
-| `local/completionhistory:viewall` | Read | Manager |
-| `local/completionhistory:manage` | Write | Manager |
-| `local/completionhistory:managecoursemap` | Write | Manager |
-| `local/completionhistory:runbackfill` | Write | Admin only |
-
-## Known Limitations
-
-1. **Purge hook not yet dispatched.** The `\local_completionhistory\hook\course_completions_purged` hook class exists but `enrol_programs` does not dispatch it yet. The daily reconciliation task serves as a safety net.
-2. **Artifact storage is stubbed.** Certificate URLs depend on a stable file storage mechanism that doesn't exist yet. The `artifacturl` field is nullable.
-3. **GDPR anonymization is a policy question.** The default is OFF. Institutions must decide whether to anonymize or retain full PII in achievement records.
-4. **No automatic course redirects.** V1 shows replacement recommendations only; it does not redirect users to replacement courses.
-
-## Next Steps for External SIS Sync
-
-1. Implement `process_outbox` task to push achievements to an external endpoint.
-2. Add `local_completionhistory_get_unsynced_outbox` and `local_completionhistory_mark_outbox_sent` web service functions.
-3. Define the external SIS API contract.
-4. Enable the outbox scheduled task.
+- The optional purge hook must be dispatched by the component performing the purge; scheduled reconciliation remains the safety net.
+- Stable artifact retention depends on the originating certificate/file subsystem.
+- Snapshot catalog/program APIs deliberately fail rather than return an unbounded or silently truncated response on unusually large sites; such deployments need a paginated integration contract.
+- This plugin retains anonymized academic records by design. Institutions must validate that policy against their legal and records-management obligations.
 
 ## License
 
-GNU GPL v3 or later — https://www.gnu.org/copyleft/gpl.html
+GNU GPL v3 or later — <https://www.gnu.org/copyleft/gpl.html>

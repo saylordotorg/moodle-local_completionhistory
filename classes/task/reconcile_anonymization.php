@@ -48,7 +48,7 @@ class reconcile_anonymization extends \core\task\scheduled_task {
 
         mtrace('Reconciling anonymization for deleted users...');
         $stats = ledger_service::reconcile_deleted_users();
-        mtrace("  Deleted users with achievement rows: {$stats->candidates}");
-        mtrace("  Rows anonymized: {$stats->anonymized}");
+        mtrace("  Deleted users with academic rows: {$stats->candidates}");
+        mtrace("  Achievement rows anonymized (exam attempts also scrubbed): {$stats->anonymized}");
     }
 }

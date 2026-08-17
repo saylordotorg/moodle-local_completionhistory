@@ -22,8 +22,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$dir = dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'] ?? __DIR__)));
-require($dir . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_login();
 
 use local_completionhistory\local\flag_service;
@@ -64,7 +63,8 @@ if ($id) {
 
 // Handle save.
 $errors = [];
-if (data_submitted() && confirm_sesskey()) {
+if (data_submitted()) {
+    require_sesskey();
     $flag->code        = trim(required_param('code', PARAM_ALPHANUMEXT));
     $flag->name        = trim(required_param('name', PARAM_TEXT));
     $flag->description = trim(optional_param('description', '', PARAM_TEXT));

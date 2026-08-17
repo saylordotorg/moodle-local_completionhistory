@@ -35,6 +35,9 @@ use local_completionhistory\local\outbox_service;
  */
 class get_unsynced_outbox extends external_api {
 
+    /** Hard ceiling on rows per call. */
+    private const MAX_LIMIT = 1000;
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'limit'  => new external_value(PARAM_INT, 'Maximum rows to return', VALUE_DEFAULT, 500),
@@ -50,9 +53,21 @@ class get_unsynced_outbox extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:viewall', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
 
-        $rows = outbox_service::get_unsynced($params['limit'], $params['status']);
+        $limit = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
+        $statuses = [
+            outbox_service::STATUS_PENDING,
+            outbox_service::STATUS_FAILED,
+            outbox_service::STATUS_SENT,
+            outbox_service::STATUS_CANCELLED,
+        ];
+        if (!in_array($params['status'], $statuses, true)) {
+            throw new \invalid_parameter_exception('Unknown outbox status.');
+        }
+
+        $rows = outbox_service::get_unsynced($limit, $params['status']);
 
         $result = [];
         foreach ($rows as $r) {

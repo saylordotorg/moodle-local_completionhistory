@@ -118,6 +118,15 @@ if ($hassiteconfig) {
         0
     ));
 
+    // Source site identifier stamped into every SIS sync payload.
+    $settings->add(new admin_setting_configtext(
+        'local_completionhistory/sourcesite',
+        get_string('setting_sourcesite', 'local_completionhistory'),
+        get_string('setting_sourcesite_desc', 'local_completionhistory'),
+        $CFG->wwwroot,
+        PARAM_TEXT
+    ));
+
     $ADMIN->add('localplugins', $settings);
 
     // External pages for admin navigation.

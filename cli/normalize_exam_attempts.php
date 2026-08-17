@@ -37,15 +37,7 @@
 
 define('CLI_SCRIPT', true);
 
-$configpath = __DIR__ . '/../../../config.php';
-if (!file_exists($configpath)) {
-    $configpath = getcwd();
-    while ($configpath !== '/' && !file_exists($configpath . '/config.php')) {
-        $configpath = dirname($configpath);
-    }
-    $configpath .= '/config.php';
-}
-require($configpath);
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
 [$options, $unrecognised] = cli_get_params(

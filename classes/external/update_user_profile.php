@@ -41,10 +41,9 @@ use core_external\external_value;
  *   changing it is an identity operation with merge implications, not a contact correction. The
  *   SIS refuses it at its own endpoint too.
  *
- *   PRIVILEGED ACCOUNTS — a site admin, or a holder of site:config / role:assign /
- *   user:loginas, is refused outright, matching create_login_key. Anyone who can already grant
- *   themselves anything should not have their profile rewritten by an integration token, and
- *   the asymmetry is what makes the refusal cheap to reason about.
+ *   NON-LEARNER ACCOUNTS — administrators and accounts with staff-role assignments are
+ *   refused outright, matching create_login_key. The SIS integration must not rewrite an
+ *   instructor or manager profile merely because its email was supplied.
  *
  * IDEMPOTENT AND HONEST. Only fields whose value actually differs are written, and the response
  * names them, so the SIS can record what really changed rather than assuming its patch applied.
@@ -92,7 +91,7 @@ class update_user_profile extends external_api {
      * @return array
      */
     public static function execute(string $email, array $fields): array {
-        global $CFG, $DB;
+        global $CFG;
         require_once($CFG->dirroot . '/user/lib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
@@ -102,28 +101,20 @@ class update_user_profile extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
-
-        $user = $DB->get_record('user', [
-            'email'      => \core_text::strtolower($params['email']),
-            'deleted'    => 0,
-            'mnethostid' => $CFG->mnet_localhost_id,
-        ]);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+        require_capability('local/completionhistory:updateprofiles', $systemcontext);
+        $user = \local_completionhistory\local\security::get_unique_local_user_by_email($params['email']);
         if (!$user) {
             return ['success' => false, 'updated' => '', 'warning' => 'No account was found for that email.'];
         }
 
-        // Same refusal as create_login_key, for the same reason: an integration token must not
-        // reach an account that can already grant itself anything.
-        $usercontext = \context_user::instance($user->id);
-        if (is_siteadmin($user)
-                || has_capability('moodle/site:config', $systemcontext, $user)
-                || has_capability('moodle/role:assign', $systemcontext, $user)
-                || has_capability('moodle/user:loginas', $systemcontext, $user)) {
+        // Same refusal as create_login_key: this integration mutates learners, not staff.
+        if (!\local_completionhistory\local\security::is_learner_account($user)) {
             return [
                 'success' => false,
                 'updated' => '',
-                'warning' => 'This account is privileged; its profile cannot be changed through the integration.',
+                'warning' => 'This account is not an eligible learner; its profile cannot be changed through the integration.',
             ];
         }
 

@@ -36,7 +36,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class provision_applicant extends external_api {
-
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'email'           => new external_value(PARAM_EMAIL, 'Applicant email (identity key)'),
@@ -59,84 +58,107 @@ class provision_applicant extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
-
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+        require_capability('local/completionhistory:provisionusers', $systemcontext);
         $warning = '';
         $usernamewarning = '';
         $created = false;
         $password = '';
 
-        // 1) Find or create the user by email. An existing account is ADOPTED,
-        //    never duplicated and never password-reset: the email is the
-        //    identity key, so a match means a returning learner whose history
-        //    should attach to this application.
-        $emaillower = \core_text::strtolower($params['email']);
-        $user = $DB->get_record('user', ['email' => $emaillower, 'deleted' => 0, 'mnethostid' => $CFG->mnet_localhost_id]);
-        if (!$user) {
-            // Username = the email address (SIS policy, 2026-06): one
-            // identifier across degrees.saylor.org, mySaylor, and the future
-            // Cognito SSO. clean_param may strip chars Moodle disallows
-            // (e.g. "+" unless extendedusernamechars) — use what survives.
-            $username = clean_param($emaillower, PARAM_USERNAME);
-            if ($username === '') {
-                $username = 'sisuser';
-            }
-            if ($DB->record_exists('user', ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id])) {
-                // The exact username belongs to a DIFFERENT account (no user
-                // has this email, or we would have adopted it above).
-                $base = $username;
-                $suffix = 1;
-                while ($DB->record_exists('user', ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id])) {
-                    $username = $base . (++$suffix);
-                }
-                $usernamewarning = 'Username ' . $base . ' was taken by another account; created as ' . $username . '.';
-            }
-
-            $password = bin2hex(random_bytes(6)) . 'Aa1!';
-            $new = new \stdClass();
-            $new->username = $username;
-            $new->firstname = $params['firstname'] !== '' ? $params['firstname'] : 'Applicant';
-            $new->lastname = $params['lastname'] !== '' ? $params['lastname'] : 'User';
-            $new->email = $emaillower;
-            $new->auth = 'manual';
-            $new->confirmed = 1;
-            $new->mnethostid = $CFG->mnet_localhost_id;
-            $new->password = $password;
-            $userid = user_create_user($new, true, true);
-            set_user_preference('auth_forcepasswordchange', 1, $userid);
-            $user = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
-            $created = true;
+        // 1) Find or create the user by email. An eligible existing learner is
+        // adopted, never duplicated and never password-reset. Staff and other
+        // non-learner accounts are refused even when the email matches.
+        $emaillower = \core_text::strtolower(trim($params['email']));
+        $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_provision');
+        $lock = $lockfactory->get_lock('email_' . hash('sha256', $emaillower), 5);
+        if (!$lock) {
+            throw new \moodle_exception('provisioninglockunavailable', 'local_completionhistory');
         }
 
-        // 2) Allocate to the requested program (optional).
-        $allocated = false;
-        if ($params['programidnumber'] !== '') {
-            $program = $DB->get_record('enrol_programs_programs', ['idnumber' => $params['programidnumber']]);
-            if (!$program) {
-                $warning = 'Program not found: ' . $params['programidnumber'];
-            } else if ($DB->record_exists('enrol_programs_allocations', ['programid' => $program->id, 'userid' => $user->id, 'archived' => 0])) {
-                $allocated = true; // Already allocated — idempotent success.
-            } else if (!class_exists('\\enrol_programs\\local\\source\\manual')) {
-                $warning = 'enrol_programs manual source unavailable.';
-            } else {
-                $source = $DB->get_record('enrol_programs_sources', ['programid' => $program->id, 'type' => 'manual']);
-                if (!$source) {
-                    $warning = 'Program has no manual allocation source: ' . $params['programidnumber'];
+        try {
+            $user = \local_completionhistory\local\security::get_unique_local_user_by_email($emaillower);
+            if (!$user) {
+                // Username = the email address (SIS policy, 2026-06): one
+                // identifier across degrees.saylor.org, mySaylor, and the future
+                // Cognito SSO. clean_param may strip chars Moodle disallows
+                // (e.g. "+" unless extendedusernamechars) — use what survives.
+                $username = clean_param($emaillower, PARAM_USERNAME);
+                if ($username === '') {
+                    $username = 'sisuser';
+                }
+                if ($DB->record_exists('user', ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id])) {
+                    // The exact username belongs to a DIFFERENT account (no user
+                    // has this email, or we would have adopted it above).
+                    $base = $username;
+                    $suffix = 1;
+                    while ($DB->record_exists('user', ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id])) {
+                        $suffixtext = (string) (++$suffix);
+                        $username = \core_text::substr($base, 0, 100 - strlen($suffixtext)) . $suffixtext;
+                    }
+                    $usernamewarning = 'Username ' . $base . ' was taken by another account; created as ' . $username . '.';
+                }
+
+                $password = bin2hex(random_bytes(16)) . 'Aa1!';
+                $new = new \stdClass();
+                $new->username = $username;
+                $new->firstname = $params['firstname'] !== ''
+                    ? \core_text::substr($params['firstname'], 0, 100)
+                    : 'Applicant';
+                $new->lastname = $params['lastname'] !== ''
+                    ? \core_text::substr($params['lastname'], 0, 100)
+                    : 'User';
+                $new->email = $emaillower;
+                $new->auth = 'manual';
+                $new->confirmed = 1;
+                $new->mnethostid = $CFG->mnet_localhost_id;
+                $new->password = $password;
+                $userid = user_create_user($new, true, true);
+                set_user_preference('auth_forcepasswordchange', 1, $userid);
+                $user = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
+                $created = true;
+            } else if (!\local_completionhistory\local\security::is_learner_account($user)) {
+                return [
+                    'userid' => 0,
+                    'username' => '',
+                    'created' => false,
+                    'allocated' => false,
+                    'password' => '',
+                    'warning' => 'A non-learner account cannot be adopted by the integration.',
+                ];
+            }
+            // 2) Allocate to the requested program (optional).
+            $allocated = false;
+            if ($params['programidnumber'] !== '') {
+                $program = $DB->get_record('enrol_programs_programs', ['idnumber' => $params['programidnumber']]);
+                if (!$program) {
+                    $warning = 'Program not found: ' . $params['programidnumber'];
+                } else if ($DB->record_exists('enrol_programs_allocations', ['programid' => $program->id, 'userid' => $user->id, 'archived' => 0])) {
+                    $allocated = true; // Already allocated — idempotent success.
+                } else if (!class_exists('\\enrol_programs\\local\\source\\manual')) {
+                    $warning = 'enrol_programs manual source unavailable.';
                 } else {
-                    \enrol_programs\local\source\manual::allocate_users($program->id, $source->id, [$user->id]);
-                    $allocated = true;
+                    $source = $DB->get_record('enrol_programs_sources', ['programid' => $program->id, 'type' => 'manual']);
+                    if (!$source) {
+                        $warning = 'Program has no manual allocation source: ' . $params['programidnumber'];
+                    } else {
+                        \enrol_programs\local\source\manual::allocate_users($program->id, $source->id, [$user->id]);
+                        $allocated = true;
+                    }
                 }
             }
-        }
 
-        return [
-            'userid'    => (int) $user->id,
-            'username'  => $user->username,
-            'created'   => $created,
-            'allocated' => $allocated,
-            'password'  => $password,
-            'warning'   => trim($usernamewarning . ' ' . $warning),
-        ];
+            return [
+                'userid'    => (int) $user->id,
+                'username'  => $user->username,
+                'created'   => $created,
+                'allocated' => $allocated,
+                'password'  => $password,
+                'warning'   => trim($usernamewarning . ' ' . $warning),
+            ];
+        } finally {
+            $lock->release();
+        }
     }
 
     public static function execute_returns(): external_single_structure {

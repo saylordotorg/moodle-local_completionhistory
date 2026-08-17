@@ -49,18 +49,19 @@ use core_external\external_value;
  *   ONE LIVE KEY PER USER. Minting deletes any previous key for this script, so a
  *   student clicking twice cannot leave a spare valid key behind them.
  *
- * WHAT THIS FUNCTION IS, PLAINLY. Anyone holding a token with local/completionhistory:manage
- * can obtain a browser session as any NON-PRIVILEGED user on this site. That is a real
- * escalation over the other sixteen functions in this service, which only read and write
+ * WHAT THIS FUNCTION IS, PLAINLY. Anyone holding a token with both the base integration
+ * capability and local/completionhistory:createloginkeys can obtain a browser session as an
+ * eligible learner. That is a real escalation over the functions which only read and write
  * records, and it is why the service definition marks it 'write' and refuses AJAX. It is NOT
  * mitigated by taking an email instead of a user id — a caller can name any email as easily
  * as any id — so the parameter is the user id, which is what the SIS session authoritatively
  * holds and what avoids a second lookup that could resolve to the wrong person.
  *
- * The word "non-privileged" is doing real work there. An earlier version accepted any user
- * id at all, which meant a leaked service token could name an administrator and be handed an
- * administrator session — a service credential escalating to full site control. Site admins
- * and accounts holding site:config / role:assign / user:loginas are now refused outright.
+ * "Eligible learner" is doing real work there. An earlier version accepted any user id at
+ * all, which meant a leaked service token could name an administrator and be handed an
+ * administrator session — a service credential escalating to full site control. Site admins,
+ * accounts holding high-risk capabilities, and accounts assigned staff-role archetypes are
+ * now refused outright.
  *
  * The thing that actually constrains it is the caller: the SIS route passes only the
  * `uid` claim from the student's own signed session, never a value from the request body.
@@ -94,8 +95,9 @@ class create_login_key extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
-
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+        require_capability('local/completionhistory:createloginkeys', $systemcontext);
         // An empty IP restriction would mean "valid from anywhere", which is exactly the
         // protection this relies on when a key leaks. Refused rather than defaulted —
         // and PARAM_RAW above is deliberate, because PARAM_TEXT would silently mangle a
@@ -127,34 +129,36 @@ class create_login_key extends external_api {
         }
 
         // PRIVILEGED ACCOUNTS ARE NOT VALID TARGETS. Without this, a token holding
-        // local/completionhistory:manage could name an administrator's user id and receive
+        // the login-key capabilities could name an administrator's user id and receive
         // a browser session as them — turning a restricted service credential into a full
         // administrator login. That is a categorically different power from the record
         // access the rest of this service grants, and nothing about "student SSO" implies it.
         //
-        // Checked by CAPABILITY rather than by role name, because a site can call its
-        // administrative role anything. The three below are the ones that let an account
-        // grant itself more: change site configuration, hand out roles, or log in as
-        // someone else. An account with any of them is not a learner.
-        if (is_siteadmin($user->id)) {
+        // Checked by capabilities and assigned role archetypes rather than role names,
+        // because a site can call its administrative or teaching roles anything.
+        if (!\local_completionhistory\local\security::is_learner_account($user)) {
             return ['key' => '', 'expiresin' => 0, 'warning' => 'This account is not eligible for single sign-on.'];
         }
-        foreach (['moodle/site:config', 'moodle/role:assign', 'moodle/user:loginas'] as $capability) {
-            if (has_capability($capability, $systemcontext, $user->id)) {
-                return ['key' => '', 'expiresin' => 0, 'warning' => 'This account is not eligible for single sign-on.'];
-            }
+        // At most one live key per user. Serialize delete + create so concurrent
+        // requests cannot both create a key after each has observed an empty set.
+        $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_sso_mint');
+        $lock = $lockfactory->get_lock('user_' . (int) $user->id, 5);
+        if (!$lock) {
+            return ['key' => '', 'expiresin' => 0, 'warning' => 'Single sign-on is already being prepared.'];
         }
 
-        // At most one live key per user. Two clicks must not leave a spare behind.
-        delete_user_key(self::SCRIPT, $user->id);
-
-        $key = create_user_key(
-            self::SCRIPT,
-            $user->id,
-            null,
-            $ip,
-            time() + self::TTL
-        );
+        try {
+            delete_user_key(self::SCRIPT, $user->id);
+            $key = create_user_key(
+                self::SCRIPT,
+                $user->id,
+                null,
+                $ip,
+                time() + self::TTL
+            );
+        } finally {
+            $lock->release();
+        }
 
         return ['key' => $key, 'expiresin' => self::TTL, 'warning' => ''];
     }

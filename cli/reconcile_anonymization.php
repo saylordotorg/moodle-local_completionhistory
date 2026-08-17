@@ -29,15 +29,7 @@
 
 define('CLI_SCRIPT', true);
 
-$configpath = __DIR__ . '/../../../config.php';
-if (!file_exists($configpath)) {
-    $configpath = getcwd();
-    while ($configpath !== '/' && !file_exists($configpath . '/config.php')) {
-        $configpath = dirname($configpath);
-    }
-    $configpath .= '/config.php';
-}
-require($configpath);
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
 use local_completionhistory\local\ledger_service;
@@ -71,26 +63,43 @@ global $DB;
 
 // Dry run: count without writing.
 if ($options['dryrun']) {
-    $sql = "SELECT COUNT(DISTINCT a.userid)
-              FROM {local_completionhistory_achievement} a
-         LEFT JOIN {user} u ON u.id = a.userid
-             WHERE a.userid > 0
-               AND (u.id IS NULL OR u.deleted = 1)";
-    $users = $DB->count_records_sql($sql);
+    $achievementusers = $DB->get_fieldset_sql(
+        "SELECT DISTINCT a.userid
+           FROM {local_completionhistory_achievement} a
+      LEFT JOIN {user} u ON u.id = a.userid
+          WHERE a.userid > 0
+            AND (u.id IS NULL OR u.deleted = 1)"
+    );
+    $attemptusers = $DB->get_fieldset_sql(
+        "SELECT DISTINCT ea.userid
+           FROM {local_completionhistory_exam_attempt} ea
+      LEFT JOIN {user} u ON u.id = ea.userid
+          WHERE ea.userid > 0
+            AND (u.id IS NULL OR u.deleted = 1)"
+    );
+    $users = count(array_unique(array_merge($achievementusers, $attemptusers)));
 
     $sql = "SELECT COUNT(a.id)
               FROM {local_completionhistory_achievement} a
          LEFT JOIN {user} u ON u.id = a.userid
              WHERE a.userid > 0
                AND (u.id IS NULL OR u.deleted = 1)";
-    $rows = $DB->count_records_sql($sql);
+    $achievementrows = $DB->count_records_sql($sql);
+
+    $sql = "SELECT COUNT(ea.id)
+              FROM {local_completionhistory_exam_attempt} ea
+         LEFT JOIN {user} u ON u.id = ea.userid
+             WHERE ea.userid > 0
+               AND (u.id IS NULL OR u.deleted = 1)";
+    $attemptrows = $DB->count_records_sql($sql);
 
     cli_writeln("DRY RUN — no changes written.");
-    cli_writeln("Deleted users with achievement rows: {$users}");
-    cli_writeln("Achievement rows that would be anonymized: {$rows}");
+    cli_writeln("Deleted users with academic rows: {$users}");
+    cli_writeln("Achievement rows that would be anonymized: {$achievementrows}");
+    cli_writeln("Exam-attempt rows that would be anonymized: {$attemptrows}");
     exit(0);
 }
 
 $stats = ledger_service::reconcile_deleted_users();
-cli_writeln("Deleted users with achievement rows: {$stats->candidates}");
-cli_writeln("Achievement rows anonymized: {$stats->anonymized}");
+cli_writeln("Deleted users with academic rows: {$stats->candidates}");
+cli_writeln("Achievement rows anonymized (exam attempts also scrubbed): {$stats->anonymized}");

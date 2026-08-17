@@ -134,9 +134,10 @@ class get_flagged_attempts extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
+        \local_completionhistory\local\security::require_enabled();
         // Same capability as get_recent_achievements: this is cross-user data and
         // carries names and email addresses.
-        require_capability('local/completionhistory:viewall', $systemcontext);
+        require_capability('local/completionhistory:integrate', $systemcontext);
 
         $since   = max(0, (int) $params['since']);
         $sinceid = max(0, (int) $params['since_id']);

@@ -167,8 +167,8 @@ class get_grade_items extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:viewall', $systemcontext);
-
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
         $since   = max(0, (int) $params['since']);
         $sinceid = max(0, (int) $params['since_id']);
         $limit   = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
@@ -189,14 +189,22 @@ class get_grade_items extends external_api {
             $where[] = 'gi.hidden = 0';
         }
 
-        $types = array_values(array_unique(array_filter(array_map('strval', $params['itemtypes']))));
+        $types = array_slice(
+            array_values(array_unique(array_filter(array_map('strval', $params['itemtypes'])))),
+            0,
+            self::MAX_LIMIT
+        );
         if ($types) {
             [$insql, $inparams] = $DB->get_in_or_equal($types, SQL_PARAMS_NAMED, 'it');
             $where[] = "gi.itemtype {$insql}";
             $sqlparams += $inparams;
         }
 
-        $cids = array_values(array_unique(array_map('intval', $params['courseids'])));
+        $cids = array_slice(
+            array_values(array_unique(array_filter(array_map('intval', $params['courseids'])))),
+            0,
+            self::MAX_LIMIT
+        );
         if ($cids) {
             [$insql, $inparams] = $DB->get_in_or_equal($cids, SQL_PARAMS_NAMED, 'cid');
             $where[] = "gi.courseid {$insql}";

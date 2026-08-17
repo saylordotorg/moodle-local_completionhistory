@@ -31,6 +31,8 @@ use core_external\external_value;
  */
 class get_purge_audit extends external_api {
 
+    /** Hard ceiling on rows per call. */
+    private const MAX_LIMIT = 500;
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'since' => new external_value(PARAM_INT, 'Return records created after this timestamp', VALUE_DEFAULT, 0),
@@ -48,18 +50,20 @@ class get_purge_audit extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+        $since = max(0, (int) $params['since']);
+        $limit = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
 
         $records = $DB->get_records_select(
             'local_completionhistory_purge_audit',
             'timecreated > :since',
-            ['since' => $params['since']],
+            ['since' => $since],
             'timecreated DESC',
             '*',
             0,
-            $params['limit']
+            $limit
         );
-
         $result = [];
         foreach ($records as $r) {
             $result[] = [

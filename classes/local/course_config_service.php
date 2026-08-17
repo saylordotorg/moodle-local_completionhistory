@@ -110,6 +110,7 @@ class course_config_service {
     public static function save_config(stdClass $config): int {
         global $DB;
 
+        $config = self::validate_config($config);
         $now = time();
         $existing = $DB->get_record('local_completionhistory_course_exam_config', ['courseid' => $config->courseid]);
 
@@ -146,6 +147,8 @@ class course_config_service {
     public static function get_all_configs(int $page = 0, int $perpage = 50): array {
         global $DB;
 
+        $page = max(0, $page);
+        $perpage = max(1, min(100, $perpage));
         $total   = $DB->count_records('local_completionhistory_course_exam_config');
         $configs = $DB->get_records(
             'local_completionhistory_course_exam_config',
@@ -157,6 +160,57 @@ class course_config_service {
         );
 
         return ['configs' => array_values($configs), 'total' => $total];
+    }
+
+    /**
+     * Validate references and bounded values before persisting configuration.
+     *
+     * @param stdClass $config Submitted configuration.
+     * @return stdClass Sanitized clone.
+     */
+    private static function validate_config(stdClass $config): stdClass {
+        global $DB;
+
+        $config = clone $config;
+        $config->courseid = (int) ($config->courseid ?? 0);
+        if ($config->courseid <= 0 || !$DB->record_exists('course', ['id' => $config->courseid])) {
+            throw new \invalid_parameter_exception('A valid course is required.');
+        }
+
+        $types = array_keys(self::type_labels());
+        if (!in_array($config->course_type ?? '', $types, true)) {
+            throw new \invalid_parameter_exception('Unknown course exam type.');
+        }
+
+        $quizfields = ['program_final_quizid', 'dc_quizid', 'cert_quizid'];
+        $quizids = [];
+        foreach ($quizfields as $field) {
+            $quizid = empty($config->$field) ? null : (int) $config->$field;
+            if ($quizid !== null && !$DB->record_exists('quiz', [
+                    'id' => $quizid,
+                    'course' => $config->courseid,
+                ])) {
+                throw new \invalid_parameter_exception('Every selected quiz must belong to the configured course.');
+            }
+            if ($quizid !== null && in_array($quizid, $quizids, true)) {
+                throw new \invalid_parameter_exception('A quiz cannot be assigned to more than one exam track.');
+            }
+            $config->$field = $quizid;
+            if ($quizid !== null) {
+                $quizids[] = $quizid;
+            }
+        }
+
+        foreach (['program_attempts_allowed', 'dc_attempts_allowed', 'cert_attempts_allowed'] as $field) {
+            $value = (int) ($config->$field ?? 0);
+            if ($value < 0 || $value > 99) {
+                throw new \invalid_parameter_exception('Attempts allowed must be between 0 and 99.');
+            }
+            $config->$field = $value;
+        }
+
+        $config->notes = clean_param((string) ($config->notes ?? ''), PARAM_TEXT);
+        return $config;
     }
 
     /**

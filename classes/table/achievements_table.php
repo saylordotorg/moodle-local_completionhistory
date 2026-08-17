@@ -247,7 +247,7 @@ class achievements_table extends table_sql {
         ];
 
         [$label, $cls] = $labels[$row->exam_track] ?? [$row->exam_track, 'badge-secondary'];
-        return html_writer::tag('span', $label, ['class' => "badge {$cls}", 'style' => 'font-size:0.82em']);
+        return html_writer::tag('span', s($label), ['class' => "badge {$cls}", 'style' => 'font-size:0.82em']);
     }
 
     /**
@@ -317,7 +317,9 @@ class achievements_table extends table_sql {
 
     public function col_artifacturl($row): string {
         if (empty($row->artifacturl)) return '-';
-        return html_writer::link($row->artifacturl, get_string('col_artifact', 'local_completionhistory'),
+        $url = clean_param((string) $row->artifacturl, PARAM_URL);
+        if ($url === '') return '-';
+        return html_writer::link($url, get_string('col_artifact', 'local_completionhistory'),
             ['target' => '_blank', 'rel' => 'noopener noreferrer']);
     }
 }

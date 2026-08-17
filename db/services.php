@@ -43,53 +43,53 @@ $functions = [
         'classname'    => 'local_completionhistory\external\get_recent_achievements',
         'description'  => 'Retrieve recent achievement records for SIS sync.',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_get_purge_audit' => [
         'classname'    => 'local_completionhistory\external\get_purge_audit',
         'description'  => 'Retrieve purge audit records.',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:manage',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_get_unsynced_outbox' => [
         'classname'    => 'local_completionhistory\external\get_unsynced_outbox',
         'description'  => 'Retrieve unsynced outbox rows (durable SIS sync queue).',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_mark_outbox_sent' => [
         'classname'    => 'local_completionhistory\external\mark_outbox_sent',
         'description'  => 'Acknowledge outbox rows after the SIS has consumed them.',
         'type'         => 'write',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:manage',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_provision_applicant' => [
         'classname'    => 'local_completionhistory\external\provision_applicant',
         'description'  => 'Create/find a user by email and allocate to a program (SIS admissions).',
         'type'         => 'write',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:manage',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:provisionusers',
     ],
     'local_completionhistory_set_password' => [
         'classname'    => 'local_completionhistory\external\set_password',
-        'description'  => 'Set a manual-auth user password by email and clear force-change (SIS welcome flow).',
+        'description'  => 'Complete one-time initial password setup for an eligible manual-auth learner.',
         'type'         => 'write',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:manage',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:resetpasswords',
     ],
     // Six contact fields and nothing else, so the SIS never needs core_user_update_users —
-    // which could also change auth, password, username and roles (SIS-33). Privileged
+    // which could also change auth, password, username and roles (SIS-33). Non-learner
     // accounts are refused, matching create_login_key.
     'local_completionhistory_update_user_profile' => [
         'classname'    => 'local_completionhistory\external\update_user_profile',
         'description'  => 'Apply a SIS profile correction to whitelisted Moodle contact fields, by email.',
         'type'         => 'write',
         'ajax'         => false,
-        'capabilities' => 'local/completionhistory:manage',
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:updateprofiles',
     ],
     // Proctoring flags for the SIS exam-review queue. The plugin evaluates these
     // rules at render time only, so without this the matches exist nowhere the SIS
@@ -98,8 +98,8 @@ $functions = [
         'classname'    => 'local_completionhistory\external\get_flagged_attempts',
         'description'  => 'Exam attempts matching the configured system flags (SIS exam-review case queue).',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     // Course catalog, wrapping core reads the SIS token is deliberately not
     // authorised for. Without this the SIS course sync had never worked (SIS-44).
@@ -107,8 +107,8 @@ $functions = [
         'classname'    => 'local_completionhistory\\external\\list_courses',
         'description'  => 'Course catalog and category tree (SIS course mapping / catalog sync).',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     // Login and last-access timestamps, which are a different question from
     // academic activity and could not be answered at all before (SIS-43).
@@ -116,43 +116,43 @@ $functions = [
         'classname'    => 'local_completionhistory\external\get_grade_items',
         'description'  => 'Per-grade-item grades for SIS grade ingestion (SIS-42). Authorised alternative to the core gradereport_user_get_grade_items, which the SIS token cannot call.',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_get_user_activity' => [
         'classname'    => 'local_completionhistory\\external\\get_user_activity',
         'description'  => 'Login and last-access timestamps for learners (SIS engagement / last-login reporting).',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_list_programs' => [
         'classname'    => 'local_completionhistory\external\list_programs',
         'description'  => 'List enrol_programs programs and their member courses (SIS program registry sync).',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_get_user_inprogress_courses' => [
         'classname'    => 'local_completionhistory\external\get_user_inprogress_courses',
         'description'  => 'Courses a user has started but not completed (SIS requirements/teach-out engine).',
         'type'         => 'read',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:viewall',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
     ],
     'local_completionhistory_enrol_user_in_course' => [
         'classname'    => 'local_completionhistory\external\enrol_user_in_course',
         'description'  => 'Manually enrol a user into a course by email + idnumber (SIS course-window pacer / alumni enrolment).',
         'type'         => 'write',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:manage',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:enrolusers',
     ],
     'local_completionhistory_set_program_deadline' => [
         'classname'    => 'local_completionhistory\external\set_program_deadline',
         'description'  => 'Set the timeend of a user program allocation (SIS time-to-completion clocks).',
         'type'         => 'write',
-        'ajax'         => true,
-        'capabilities' => 'local/completionhistory:manage',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:setdeadlines',
     ],
     // The one function here that can produce a LOGGED-IN BROWSER SESSION rather than
     // just data. 'write' rather than 'read' for that reason, even though it writes only
@@ -166,7 +166,7 @@ $functions = [
         // reachable with any logged-in user's session cookie, which is a different and
         // much larger attack surface than a server-to-server token.
         'ajax'         => false,
-        'capabilities' => 'local/completionhistory:manage',
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:createloginkeys',
     ],
 ];
 

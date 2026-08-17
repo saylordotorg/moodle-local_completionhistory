@@ -74,11 +74,13 @@ class ledger_service {
         $courseidnumber  = $course ? $course->idnumber  : null;
 
         // Snapshot user fields.
-        $user         = $DB->get_record('user', ['id' => $userid], 'id, idnumber, firstname, lastname, email');
-        $useridnumber = $user ? $user->idnumber  : null;
-        $firstname    = $user ? $user->firstname : null;
-        $lastname     = $user ? $user->lastname  : null;
-        $email        = $user ? $user->email     : null;
+        $user = $DB->get_record('user', ['id' => $userid], 'id, deleted, idnumber, firstname, lastname, email');
+        $anonymizeonwrite = (bool) get_config('local_completionhistory', 'gdpranonymize') &&
+            (!$user || !empty($user->deleted));
+        $useridnumber = ($user && !$anonymizeonwrite) ? $user->idnumber  : null;
+        $firstname    = ($user && !$anonymizeonwrite) ? $user->firstname : null;
+        $lastname     = ($user && !$anonymizeonwrite) ? $user->lastname  : null;
+        $email        = ($user && !$anonymizeonwrite) ? $user->email     : null;
 
         // Snapshot earliest enrolment date for this user+course.
         $enrolments = $DB->get_records_sql(
@@ -104,7 +106,9 @@ class ledger_service {
 
         // Resolve program context.
         $programs = program_context_resolver::resolve($userid, $courseid);
-        $artifact = artifact_service::certificate_artifact_for_user_course($userid, $courseid);
+        $artifact = $anonymizeonwrite
+            ? null
+            : artifact_service::certificate_artifact_for_user_course($userid, $courseid);
 
         // If no exam_track was explicitly provided, try to auto-detect from course config.
         if ($exam_track === null) {
@@ -129,7 +133,7 @@ class ledger_service {
         // Build the achievement record.
         $record                           = new stdClass();
         $record->ledgeruuid               = self::generate_uuid();
-        $record->userid                   = $userid;
+        $record->userid                   = $anonymizeonwrite ? 0 : $userid;
         $record->useridnumber_snapshot    = $useridnumber  ?: null;
         $record->firstname_snapshot       = $firstname     ?: null;
         $record->lastname_snapshot        = $lastname      ?: null;
@@ -161,7 +165,7 @@ class ledger_service {
             foreach ($programs as $program) {
                 $progrecord                           = new stdClass();
                 $progrecord->achievementid            = $achievementid;
-                $progrecord->allocationid             = $program->allocationid ?? null;
+                $progrecord->allocationid             = $anonymizeonwrite ? null : ($program->allocationid ?? null);
                 $progrecord->programid                = $program->programid    ?? null;
                 $progrecord->programidnumber_snapshot = $program->idnumber     ?? null;
                 $progrecord->programname_snapshot     = $program->fullname;
@@ -233,24 +237,61 @@ class ledger_service {
 
         [$insql, $params] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
 
-        $count = $DB->count_records_select(
+        $achievements = $DB->get_records_select(
             'local_completionhistory_achievement',
             "userid {$insql}",
-            $params
+            $params,
+            '',
+            'id'
         );
+        $count = count($achievements);
 
-        $DB->execute(
-            "UPDATE {local_completionhistory_achievement}
-                SET userid                = 0,
-                    useridnumber_snapshot = NULL,
-                    firstname_snapshot    = NULL,
-                    lastname_snapshot     = NULL,
-                    email_snapshot        = NULL,
-                    artifacturl           = NULL,
-                    artifactstorage       = NULL
-              WHERE userid {$insql}",
-            $params
-        );
+        $transaction = $DB->start_delegated_transaction();
+        try {
+            $DB->execute(
+                "UPDATE {local_completionhistory_achievement}
+                    SET userid                = 0,
+                        useridnumber_snapshot = NULL,
+                        firstname_snapshot    = NULL,
+                        lastname_snapshot     = NULL,
+                        email_snapshot        = NULL,
+                        artifacturl           = NULL,
+                        artifactstorage       = NULL
+                  WHERE userid {$insql}",
+                $params
+            );
+
+            // Attempt rows are academic records too, but the direct userid is not
+            // required once the account is erased.
+            $DB->execute(
+                "UPDATE {local_completionhistory_exam_attempt}
+                    SET userid = 0
+                  WHERE userid {$insql}",
+                $params
+            );
+
+            // Allocation ids point back to a user-specific enrol_programs row;
+            // retain the academic program snapshot but remove that live linkage.
+            if ($achievements) {
+                [$achievementinsql, $achievementparams] = $DB->get_in_or_equal(
+                    array_keys($achievements),
+                    SQL_PARAMS_NAMED,
+                    'achievement'
+                );
+                $DB->execute(
+                    "UPDATE {local_completionhistory_ach_program}
+                        SET allocationid = NULL
+                      WHERE achievementid {$achievementinsql}",
+                    $achievementparams
+                );
+            }
+
+            // Outbox rows contain a denormalized JSON copy of all snapshot PII.
+            outbox_service::anonymize_achievement_payloads(array_keys($achievements));
+            $transaction->allow_commit();
+        } catch (\Throwable $e) {
+            $transaction->rollback($e);
+        }
 
         return $count;
     }
@@ -274,14 +315,22 @@ class ledger_service {
         $stats->candidates = 0;
         $stats->anonymized = 0;
 
-        // Distinct achievement userids where the referenced user is either
-        // flagged deleted=1 or gone from the user table entirely.
-        $sql = "SELECT DISTINCT a.userid
-                  FROM {local_completionhistory_achievement} a
-             LEFT JOIN {user} u ON u.id = a.userid
-                 WHERE a.userid > 0
-                   AND (u.id IS NULL OR u.deleted = 1)";
-        $userids = $DB->get_fieldset_sql($sql);
+        // Include exam-only users as well as users with ledger rows.
+        $achievementusers = $DB->get_fieldset_sql(
+            "SELECT DISTINCT a.userid
+               FROM {local_completionhistory_achievement} a
+          LEFT JOIN {user} u ON u.id = a.userid
+              WHERE a.userid > 0
+                AND (u.id IS NULL OR u.deleted = 1)"
+        );
+        $attemptusers = $DB->get_fieldset_sql(
+            "SELECT DISTINCT ea.userid
+               FROM {local_completionhistory_exam_attempt} ea
+          LEFT JOIN {user} u ON u.id = ea.userid
+              WHERE ea.userid > 0
+                AND (u.id IS NULL OR u.deleted = 1)"
+        );
+        $userids = array_values(array_unique(array_merge($achievementusers, $attemptusers)));
 
         $stats->candidates = count($userids);
         if (empty($userids)) {
@@ -315,7 +364,11 @@ class ledger_service {
     }
 
     /**
-     * Compute deterministic SHA-256 hash for deduplication.
+     * Compute a deterministic, site-keyed SHA-256 hash for deduplication.
+     *
+     * A keyed hash prevents the original userid from being recovered by enumerating
+     * the small set of candidate ids while retaining the key after anonymization so
+     * that a later backfill cannot recreate the same achievement.
      *
      * @param int    $userid
      * @param int    $courseid
@@ -324,7 +377,29 @@ class ledger_service {
      * @return string 64-character hex hash.
      */
     public static function compute_event_hash(int $userid, int $courseid, int $timecompleted, string $sourcecomponent): string {
-        return hash('sha256', $userid . '|' . $courseid . '|' . $timecompleted . '|' . $sourcecomponent);
+        return hash_hmac(
+            'sha256',
+            $userid . '|' . $courseid . '|' . $timecompleted . '|' . $sourcecomponent,
+            self::get_hash_secret()
+        );
+    }
+
+    /**
+     * Return the private key for event hashes.
+     *
+     * The install and upgrade hooks persist a plugin-specific random key. The
+     * site-identifier fallback keeps restored or unusually bootstrapped sites
+     * deterministic without creating a race between concurrent first events.
+     *
+     * @return string
+     */
+    private static function get_hash_secret(): string {
+        $secret = (string) get_config('local_completionhistory', 'hashsecret');
+        if (strlen($secret) >= 32) {
+            return $secret;
+        }
+
+        return hash('sha256', 'local_completionhistory|' . get_site_identifier());
     }
 
     /**

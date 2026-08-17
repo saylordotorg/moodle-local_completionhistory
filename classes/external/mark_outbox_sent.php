@@ -32,6 +32,12 @@ use local_completionhistory\local\outbox_service;
  */
 class mark_outbox_sent extends external_api {
 
+    /** Maximum acknowledgements accepted in one request. */
+    private const MAX_IDS = 1000;
+
+    /** Maximum retained delivery-error length. */
+    private const MAX_ERROR_LENGTH = 4000;
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'ids'    => new external_multiple_structure(
@@ -51,12 +57,25 @@ class mark_outbox_sent extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+
+        if (count($params['ids']) > self::MAX_IDS) {
+            throw new \invalid_parameter_exception('Too many outbox ids; maximum is ' . self::MAX_IDS . '.');
+        }
+        if (!in_array($params['status'], [
+            outbox_service::STATUS_SENT,
+            outbox_service::STATUS_FAILED,
+            outbox_service::STATUS_CANCELLED,
+        ], true)) {
+            throw new \invalid_parameter_exception('Unknown outbox status.');
+        }
+        $error = \core_text::substr((string) $params['error'], 0, self::MAX_ERROR_LENGTH);
 
         $updated = outbox_service::mark_sent(
             $params['ids'],
             $params['status'],
-            ($params['error'] !== '') ? $params['error'] : null
+            ($error !== '') ? $error : null
         );
 
         return ['updated' => $updated];

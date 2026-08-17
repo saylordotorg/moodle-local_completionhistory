@@ -35,6 +35,9 @@ use core_external\external_value;
  */
 class get_user_inprogress_courses extends external_api {
 
+    /** Defensive ceiling for pathological enrolment sets. */
+    private const MAX_COURSES = 1000;
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'userid' => new external_value(PARAM_INT, 'Moodle user id'),
@@ -48,8 +51,8 @@ class get_user_inprogress_courses extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:viewall', $systemcontext);
-
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
         // Started = actively enrolled + has a course last-access row; in
         // progress = started AND not completed.
         //
@@ -71,7 +74,8 @@ class get_user_inprogress_courses extends external_api {
                    AND NOT EXISTS (
                        SELECT 1 FROM {course_completions} cc
                         WHERE cc.course = c.id AND cc.userid = :uid3 AND cc.timecompleted IS NOT NULL
-                   )";
+                   )
+              ORDER BY c.id ASC";
         $records = $DB->get_records_sql($sql, [
             'uid1'   => $params['userid'],
             'uid2'   => $params['userid'],
@@ -79,7 +83,10 @@ class get_user_inprogress_courses extends external_api {
             'now1'   => $now,
             'now2'   => $now,
             'siteid' => SITEID,
-        ]);
+        ], 0, self::MAX_COURSES + 1);
+        if (count($records) > self::MAX_COURSES) {
+            throw new \moodle_exception('inprogresscoursestoolarge', 'local_completionhistory');
+        }
 
         $courses = [];
         foreach ($records as $c) {

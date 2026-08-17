@@ -62,4 +62,46 @@ $capabilities = [
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [],
     ],
+    'local/completionhistory:integrate' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_DATALOSS,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
+    'local/completionhistory:provisionusers' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_CONFIG,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
+    'local/completionhistory:resetpasswords' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_CONFIG,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
+    'local/completionhistory:createloginkeys' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_CONFIG,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
+    'local/completionhistory:updateprofiles' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_DATALOSS,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
+    'local/completionhistory:enrolusers' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_CONFIG,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
+    'local/completionhistory:setdeadlines' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_DATALOSS,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
 ];

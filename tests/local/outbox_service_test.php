@@ -25,7 +25,6 @@ use stdClass;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_completionhistory\local\outbox_service
  */
 class outbox_service_test extends advanced_testcase {
 
@@ -92,6 +91,8 @@ class outbox_service_test extends advanced_testcase {
     }
 
     public function test_build_achievement_payload_shape(): void {
+        global $CFG;
+
         /** @var \local_completionhistory_generator $gen */
         $gen = $this->getDataGenerator()->get_plugin_generator('local_completionhistory');
         $a = $gen->create_achievement([
@@ -120,7 +121,24 @@ class outbox_service_test extends advanced_testcase {
         $this->assertSame('', $payload['artifacturl']);
         $this->assertSame('', $payload['artifactstorage']);
         $this->assertSame('', $payload['artifactcode']);
+        // Unset/blank setting falls back to the site URL at build time.
+        $this->assertSame($CFG->wwwroot, $payload['sourcesite']);
         $this->assertIsArray($payload['programs']);
+    }
+
+    public function test_build_achievement_payload_uses_sourcesite_setting(): void {
+        /** @var \local_completionhistory_generator $gen */
+        $gen = $this->getDataGenerator()->get_plugin_generator('local_completionhistory');
+        $a = $gen->create_achievement([]);
+
+        set_config('sourcesite', 'prod-degrees', 'local_completionhistory');
+        $payload = outbox_service::build_achievement_payload($a);
+        $this->assertSame('prod-degrees', $payload['sourcesite']);
+
+        set_config('sourcesite', '   ', 'local_completionhistory');
+        global $CFG;
+        $payload = outbox_service::build_achievement_payload($a);
+        $this->assertSame($CFG->wwwroot, $payload['sourcesite']);
     }
 
     public function test_build_achievement_payload_includes_certificate_artifact(): void {

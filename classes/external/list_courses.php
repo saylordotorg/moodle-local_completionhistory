@@ -56,6 +56,9 @@ use core_external\external_value;
  */
 class list_courses extends external_api {
 
+    /** Maximum rows returned by this snapshot-style catalog endpoint. */
+    private const MAX_CATALOG_ROWS = 5000;
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'includehidden' => new external_value(PARAM_BOOL,
@@ -77,9 +80,10 @@ class list_courses extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
+        \local_completionhistory\local\security::require_enabled();
         // Same capability as the sibling read functions. The catalog is not
         // per-student data, but it is still an authenticated read.
-        require_capability('local/completionhistory:viewall', $systemcontext);
+        require_capability('local/completionhistory:integrate', $systemcontext);
 
         // Read the tables directly rather than through get_courses(), which loads
         // full course objects including summaries and format options the SIS does
@@ -90,14 +94,23 @@ class list_courses extends external_api {
                     c.visible, c.sortorder, c.timemodified
                FROM {course} c
                {$where}
-           ORDER BY c.sortorder ASC, c.id ASC"
+           ORDER BY c.sortorder ASC, c.id ASC",
+            [],
+            0,
+            self::MAX_CATALOG_ROWS + 1
         );
 
         $categories = $DB->get_records_sql(
             "SELECT cc.id, cc.name, cc.parent, cc.sortorder, cc.coursecount, cc.visible, cc.idnumber
                FROM {course_categories} cc
-           ORDER BY cc.sortorder ASC, cc.id ASC"
+           ORDER BY cc.sortorder ASC, cc.id ASC",
+            [],
+            0,
+            self::MAX_CATALOG_ROWS + 1
         );
+        if (count($courses) > self::MAX_CATALOG_ROWS || count($categories) > self::MAX_CATALOG_ROWS) {
+            throw new \moodle_exception('catalogtoolarge', 'local_completionhistory');
+        }
 
         $outcourses = [];
         foreach ($courses as $c) {

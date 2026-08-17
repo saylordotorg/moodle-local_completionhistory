@@ -36,6 +36,9 @@ use local_completionhistory\local\outbox_service;
  */
 class get_recent_achievements extends external_api {
 
+    /** Hard ceiling on rows per call. */
+    private const MAX_LIMIT = 1000;
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'since' => new external_value(PARAM_INT, 'Return achievements created after this timestamp'),
@@ -53,16 +56,20 @@ class get_recent_achievements extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:viewall', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+
+        $since = max(0, (int) $params['since']);
+        $limit = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
 
         $achievements = $DB->get_records_select(
             'local_completionhistory_achievement',
             'timecreated > :since',
-            ['since' => $params['since']],
+            ['since' => $since],
             'timecreated ASC',
             '*',
             0,
-            $params['limit']
+            $limit
         );
 
         $result = [];
@@ -102,6 +109,7 @@ class get_recent_achievements extends external_api {
                 'artifactcode'    => new external_value(PARAM_RAW, 'Certificate code when the artifact is a Moodle certificate'),
                 'sourcecomponent' => new external_value(PARAM_RAW, 'Capture source component'),
                 'sourceevent'     => new external_value(PARAM_RAW, 'Capture source event'),
+                'sourcesite'      => new external_value(PARAM_RAW, 'Identifier of the Moodle site that produced this record'),
                 'timecreated'     => new external_value(PARAM_INT, 'Record creation timestamp'),
                 'programs'        => new external_multiple_structure(
                     new external_single_structure([

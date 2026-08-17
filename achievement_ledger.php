@@ -22,8 +22,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$dir = dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'] ?? __DIR__)));
-require($dir . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_login();
 
 use local_completionhistory\table\achievements_table;
@@ -101,6 +100,9 @@ $savedefault   = optional_param('savedefault',   0, PARAM_BOOL);
 $resetdefault  = optional_param('resetdefault',  0, PARAM_BOOL);
 
 if ($savelayout || $resetlayout || $savedefault || $resetdefault) {
+    if (!data_submitted()) {
+        throw new moodle_exception('invalidrequest');
+    }
     require_sesskey();
 
     if ($savedefault || $resetdefault) {
@@ -375,6 +377,7 @@ echo html_writer::empty_tag('input', [
     'value' => get_string('savelayout', 'local_completionhistory'),
     'class' => 'btn btn-outline-success btn-sm mr-2',
     'title' => get_string('savelayout_help', 'local_completionhistory'),
+    'formmethod' => 'post',
 ]);
 if ($savedpref !== '') {
     echo html_writer::empty_tag('input', [
@@ -383,6 +386,7 @@ if ($savedpref !== '') {
         'value'   => get_string('resetlayout', 'local_completionhistory'),
         'class'   => 'btn btn-outline-danger btn-sm mr-2',
         'title'   => get_string('resetlayout_help', 'local_completionhistory'),
+        'formmethod' => 'post',
         'onclick' => 'return confirm(' . json_encode(get_string('resetlayout_confirm', 'local_completionhistory')) . ');',
     ]);
 }
@@ -393,6 +397,7 @@ if ($cansetdefault) {
         'value' => get_string('savedefault', 'local_completionhistory'),
         'class' => 'btn btn-outline-primary btn-sm mr-2',
         'title' => get_string('savedefault_help', 'local_completionhistory'),
+        'formmethod' => 'post',
     ]);
     if ($siteconfigcols !== '') {
         echo html_writer::empty_tag('input', [
@@ -401,6 +406,7 @@ if ($cansetdefault) {
             'value'   => get_string('resetdefault', 'local_completionhistory'),
             'class'   => 'btn btn-outline-warning btn-sm',
             'title'   => get_string('resetdefault_help', 'local_completionhistory'),
+            'formmethod' => 'post',
             'onclick' => 'return confirm(' . json_encode(get_string('resetdefault_confirm', 'local_completionhistory')) . ');',
         ]);
     }

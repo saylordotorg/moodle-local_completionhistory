@@ -44,7 +44,7 @@ class set_password extends external_api {
     }
 
     public static function execute(string $email, string $password): array {
-        global $CFG, $DB;
+        global $CFG;
         require_once($CFG->dirroot . '/user/lib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
@@ -54,18 +54,19 @@ class set_password extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+        require_capability('local/completionhistory:resetpasswords', $systemcontext);
 
-        $user = $DB->get_record('user', [
-            'email'      => \core_text::strtolower($params['email']),
-            'deleted'    => 0,
-            'mnethostid' => $CFG->mnet_localhost_id,
-        ]);
+        $user = \local_completionhistory\local\security::get_unique_local_user_by_email($params['email']);
         if (!$user) {
             return ['success' => false, 'warning' => 'No account was found for that email.'];
         }
         if ($user->auth !== 'manual') {
             return ['success' => false, 'warning' => 'This account is not managed by mySaylor.'];
+        }
+        if (!\local_completionhistory\local\security::is_learner_account($user)) {
+            return ['success' => false, 'warning' => 'This account is not eligible for integration password setup.'];
         }
 
         // Enforce the site password policy server-side.
@@ -74,9 +75,29 @@ class set_password extends external_api {
             return ['success' => false, 'warning' => trim(html_to_text($errmsg, 0, false))];
         }
 
-        update_internal_user_password($user, $params['password']);
-        // Clear the force-change flag so login/token.php accepts the account.
-        unset_user_preference('auth_forcepasswordchange', $user);
+        // Serialize the one-time check and update. Without the lock, two concurrent
+        // welcome requests could both observe the force-change marker and the later
+        // request would silently replace the password chosen by the first.
+        $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_password');
+        $lock = $lockfactory->get_lock('user_' . (int) $user->id, 5);
+        if (!$lock) {
+            return ['success' => false, 'warning' => 'Password setup is already in progress.'];
+        }
+
+        try {
+            // This endpoint is setup, not password reset. It can only complete the
+            // one-time password flow established by provision_applicant.
+            $forcechange = (bool) get_user_preferences('auth_forcepasswordchange', false, $user->id);
+            if (!$forcechange) {
+                return ['success' => false, 'warning' => 'This account is not awaiting initial password setup.'];
+            }
+
+            update_internal_user_password($user, $params['password']);
+            // Clear the force-change flag so login/token.php accepts the account.
+            unset_user_preference('auth_forcepasswordchange', $user);
+        } finally {
+            $lock->release();
+        }
 
         return ['success' => true, 'warning' => ''];
     }

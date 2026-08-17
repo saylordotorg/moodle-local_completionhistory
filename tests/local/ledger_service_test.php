@@ -25,7 +25,6 @@ use stdClass;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_completionhistory\local\ledger_service
  */
 class ledger_service_test extends advanced_testcase {
 
@@ -35,6 +34,7 @@ class ledger_service_test extends advanced_testcase {
         set_config('enabled', 1, 'local_completionhistory');
         set_config('autocapture', 1, 'local_completionhistory');
         set_config('capturegrades', 1, 'local_completionhistory');
+        set_config('hashsecret', str_repeat('a', 64), 'local_completionhistory');
     }
 
     /**
@@ -137,6 +137,37 @@ class ledger_service_test extends advanced_testcase {
     }
 
     /**
+     * A late completion must not reintroduce PII after automatic erasure.
+     */
+    public function test_capture_for_deleted_user_is_anonymous_when_configured(): void {
+        global $DB;
+
+        set_config('gdpranonymize', 1, 'local_completionhistory');
+        $user = $this->getDataGenerator()->create_user([
+            'idnumber' => 'ERASED-123',
+            'firstname' => 'Private',
+            'lastname' => 'Learner',
+        ]);
+        $course = $this->getDataGenerator()->create_course();
+        $DB->set_field('user', 'deleted', 1, ['id' => $user->id]);
+
+        $completion = (object) [
+            'userid' => $user->id,
+            'course' => $course->id,
+            'timecompleted' => time(),
+        ];
+        $id = ledger_service::capture_achievement($completion, 'core_completion', 'test');
+        $record = $DB->get_record('local_completionhistory_achievement', ['id' => $id], '*', MUST_EXIST);
+
+        $this->assertEquals(0, $record->userid);
+        $this->assertNull($record->useridnumber_snapshot);
+        $this->assertNull($record->firstname_snapshot);
+        $this->assertNull($record->lastname_snapshot);
+        $this->assertNull($record->email_snapshot);
+        $this->assertNull($record->artifacturl);
+    }
+
+    /**
      * Test UUID generation produces valid format.
      */
     public function test_uuid_format(): void {
@@ -158,6 +189,17 @@ class ledger_service_test extends advanced_testcase {
         // Different input = different hash.
         $hash3 = ledger_service::compute_event_hash(42, 10, 1700000001, 'core_completion');
         $this->assertNotEquals($hash1, $hash3);
+
+        $enumerable = hash('sha256', '42|10|1700000000|core_completion');
+        $this->assertNotSame($enumerable, $hash1);
+        $this->assertSame(
+            hash_hmac(
+                'sha256',
+                '42|10|1700000000|core_completion',
+                (string) get_config('local_completionhistory', 'hashsecret')
+            ),
+            $hash1
+        );
     }
 
     /**

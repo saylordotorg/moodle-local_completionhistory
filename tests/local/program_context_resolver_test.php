@@ -24,7 +24,6 @@ use advanced_testcase;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_completionhistory\local\program_context_resolver
  */
 class program_context_resolver_test extends advanced_testcase {
 

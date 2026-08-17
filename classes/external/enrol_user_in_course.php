@@ -53,14 +53,16 @@ class enrol_user_in_course extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:manage', $systemcontext);
-
-        $user = $DB->get_record('user', [
-            'email' => \core_text::strtolower($params['email']),
-            'deleted' => 0,
-            'mnethostid' => $CFG->mnet_localhost_id,
-        ], '*', MUST_EXIST);
-
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
+        require_capability('local/completionhistory:enrolusers', $systemcontext);
+        $user = \local_completionhistory\local\security::get_unique_local_user_by_email($params['email']);
+        if (!$user) {
+            throw new \moodle_exception('invaliduser', 'error');
+        }
+        if (!\local_completionhistory\local\security::is_learner_account($user)) {
+            throw new \moodle_exception('invaliduser', 'error');
+        }
         $course = $DB->get_record('course', ['idnumber' => $params['courseidnumber']]);
         if (!$course) {
             $course = $DB->get_record('course', ['shortname' => $params['courseidnumber']], '*', MUST_EXIST);
@@ -72,11 +74,15 @@ class enrol_user_in_course extends external_api {
             return ['ok' => true, 'courseid' => (int) $course->id, 'already' => true, 'warning' => ''];
         }
 
+        $plugin = enrol_get_plugin('manual');
+        if (!$plugin) {
+            throw new \moodle_exception('manualenrolunavailable', 'local_completionhistory');
+        }
+
         $instance = $DB->get_record('enrol', ['courseid' => $course->id, 'enrol' => 'manual', 'status' => ENROL_INSTANCE_ENABLED]);
         $warning = '';
         if (!$instance) {
             // Add (or re-enable) a manual instance so the SIS can always place students.
-            $plugin = enrol_get_plugin('manual');
             $disabled = $DB->get_record('enrol', ['courseid' => $course->id, 'enrol' => 'manual']);
             if ($disabled) {
                 $plugin->update_status($disabled, ENROL_INSTANCE_ENABLED);
@@ -97,14 +103,9 @@ class enrol_user_in_course extends external_api {
         // is worse than refusing, because nobody goes looking.
         $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
         if ($studentroleid <= 0) {
-            throw new \moodle_exception(
-                'No role with shortname "student" exists on this site, so the learner cannot be '
-                . 'enrolled with student permissions. Create or rename the role, or tell the SIS which '
-                . 'role to use.'
-            );
+            throw new \moodle_exception('studentrolemissing', 'local_completionhistory');
         }
-        enrol_get_plugin('manual')->enrol_user($instance, $user->id, $studentroleid, time(), 0, ENROL_USER_ACTIVE);
-
+        $plugin->enrol_user($instance, $user->id, $studentroleid, time(), 0, ENROL_USER_ACTIVE);
         return ['ok' => true, 'courseid' => (int) $course->id, 'already' => false, 'warning' => $warning];
     }
 

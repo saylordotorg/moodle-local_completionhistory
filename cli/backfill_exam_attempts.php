@@ -39,16 +39,7 @@
 
 define('CLI_SCRIPT', true);
 
-$configpath = __DIR__ . '/../../../config.php';
-if (!file_exists($configpath)) {
-    // Fallback: walk up from the working directory.
-    $configpath = getcwd();
-    while ($configpath !== '/' && !file_exists($configpath . '/config.php')) {
-        $configpath = dirname($configpath);
-    }
-    $configpath .= '/config.php';
-}
-require($configpath);
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
 use local_completionhistory\local\exam_backfill_service;

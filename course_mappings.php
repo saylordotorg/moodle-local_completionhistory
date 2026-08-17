@@ -22,9 +22,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// Use SCRIPT_FILENAME + dirname to handle symlinked plugin directories.
-$dir = dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'] ?? __DIR__)));
-require($dir . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_login();
 
 use local_completionhistory\form\course_mapping_form;
@@ -49,6 +47,9 @@ $PAGE->set_pagelayout('admin');
 
 // Handle delete action.
 if ($action === 'delete' && $id > 0) {
+    if (!data_submitted()) {
+        throw new moodle_exception('invalidrequest');
+    }
     require_sesskey();
     $DB->delete_records('local_completionhistory_course_map', ['id' => $id]);
     \core\notification::success(get_string('mappingdeleted', 'local_completionhistory'));

@@ -74,6 +74,9 @@ class get_user_activity extends external_api {
     /** Hard ceiling on users per call, whatever the caller asks for. */
     private const MAX_LIMIT = 1000;
 
+    /** Maximum per-course access rows included in one response. */
+    private const MAX_COURSE_ROWS = 10000;
+
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'userids' => new external_multiple_structure(
@@ -137,12 +140,17 @@ class get_user_activity extends external_api {
 
         $systemcontext = \context_system::instance();
         self::validate_context($systemcontext);
-        require_capability('local/completionhistory:viewall', $systemcontext);
+        \local_completionhistory\local\security::require_enabled();
+        require_capability('local/completionhistory:integrate', $systemcontext);
 
         $since   = max(0, (int) $params['since']);
         $sinceid = max(0, (int) $params['since_id']);
         $limit   = max(1, min(self::MAX_LIMIT, (int) $params['limit']));
-        $ids     = array_values(array_unique(array_map('intval', $params['userids'])));
+        $ids = array_slice(
+            array_values(array_unique(array_filter(array_map('intval', $params['userids'])))),
+            0,
+            self::MAX_LIMIT
+        );
 
         // Guests, deleted accounts and UNCONFIRMED accounts are not learners.
         // Unconfirmed matters: abandoned self-registrations would otherwise enter the
@@ -183,8 +191,13 @@ class get_user_activity extends external_api {
                    FROM {user_lastaccess} ul
                   WHERE ul.userid {$insql}
                ORDER BY ul.timeaccess DESC",
-                $inparams
+                $inparams,
+                0,
+                self::MAX_COURSE_ROWS + 1
             );
+            if (count($rows) > self::MAX_COURSE_ROWS) {
+                throw new \moodle_exception('activitydetailtoolarge', 'local_completionhistory');
+            }
             foreach ($rows as $r) {
                 $percourse[(int) $r->userid][] = [
                     'courseid'   => (int) $r->courseid,

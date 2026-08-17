@@ -15,18 +15,16 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Plugin version and other metadata.
+ * Installation hook for local_completionhistory.
  *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
-$plugin->component = 'local_completionhistory';
-$plugin->version   = 2026081700;
-$plugin->requires  = 2024100700; // Moodle 4.5.
-$plugin->supported = [405, 502];
-$plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.5.0';
+/**
+ * Create the private key used for non-enumerable deduplication hashes.
+ */
+function xmldb_local_completionhistory_install(): void {
+    set_config('hashsecret', bin2hex(random_bytes(32)), 'local_completionhistory');
+}
