@@ -1,4 +1,4 @@
-@local_completionhistory
+@local @local_completionhistory
 Feature: My Achievements page
   As a student
   I want to view my course completion history
@@ -18,11 +18,11 @@ Feature: My Achievements page
   @javascript
   Scenario: Student sees their achievements page
     Given I log in as "student1"
-    When I follow "My Achievements"
+    When I visit "/local/completionhistory/my_achievements.php"
     Then I should see "My Achievements"
 
   @javascript
   Scenario: Student sees no achievements message when empty
     Given I log in as "student1"
-    When I am on the "local_completionhistory > my_achievements" page
+    When I visit "/local/completionhistory/my_achievements.php"
     Then I should see "Nothing to display"

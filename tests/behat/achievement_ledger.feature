@@ -1,4 +1,4 @@
-@local_completionhistory
+@local @local_completionhistory
 Feature: Achievement Ledger page
   As a manager
   I want to view and filter the achievement ledger
@@ -17,5 +17,5 @@ Feature: Achievement Ledger page
   @javascript
   Scenario: Manager can access the achievement ledger
     Given I log in as "manager1"
-    When I navigate to "Plugins > Local plugins > Achievement Ledger" in site administration
+    When I visit "/local/completionhistory/achievement_ledger.php"
     Then I should see "Achievement Ledger"

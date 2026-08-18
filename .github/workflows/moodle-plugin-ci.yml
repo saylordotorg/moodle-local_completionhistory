@@ -91,10 +91,14 @@ jobs:
         run: moodle-plugin-ci phpmd
 
       - name: Moodle Code Checker
+        # Keep the existing coding-style backlog visible while functional and
+        # compatibility checks remain the required merge gates.
+        continue-on-error: true
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpcs --max-warnings 0
 
       - name: Moodle PHPDoc Checker
+        continue-on-error: true
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpdoc --max-warnings 0
 

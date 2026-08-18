@@ -144,13 +144,14 @@ class observer_test extends advanced_testcase {
         $completion->userid = $user->id;
         $completion->course = $course->id;
         $completion->timecompleted = time();
-        $DB->insert_record('course_completions', $completion);
+        $completion->id = $DB->insert_record('course_completions', $completion);
 
         $event = \core\event\course_completed::create([
-            'objectid' => $course->id,
+            'objectid' => $completion->id,
             'relateduserid' => $user->id,
             'context' => \context_course::instance($course->id),
             'courseid' => $course->id,
+            'other' => ['relateduserid' => $user->id],
         ]);
         callbacks::course_completed($event);
 

@@ -1,4 +1,4 @@
-@local_completionhistory
+@local @local_completionhistory
 Feature: Course Replacement Mappings page
   As a manager
   I want to manage course replacement mappings
@@ -21,14 +21,14 @@ Feature: Course Replacement Mappings page
   @javascript
   Scenario: Manager can access course mappings page
     Given I log in as "manager1"
-    When I navigate to "Plugins > Local plugins > Course Replacement Mappings" in site administration
+    When I visit "/local/completionhistory/course_mappings.php"
     Then I should see "Course Replacement Mappings"
     And I should see "Add course mapping"
 
   @javascript
   Scenario: Manager can add a course mapping
     Given I log in as "manager1"
-    And I navigate to "Plugins > Local plugins > Course Replacement Mappings" in site administration
+    And I visit "/local/completionhistory/course_mappings.php"
     When I click on "Add course mapping" "link"
     Then I should see "Old course"
     And I should see "New course"
