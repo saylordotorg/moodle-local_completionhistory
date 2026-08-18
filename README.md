@@ -1,5 +1,7 @@
 # Completion History (`local_completionhistory`)
 
+[![Moodle Plugin CI for 4.5](https://github.com/saylordotorg/moodle-local_completionhistory/actions/workflows/moodle-plugin-ci.yml/badge.svg)](https://github.com/saylordotorg/moodle-local_completionhistory/actions/workflows/moodle-plugin-ci.yml)
+
 A Moodle local plugin providing a durable academic-history ledger, exam-attempt audit data, course-replacement mappings, and a deliberately narrow integration surface for the Saylor SIS.
 
 ## Requirements
