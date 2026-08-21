@@ -26,6 +26,7 @@
 $string['pluginname'] = 'Completion History';
 
 // Capabilities.
+$string['completionhistory:viewcertificates'] = 'Read learners\' issued certificates through the integration';
 $string['completionhistory:viewown']         = 'View own achievement history';
 $string['completionhistory:viewall']         = 'View all achievement history';
 $string['completionhistory:manage']          = 'Manage achievement history';
