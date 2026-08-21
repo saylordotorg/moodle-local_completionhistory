@@ -62,6 +62,16 @@ $capabilities = [
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [],
     ],
+    // Deliberately its OWN capability rather than reusing viewall or integrate:
+    // on a site where this plugin exists only to answer certificate queries, the
+    // token account is granted exactly this, and holding it unlocks nothing that
+    // provisions, enrols or writes.
+    'local/completionhistory:viewcertificates' => [
+        'riskbitmask' => RISK_PERSONAL,
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
     'local/completionhistory:integrate' => [
         'riskbitmask' => RISK_PERSONAL | RISK_DATALOSS,
         'captype' => 'write',

@@ -25,6 +25,17 @@
 defined('MOODLE_INTERNAL') || die();
 
 $functions = [
+    'local_completionhistory_get_user_certificates' => [
+        'classname'    => 'local_completionhistory\external\get_user_certificates',
+        'description'  => 'List a learner\'s issued tool_certificate certificates, by email.',
+        'type'         => 'read',
+        // Not callable from page JavaScript: a by-email read reachable with any
+        // logged-in session cookie would let one user enumerate another's
+        // certificate codes, and a code is a bearer credential for the public
+        // verify page. Server-to-server tokens only.
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:viewcertificates',
+    ],
     'local_completionhistory_get_user_achievements' => [
         'classname'    => 'local_completionhistory\external\get_user_achievements',
         'description'  => 'Retrieve achievement records for a user.',
@@ -173,6 +184,7 @@ $functions = [
 $services = [
     'Completion History SIS' => [
         'functions'       => [
+            'local_completionhistory_get_user_certificates',
             'local_completionhistory_get_user_achievements',
             'local_completionhistory_get_course_replacement',
             'local_completionhistory_get_recent_achievements',
