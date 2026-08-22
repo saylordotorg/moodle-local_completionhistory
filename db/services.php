@@ -80,7 +80,8 @@ $functions = [
     ],
     'local_completionhistory_provision_applicant' => [
         'classname'    => 'local_completionhistory\external\provision_applicant',
-        'description'  => 'Create/find a user account by email (SIS admissions). Account only — programme placement is an SIS fact since SIS-165.',
+        'description'  => 'Create/find a user account by email (SIS admissions). Account only — '
+            . 'programme placement is an SIS fact since SIS-165.',
         'type'         => 'write',
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:provisionusers',
