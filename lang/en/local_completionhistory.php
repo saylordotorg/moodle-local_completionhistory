@@ -38,7 +38,6 @@ $string['completionhistory:resetpasswords']  = 'Complete initial password setup 
 $string['completionhistory:createloginkeys'] = 'Create learner single sign-on keys';
 $string['completionhistory:updateprofiles']  = 'Update learner profiles through the integration';
 $string['completionhistory:enrolusers']      = 'Enrol learners through the integration';
-$string['completionhistory:setdeadlines']    = 'Set learner program deadlines through the integration';
 $string['catalogtoolarge'] = 'The catalog is too large for the snapshot API. Use a paginated integration endpoint.';
 $string['programregistrytoolarge'] = 'The program registry is too large for the snapshot API. Use a paginated integration endpoint.';
 $string['inprogresscoursestoolarge'] = 'This learner has too many in-progress courses for one response.';

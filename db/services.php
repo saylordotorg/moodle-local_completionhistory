@@ -80,7 +80,7 @@ $functions = [
     ],
     'local_completionhistory_provision_applicant' => [
         'classname'    => 'local_completionhistory\external\provision_applicant',
-        'description'  => 'Create/find a user by email and allocate to a program (SIS admissions).',
+        'description'  => 'Create/find a user account by email (SIS admissions). Account only — programme placement is an SIS fact since SIS-165.',
         'type'         => 'write',
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:provisionusers',
@@ -158,13 +158,6 @@ $functions = [
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:enrolusers',
     ],
-    'local_completionhistory_set_program_deadline' => [
-        'classname'    => 'local_completionhistory\external\set_program_deadline',
-        'description'  => 'Set the timeend of a user program allocation (SIS time-to-completion clocks).',
-        'type'         => 'write',
-        'ajax'         => false,
-        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:setdeadlines',
-    ],
     // The one function here that can produce a LOGGED-IN BROWSER SESSION rather than
     // just data. 'write' rather than 'read' for that reason, even though it writes only
     // a key: the type is what an administrator reads when deciding what a token can do,
@@ -200,7 +193,6 @@ $services = [
             'local_completionhistory_list_programs',
             'local_completionhistory_get_user_inprogress_courses',
             'local_completionhistory_enrol_user_in_course',
-            'local_completionhistory_set_program_deadline',
             'local_completionhistory_create_login_key',
             'local_completionhistory_update_user_profile',
         ],
