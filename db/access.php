@@ -108,10 +108,4 @@ $capabilities = [
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [],
     ],
-    'local/completionhistory:setdeadlines' => [
-        'riskbitmask' => RISK_PERSONAL | RISK_DATALOSS,
-        'captype' => 'write',
-        'contextlevel' => CONTEXT_SYSTEM,
-        'archetypes' => [],
-    ],
 ];

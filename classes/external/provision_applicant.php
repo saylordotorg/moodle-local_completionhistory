@@ -23,13 +23,15 @@ use core_external\external_value;
 
 /**
  * External function used by the SIS admissions service: create (or find) the
- * applicant's Moodle account and allocate it to a program (enrol_programs)
- * by program idnumber — e.g. the degree's Pre-Master's on approval, or the
- * degree program itself on matriculation.
+ * applicant's Moodle account. Account only — until SIS-165 this also allocated
+ * the user to an enrol_programs programme, which granted whole-programme course
+ * access and silently outranked the SIS learning-window pacer. Programme
+ * placement is an SIS fact now; Moodle's share is the account and the
+ * per-course manual enrolments the pacer creates (enrol_user_in_course).
  *
- * Idempotent: existing users are matched by email; existing allocations are
- * reported rather than duplicated. A generated password is returned only
- * when the account was created in this call.
+ * Idempotent: existing users are matched by email, never duplicated and never
+ * password-reset. A generated password is returned only when the account was
+ * created in this call.
  *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
@@ -38,22 +40,20 @@ use core_external\external_value;
 class provision_applicant extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'email'           => new external_value(PARAM_EMAIL, 'Applicant email (identity key)'),
-            'firstname'       => new external_value(PARAM_TEXT, 'First name'),
-            'lastname'        => new external_value(PARAM_TEXT, 'Last name'),
-            'programidnumber' => new external_value(PARAM_RAW, 'enrol_programs program idnumber to allocate', VALUE_DEFAULT, ''),
+            'email'     => new external_value(PARAM_EMAIL, 'Applicant email (identity key)'),
+            'firstname' => new external_value(PARAM_TEXT, 'First name'),
+            'lastname'  => new external_value(PARAM_TEXT, 'Last name'),
         ]);
     }
 
-    public static function execute(string $email, string $firstname, string $lastname, string $programidnumber = ''): array {
+    public static function execute(string $email, string $firstname, string $lastname): array {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/user/lib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
-            'email'           => $email,
-            'firstname'       => $firstname,
-            'lastname'        => $lastname,
-            'programidnumber' => $programidnumber,
+            'email'     => $email,
+            'firstname' => $firstname,
+            'lastname'  => $lastname,
         ]);
 
         $systemcontext = \context_system::instance();
@@ -122,37 +122,15 @@ class provision_applicant extends external_api {
                     'userid' => 0,
                     'username' => '',
                     'created' => false,
-                    'allocated' => false,
                     'password' => '',
                     'warning' => 'A non-learner account cannot be adopted by the integration.',
                 ];
-            }
-            // 2) Allocate to the requested program (optional).
-            $allocated = false;
-            if ($params['programidnumber'] !== '') {
-                $program = $DB->get_record('enrol_programs_programs', ['idnumber' => $params['programidnumber']]);
-                if (!$program) {
-                    $warning = 'Program not found: ' . $params['programidnumber'];
-                } else if ($DB->record_exists('enrol_programs_allocations', ['programid' => $program->id, 'userid' => $user->id, 'archived' => 0])) {
-                    $allocated = true; // Already allocated — idempotent success.
-                } else if (!class_exists('\\enrol_programs\\local\\source\\manual')) {
-                    $warning = 'enrol_programs manual source unavailable.';
-                } else {
-                    $source = $DB->get_record('enrol_programs_sources', ['programid' => $program->id, 'type' => 'manual']);
-                    if (!$source) {
-                        $warning = 'Program has no manual allocation source: ' . $params['programidnumber'];
-                    } else {
-                        \enrol_programs\local\source\manual::allocate_users($program->id, $source->id, [$user->id]);
-                        $allocated = true;
-                    }
-                }
             }
 
             return [
                 'userid'    => (int) $user->id,
                 'username'  => $user->username,
                 'created'   => $created,
-                'allocated' => $allocated,
                 'password'  => $password,
                 'warning'   => trim($usernamewarning . ' ' . $warning),
             ];
@@ -166,7 +144,6 @@ class provision_applicant extends external_api {
             'userid'    => new external_value(PARAM_INT, 'Moodle user id'),
             'username'  => new external_value(PARAM_RAW, 'Moodle username'),
             'created'   => new external_value(PARAM_BOOL, 'Whether the account was created by this call'),
-            'allocated' => new external_value(PARAM_BOOL, 'Whether the user is allocated to the requested program'),
             'password'  => new external_value(PARAM_RAW, 'Initial password (only when created; force-change on first login)'),
             'warning'   => new external_value(PARAM_RAW, 'Non-fatal warning, if any'),
         ]);

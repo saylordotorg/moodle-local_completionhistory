@@ -285,5 +285,82 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026081700, 'local', 'completionhistory');
     }
 
+    if ($oldversion < 2026082200) {
+        // SIS-165: the SIS retires enrol_programs. From 0.7.0 provisioning never allocates, so
+        // this step retires the allocations EARLIER versions created — without it, upgraded
+        // installs keep the whole-programme course access that silently outranks the SIS
+        // learning-window pacer, with the deadline endpoint that could bound it also gone
+        // (PR #10 review). Two moves, strictly in this order:
+        //
+        //   1. BACKFILL: every active course enrolment granted by the 'programs' method gets a
+        //      manual counterpart (same user, same course, same start, student role, active),
+        //      so retiring the allocation cannot cost a learner access to a course they are in.
+        //   2. ARCHIVE: every active allocation is archived, and enrol_programs is asked to
+        //      recalculate the user's enrolments so it withdraws its own grants.
+        //
+        // Guarded like list_programs: an install that never had enrol_programs has nothing to
+        // retire, and one where it was already uninstalled must not fatal on a missing table.
+        if ($dbman->table_exists(new xmldb_table('enrol_programs_allocations'))) {
+            require_once($CFG->dirroot . '/lib/enrollib.php');
+            $manual = enrol_get_plugin('manual');
+            $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+            $gaps = $DB->get_records_sql("
+                SELECT ue.id, ue.userid, ue.timestart, e.courseid
+                  FROM {user_enrolments} ue
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                 WHERE e.enrol = 'programs' AND ue.status = :active
+                   AND NOT EXISTS (
+                       SELECT 1
+                         FROM {user_enrolments} ue2
+                         JOIN {enrol} e2 ON e2.id = ue2.enrolid
+                        WHERE e2.enrol = 'manual' AND e2.courseid = e.courseid
+                          AND ue2.userid = ue.userid AND ue2.status = :active2)",
+                ['active' => ENROL_USER_ACTIVE, 'active2' => ENROL_USER_ACTIVE]);
+            if ($gaps && (!$manual || $studentroleid <= 0)) {
+                // Archiving without the backfill would take course access away from live
+                // learners, so refuse the whole step loudly rather than half-run it.
+                throw new \moodle_exception('generalexceptionmessage', 'error', '',
+                    'local_completionhistory 0.7.0 upgrade: manual enrolment plugin or student role '
+                    . 'unavailable, and ' . count($gaps) . ' programs-method enrolment(s) need a manual '
+                    . 'counterpart before allocations can be archived.');
+            }
+            foreach ($gaps as $gap) {
+                $course = $DB->get_record('course', ['id' => $gap->courseid], '*', MUST_EXIST);
+                $instance = $DB->get_record('enrol',
+                    ['courseid' => $gap->courseid, 'enrol' => 'manual', 'status' => ENROL_INSTANCE_ENABLED]);
+                if (!$instance) {
+                    $disabled = $DB->get_record('enrol', ['courseid' => $gap->courseid, 'enrol' => 'manual']);
+                    if ($disabled) {
+                        $manual->update_status($disabled, ENROL_INSTANCE_ENABLED);
+                        $instance = $DB->get_record('enrol', ['id' => $disabled->id], '*', MUST_EXIST);
+                    } else {
+                        $instanceid = $manual->add_instance($course, $manual->get_instance_defaults());
+                        $instance = $DB->get_record('enrol', ['id' => $instanceid], '*', MUST_EXIST);
+                    }
+                }
+                $manual->enrol_user($instance, $gap->userid, $studentroleid,
+                    (int) $gap->timestart, 0, ENROL_USER_ACTIVE);
+            }
+            $allocations = $DB->get_records('enrol_programs_allocations', ['archived' => 0]);
+            foreach ($allocations as $allocation) {
+                $allocation->archived = 1;
+                $allocation->timemodified = time();
+                $DB->update_record('enrol_programs_allocations', $allocation);
+                // Same guarded call set_program_deadline used while it existed: enrol_programs
+                // recalculates and withdraws its own course grants for this user, if it is
+                // still installed to do so. Leftovers are swept when the plugin is disabled.
+                if (class_exists('\\enrol_programs\\local\\allocation')
+                        && method_exists('\\enrol_programs\\local\\allocation', 'fix_user_enrolments')) {
+                    \enrol_programs\local\allocation::fix_user_enrolments($allocation->programid, $allocation->userid);
+                }
+            }
+            if ($gaps || $allocations) {
+                mtrace('local_completionhistory 0.7.0: backfilled ' . count($gaps)
+                    . ' manual enrolment(s), archived ' . count($allocations) . ' program allocation(s).');
+            }
+        }
+        upgrade_plugin_savepoint(true, 2026082200, 'local', 'completionhistory');
+    }
+
     return true;
 }

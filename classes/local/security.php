@@ -98,7 +98,6 @@ final class security {
             'local/completionhistory:createloginkeys',
             'local/completionhistory:updateprofiles',
             'local/completionhistory:enrolusers',
-            'local/completionhistory:setdeadlines',
         ];
         foreach ($capabilities as $capability) {
             if (has_capability($capability, $systemcontext, $userid)) {
