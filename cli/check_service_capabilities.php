@@ -41,12 +41,37 @@
  * against the site, after the upgrade, and answers the only question that
  * matters at that moment: is there an account that can still do the work?
  *
+ * WHAT COUNTS AS BROKEN, AND WHAT IS JUST NARROW. A service account is not
+ * required to be able to call everything — the security model in README.md says
+ * the opposite, that each capability is granted only when that operation is
+ * required, and a site using this plugin only to answer certificate queries is
+ * expected to grant exactly viewcertificates. So coverage is judged one function
+ * at a time, and the discriminator is PARTIAL provisioning:
+ *
+ *   holds NONE of a function's capabilities  -> not provisioned for it. Narrow
+ *                                               on purpose. Reported, not failed.
+ *   holds ALL of them                        -> fine.
+ *   holds SOME but not all                   -> failure. This is the shape of
+ *                                               both outages above: an account
+ *                                               that reaches the endpoint on its
+ *                                               ordinary work and is refused at
+ *                                               the last check.
+ *
+ * An operator who deliberately withholds one capability from an otherwise
+ * fully-provisioned account says so once with --optional, which turns that
+ * specific gap into a reported fact instead of a failure. The default stays
+ * strict, because "I meant to do that" should be written down somewhere a
+ * reader can see rather than assumed by a checker.
+ *
  * Run from the Moodle root:
  *
  *   php local/completionhistory/cli/check_service_capabilities.php
  *   php local/completionhistory/cli/check_service_capabilities.php --service=completionhistory_sis
+ *   php local/completionhistory/cli/check_service_capabilities.php \
+ *       --optional=local/completionhistory:resetpasswords
  *
- * Exits 0 when every authorised account holds everything it needs, 1 otherwise.
+ * Exits 0 when every authorised account can do the work it is provisioned for,
+ * 1 otherwise.
  *
  * IT DOES NOT GRANT ANYTHING, on purpose. An account can hold a capability
  * through any of several roles, so "grant the missing one" has no single right
@@ -65,8 +90,8 @@ require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
 [$options, $unrecognised] = cli_get_params(
-    ['help' => false, 'service' => ''],
-    ['h' => 'help', 's' => 'service']
+    ['help' => false, 'service' => '', 'optional' => ''],
+    ['h' => 'help', 's' => 'service', 'o' => 'optional']
 );
 
 if ($unrecognised) {
@@ -74,16 +99,28 @@ if ($unrecognised) {
 }
 
 if ($options['help']) {
-    echo "Check that accounts authorised for this plugin's web services hold the\n";
-    echo "capabilities those services' functions require.\n\n";
+    echo "Check that accounts authorised for this plugin's web services can call the\n";
+    echo "functions they are provisioned for.\n\n";
     echo "Options:\n";
     echo "  -h, --help             Print this help.\n";
-    echo "  -s, --service=SHORT    Check only this service shortname.\n\n";
-    echo "Exit status is 1 if any authorised account is missing a capability.\n";
+    echo "  -s, --service=SHORT    Check only this service shortname.\n";
+    echo "  -o, --optional=CAPS    Comma-separated capabilities this site deliberately\n";
+    echo "                         withholds. A function blocked only by these is\n";
+    echo "                         reported as unavailable rather than failed.\n\n";
+    echo "An account holding NONE of a function's capabilities is treated as not\n";
+    echo "provisioned for it, not as a failure. Holding some but not all is a failure.\n";
+    echo "Exit status is 1 if anything failed.\n";
     exit(0);
 }
 
 $syscontext = context_system::instance();
+$optionalcaps = array_values(array_filter(array_map('trim', explode(',', (string) $options['optional']))));
+
+foreach ($optionalcaps as $cap) {
+    if (!get_capability_info($cap)) {
+        cli_error("--optional names {$cap}, which is not a capability on this site.");
+    }
+}
 
 $conditions = ['component' => 'local_completionhistory'];
 if ($options['service'] !== '') {
@@ -98,25 +135,42 @@ if (!$services) {
 }
 
 /**
- * The capabilities db/services.php declares in the SOURCE TREE, per function.
+ * What db/services.php declares in the SOURCE TREE.
  *
- * Read as text rather than by including the file, because the point of the
+ * Read as text rather than by including the file, because the whole point of the
  * comparison is to catch the case where the file on disk has moved on and the
  * DATABASE has not — the failure mode of editing services.php without bumping
- * version.php, where the site keeps serving the previously registered
- * definition and nothing says so.
+ * version.php, where the site keeps serving the previously registered definition
+ * and nothing anywhere says so.
  *
- * @return array function name => list of capability strings
+ * @return array ['functions' => name => capability list, 'services' => shortname => function names]
  */
-function local_completionhistory_source_capabilities(): array {
+function local_completionhistory_source_definition(): array {
     $src = file_get_contents(__DIR__ . '/../db/services.php');
-    $out = [];
+
+    $functions = [];
     preg_match_all("/'(local_completionhistory_\w+)'\s*=>\s*\[(.*?)\n    \],/s", $src, $matches, PREG_SET_ORDER);
     foreach ($matches as $m) {
         preg_match("/'capabilities'\s*=>\s*'([^']*)'/", $m[2], $capm);
-        $out[$m[1]] = array_values(array_filter(array_map('trim', explode(',', $capm[1] ?? ''))));
+        $functions[$m[1]] = array_values(array_filter(array_map('trim', explode(',', $capm[1] ?? ''))));
     }
-    return $out;
+
+    $services = [];
+    preg_match_all(
+        "/'[^']+'\s*=>\s*\[\s*'functions'\s*=>\s*\[(.*?)\](.*?)\n    \],/s",
+        $src,
+        $servicematches,
+        PREG_SET_ORDER
+    );
+    foreach ($servicematches as $m) {
+        if (!preg_match("/'shortname'\s*=>\s*'([^']+)'/", $m[2], $sn)) {
+            continue;
+        }
+        preg_match_all("/'(local_completionhistory_\w+)'/", $m[1], $fnames);
+        $services[$sn[1]] = $fnames[1];
+    }
+
+    return ['functions' => $functions, 'services' => $services];
 }
 
 /**
@@ -136,10 +190,10 @@ function local_completionhistory_system_roles(int $userid): array {
     return array_map(static fn($r) => $r->shortname, $roles);
 }
 
-$sourcecaps = local_completionhistory_source_capabilities();
+$source = local_completionhistory_source_definition();
 $failures = [];
 $warnings = [];
-$protocols = array_filter(explode(',', (string) ($CFG->webserviceprotocols ?? '')));
+$protocols = array_values(array_filter(array_map('trim', explode(',', (string) ($CFG->webserviceprotocols ?? '')))));
 
 foreach ($services as $service) {
     echo "\nService: {$service->name} ({$service->shortname})\n";
@@ -151,7 +205,7 @@ foreach ($services as $service) {
     }
 
     // What the site believes each function needs. This is the copy the upgrade
-    // installed, and therefore the copy the operator is actually working from.
+    // installed, and therefore the copy the site actually enforces.
     $sql = "SELECT f.name, f.capabilities
               FROM {external_services_functions} sf
               JOIN {external_functions} f ON f.name = sf.functionname
@@ -159,39 +213,58 @@ foreach ($services as $service) {
           ORDER BY f.name";
     $functions = $DB->get_records_sql($sql, ['sid' => $service->id]);
 
-    $required = [];
+    $registered = [];
     foreach ($functions as $fn) {
-        $installed = array_values(array_filter(array_map('trim', explode(',', (string) $fn->capabilities))));
-        foreach ($installed as $cap) {
-            $required[$cap][] = $fn->name;
+        $registered[$fn->name] = array_values(array_filter(array_map('trim', explode(',', (string) $fn->capabilities))));
+    }
+
+    // ------------------------------------------------------------------
+    // Registered definition vs the file on disk.
+    //
+    // Both directions, because a function present in only ONE of the two is the
+    // purest form of this failure: a new endpoint added to services.php without
+    // a version bump is simply absent from the database, so a comparison that
+    // only walked the registered functions would never look at it and would
+    // report PASS on the very deploy it exists to catch.
+    // ------------------------------------------------------------------
+    $sourcefunctions = $source['services'][$service->shortname] ?? null;
+    if ($sourcefunctions === null) {
+        $warnings[] = "{$service->shortname}: db/services.php does not declare this service, so the "
+            . 'registered definition cannot be compared against the source.';
+    } else {
+        foreach (array_diff($sourcefunctions, array_keys($registered)) as $missing) {
+            $failures[] = "{$service->shortname}: db/services.php declares {$missing} but the site has not "
+                . 'registered it. Bump version.php and run the upgrade - a file change alone re-registers nothing.';
         }
-        // Installed definition vs the file on disk: a mismatch means the upgrade
-        // has not caught up with the source, and every check below is being made
-        // against the wrong list.
-        if (isset($sourcecaps[$fn->name])) {
-            $insorted = $installed;
-            $srcsorted = $sourcecaps[$fn->name];
-            sort($insorted);
-            sort($srcsorted);
-            if ($insorted !== $srcsorted) {
-                $failures[] = "{$fn->name}: the registered capabilities ("
-                    . (implode(', ', $installed) ?: 'none') . ') do not match db/services.php ('
-                    . (implode(', ', $sourcecaps[$fn->name]) ?: 'none')
-                    . '). Bump version.php and run the upgrade - a file change alone re-registers nothing.';
-            }
+        foreach (array_diff(array_keys($registered), $sourcefunctions) as $extra) {
+            $failures[] = "{$service->shortname}: the site still serves {$extra}, which db/services.php no "
+                . 'longer declares. Bump version.php and run the upgrade so the removal takes effect.';
         }
     }
 
-    printf("  %d function(s), %d distinct capability requirement(s)\n", count($functions), count($required));
-
-    if (!$required) {
-        $warnings[] = "{$service->shortname}: no function declares a capability requirement, which is unlikely to be true.";
+    foreach ($registered as $name => $installed) {
+        if (!isset($source['functions'][$name])) {
+            continue;
+        }
+        $insorted = $installed;
+        $srcsorted = $source['functions'][$name];
+        sort($insorted);
+        sort($srcsorted);
+        if ($insorted !== $srcsorted) {
+            $failures[] = "{$name}: the registered capabilities (" . (implode(', ', $installed) ?: 'none')
+                . ') do not match db/services.php (' . (implode(', ', $source['functions'][$name]) ?: 'none')
+                . '). Bump version.php and run the upgrade - a file change alone re-registers nothing.';
+        }
     }
 
+    printf("  %d function(s) registered\n", count($registered));
+
+    // ------------------------------------------------------------------
     // Who may call it: every account holding a token, plus every account on the
     // authorised list when the service is restricted. Both, because a token for
     // an account missing from the authorised list fails too, and an authorised
     // account with no token cannot call anything.
+    // ------------------------------------------------------------------
     $accounts = [];
     $tokenusers = $DB->get_records('external_tokens', ['externalserviceid' => $service->id], '', 'DISTINCT userid');
     foreach ($tokenusers as $t) {
@@ -204,7 +277,15 @@ foreach ($services as $service) {
     }
 
     if (!$accounts) {
-        $warnings[] = "{$service->shortname}: no account holds a token or authorisation for this service.";
+        // An ENABLED service nobody can call is a total outage of that
+        // integration. Reporting it as a warning would let a deploy gate go
+        // green on a site where none of this works at all.
+        $message = "{$service->shortname}: no account holds a token or authorisation for this service.";
+        if ($service->enabled) {
+            $failures[] = $message . ' The service is enabled, so nothing can call it.';
+        } else {
+            $warnings[] = $message;
+        }
         continue;
     }
 
@@ -227,31 +308,62 @@ foreach ($services as $service) {
                 . 'authorised-users list of a restricted service.';
         }
 
-        $missing = [];
-        foreach (array_keys($required) as $cap) {
-            if (!has_capability($cap, $syscontext, $user->id)) {
-                $missing[] = $cap;
-            }
-        }
-        // A token also needs the protocol capability, which is easy to miss
-        // because it is a core capability on a plugin's service.
+        // A token is not bound to a protocol, so the account needs at least ONE
+        // enabled transport. Requiring every enabled one would fail a REST-only
+        // account merely because SOAP is switched on for a different integration.
+        $heldprotocols = [];
         foreach ($protocols as $protocol) {
             $protocolcap = "webservice/{$protocol}:use";
-            if (get_capability_info($protocolcap) && !has_capability($protocolcap, $syscontext, $user->id)) {
-                $missing[] = $protocolcap;
+            if (get_capability_info($protocolcap) && has_capability($protocolcap, $syscontext, $user->id)) {
+                $heldprotocols[] = $protocol;
             }
         }
-
-        foreach ($missing as $cap) {
-            $endpoints = $required[$cap] ?? [];
-            $detail = $endpoints
-                ? ' - blocks ' . count($endpoints) . ' endpoint(s): ' . implode(', ', array_slice($endpoints, 0, 4))
-                    . (count($endpoints) > 4 ? ', …' : '')
-                : '';
-            $failures[] = "{$service->shortname}: {$user->username} lacks {$cap}{$detail}";
+        if ($protocols && !$heldprotocols) {
+            $failures[] = "{$service->shortname}: {$user->username} holds no webservice/*:use capability for any "
+                . 'enabled protocol (' . implode(', ', $protocols) . '), so no transport can authenticate it.';
         }
 
-        printf("    %-44s %s\n", 'holds every required capability', $missing ? 'NO - ' . count($missing) . ' missing' : 'yes');
+        // Coverage, one function at a time. See the header: none held is narrow,
+        // some held is broken.
+        $callable = 0;
+        $unprovisioned = [];
+        $withheld = [];
+        foreach ($registered as $name => $caps) {
+            $missing = [];
+            foreach ($caps as $cap) {
+                if (!has_capability($cap, $syscontext, $user->id)) {
+                    $missing[] = $cap;
+                }
+            }
+            if (!$missing) {
+                $callable++;
+                continue;
+            }
+            if (count($missing) === count($caps)) {
+                $unprovisioned[] = $name;
+                continue;
+            }
+            if (!array_diff($missing, $optionalcaps)) {
+                $withheld[] = $name . ' (' . implode(', ', $missing) . ')';
+                continue;
+            }
+            $failures[] = "{$service->shortname}: {$user->username} can reach {$name} but lacks "
+                . implode(', ', $missing) . ' - it holds ' . implode(', ', array_diff($caps, $missing))
+                . ', so the call gets as far as the capability check and is refused.';
+        }
+
+        printf("    %-40s %d of %d\n", 'functions it can call', $callable, count($registered));
+        if ($unprovisioned) {
+            printf("    %-40s %d (%s)\n", 'not provisioned for', count($unprovisioned),
+                implode(', ', array_slice($unprovisioned, 0, 3)) . (count($unprovisioned) > 3 ? ', ...' : ''));
+        }
+        if ($withheld) {
+            printf("    %-40s %d (%s)\n", 'deliberately withheld', count($withheld),
+                implode('; ', array_slice($withheld, 0, 3)) . (count($withheld) > 3 ? '; ...' : ''));
+        }
+        if ($heldprotocols) {
+            printf("    %-40s %s\n", 'transports available', implode(', ', $heldprotocols));
+        }
     }
 }
 
@@ -262,7 +374,7 @@ foreach ($warnings as $w) {
 }
 
 if (!$failures) {
-    echo "\nPASS: every authorised account can call every function of its service.\n";
+    echo "\nPASS: every authorised account can call every function it is provisioned for.\n";
     exit(0);
 }
 
@@ -277,5 +389,6 @@ echo "or run, from the Moodle root:\n";
 echo "  php -r \"define('CLI_SCRIPT',true); require('config.php');\n";
 echo "  assign_capability('THE/CAPABILITY', CAP_ALLOW, \\\$ROLEID, context_system::instance()->id, true);\"\n";
 echo "  php admin/cli/purge_caches.php\n";
-echo "\nThe source-tree counterpart is tests/static/check_service_capability_declarations.php.\n";
+echo "\nIf a gap is deliberate, name the capability in --optional so it is recorded rather than repaired.\n";
+echo "The source-tree counterpart is tests/static/check_service_capability_declarations.php.\n";
 exit(1);

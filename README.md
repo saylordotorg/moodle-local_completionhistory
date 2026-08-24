@@ -100,7 +100,23 @@ php local/completionhistory/cli/check_service_capabilities.php
 php local/completionhistory/tests/static/check_service_capability_declarations.php
 ```
 
-The live check reads the capabilities the upgrade **registered**, not the ones on disk, and reports a mismatch between the two — because editing `db/services.php` without bumping `version.php` re-registers nothing, and leaves the site enforcing a definition no file describes any more. It also flags a disabled service, a suspended service account, a token whose account is missing from a restricted service's authorised list, and a missing `webservice/*:use`.
+The live check reads the capabilities the upgrade **registered**, not the ones on disk, and reports any disagreement between the two in either direction — a function declared but not registered, one still served after being removed, or a changed capability list. Editing `db/services.php` without bumping `version.php` re-registers nothing and leaves the site enforcing a definition no file describes any more. It also flags a disabled service, an enabled service no account can call, a suspended service account, a token whose account is missing from a restricted service's authorised list, and an account with no usable `webservice/*:use` transport.
+
+**A narrow service account is not a broken one.** The security model above grants each capability only when the operation is required, so coverage is judged one function at a time:
+
+| the account holds | verdict |
+|---|---|
+| none of a function's capabilities | not provisioned for it — reported, not failed |
+| all of them | fine |
+| some but not all | **failure** — it reaches the endpoint and is refused at the last check |
+
+That middle case is the shape of both outages. A site that grants only `viewcertificates` passes cleanly; an account that holds `:integrate` but not `:enrolusers` does not. Where a gap in an otherwise fully-provisioned account is deliberate, name it once:
+
+```bash
+php local/completionhistory/cli/check_service_capabilities.php     --optional=local/completionhistory:resetpasswords
+```
+
+and it is reported as withheld instead of failed.
 
 Neither check grants anything. An account can hold a capability through any of several roles, so the repair has no single right answer a script could pick; the live check prints the role each account actually holds and the statement to run.
 
