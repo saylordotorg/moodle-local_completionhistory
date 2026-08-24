@@ -9,7 +9,7 @@ A Moodle local plugin providing a durable academic-history ledger, exam-attempt 
 - Moodle 4.5 through 5.2
 - PHP 8.1+
 - Optional for the core ledger: `enrol_programs` and Moodle Workplace certificate tooling
-- Required for SIS program provisioning/deadline operations: `enrol_programs`
+- No longer required: `enrol_programs`. Since 0.7.0 provisioning creates the account only, and programme membership is a fact the SIS owns
 
 ## Installation and upgrade
 
@@ -17,6 +17,13 @@ A Moodle local plugin providing a durable academic-history ledger, exam-attempt 
 2. Visit **Site administration > Notifications** or run the standard Moodle CLI upgrade.
 3. Review the settings under **Plugins > Local plugins > Completion History**.
 4. If the SIS service is used, update its dedicated role for the capabilities described below. New integration capabilities intentionally have no archetype grants.
+5. Verify the grant took, from the Moodle root:
+
+   ```bash
+   php local/completionhistory/cli/check_service_capabilities.php
+   ```
+
+   This is not optional politeness. Step 4 has been missed twice, and because the capabilities are `'archetypes' => []` the site reports nothing: the upgrade succeeds, the service is registered, the token is valid, and every call returns `nopermissions`. On 2026-08-24 only the *write* endpoints were ungranted, so the reads kept working and the outage surfaced two days later as a student who could not open a course she had just enrolled in.
 
 Database and cached service/event changes are applied through `db/install.xml`, `db/install.php`, and `db/upgrade.php`. Do not deploy updated files without completing the Moodle upgrade.
 
@@ -44,12 +51,12 @@ The bundled **Completion History SIS** external service is disabled and restrict
 
 | Capability | Purpose | Default grant |
 |---|---|---|
-| `local/completionhistory:provisionusers` | Create learner accounts and allocate programs | None |
+| `local/completionhistory:viewcertificates` | Read a learner's issued certificates | None |
+| `local/completionhistory:provisionusers` | Create learner accounts | None |
 | `local/completionhistory:resetpasswords` | Complete the one-time initial password flow | None |
 | `local/completionhistory:createloginkeys` | Mint short-lived learner SSO keys | None |
 | `local/completionhistory:updateprofiles` | Change the six whitelisted learner contact fields | None |
 | `local/completionhistory:enrolusers` | Create manual learner enrolments | None |
-| `local/completionhistory:setdeadlines` | Change learner program deadlines | None |
 
 The initial-password endpoint is not a general reset API: it accepts only local manual-auth learner accounts carrying Moodle's force-change marker, enforces the site password policy, and consumes the marker after one successful call. Email identity lookups reject duplicate/ambiguous addresses.
 
@@ -80,6 +87,22 @@ php local/completionhistory/cli/reconcile_anonymization.php --dryrun
 ```
 
 The completion-ledger reconciliation task runs daily. Outbox processing and deleted-user reconciliation tasks ship disabled and must be enabled deliberately in Scheduled tasks.
+
+## Checking the integration after a deploy
+
+Two checks keep the capability story honest, because it is told in three places that drift apart: the `require_capability` calls in `classes/external/`, the `capabilities` metadata in `db/services.php`, and the grant table above.
+
+```bash
+# On the site, after the upgrade. Does the service account still hold what it needs?
+php local/completionhistory/cli/check_service_capabilities.php
+
+# On the source tree, no database needed. Do the three sources agree?
+php local/completionhistory/tests/static/check_service_capability_declarations.php
+```
+
+The live check reads the capabilities the upgrade **registered**, not the ones on disk, and reports a mismatch between the two — because editing `db/services.php` without bumping `version.php` re-registers nothing, and leaves the site enforcing a definition no file describes any more. It also flags a disabled service, a suspended service account, a token whose account is missing from a restricted service's authorised list, and a missing `webservice/*:use`.
+
+Neither check grants anything. An account can hold a capability through any of several roles, so the repair has no single right answer a script could pick; the live check prints the role each account actually holds and the statement to run.
 
 ## Stored data
 
