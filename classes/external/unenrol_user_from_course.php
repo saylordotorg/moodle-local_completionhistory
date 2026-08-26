@@ -41,12 +41,33 @@ use core_external\external_value;
  * still there if they come back, and coming back needs no repair work —
  * enrol_user_in_course sees a non-active enrolment and reactivates that same row.
  *
- * ONLY TOUCHES MANUAL ENROLMENTS — the ones this plugin creates. An enrolment
+ * ONLY TOUCHES MANUAL ENROLMENTS — the method this integration uses. An enrolment
  * that arrived by self-enrolment, a cohort sync or a category role is somebody
  * else's decision, and suspending it here would silently undo it with no record
  * on the instance that owns it. Where such an enrolment is what is actually
  * holding the course open, the response says so through `warning` rather than
  * reporting a closure that did not happen.
+ *
+ * "MANUAL" IS NOT THE SAME CLAIM AS "OURS", and it is worth being exact about the
+ * gap (raised in review on PR #12). enrol_user_in_course reuses whatever enabled
+ * manual instance a course already has and writes no ownership marker, so a
+ * manual enrolment a registrar made by hand is indistinguishable here from one the
+ * SIS made, and this will suspend it too. Two things make that acceptable rather
+ * than merely unnoticed:
+ *
+ *   The CALLER scopes it. /me/leave-course refuses any course that is not in the
+ *   learner's own pathway (404) and any course they have completed (409), so the
+ *   only enrolments reachable are the learner's own, in their own programme,
+ *   released by the learner themselves.
+ *
+ *   Since SIS-165 the SIS — not Moodle — is the authority on programme membership.
+ *   A hand-made manual enrolment in a degree course is not a parallel source of
+ *   truth to be protected; it is the same fact recorded in the weaker place.
+ *
+ * The one signal Moodle does offer, `user_enrolments.modifierid`, deliberately is
+ * NOT gated on: the 0.7.0 upgrade backfilled 170 enrolments under whichever
+ * account ran the upgrade, so filtering by it would quietly stop closing courses
+ * for most of the live cohort — a worse failure, and a silent one.
  *
  * Idempotent: nothing enrolled, or already suspended, is success with
  * `changed = false`.
@@ -120,15 +141,24 @@ class unenrol_user_from_course extends external_api {
         }
 
         /*
-         * WHAT IS STILL HOLDING THE COURSE OPEN, said out loud. is_enrolled() with
-         * onlyactive covers every method, so this is the one check that can tell the
-         * SIS its release did not actually close access — and the student is about to
-         * be told in plain words that it did. Recomputed AFTER the suspensions
-         * above, and the context is reloaded because enrolment caches are per-request.
+         * WHAT IS STILL HOLDING THE COURSE OPEN, said out loud — the one check that can
+         * tell the SIS its release did not actually close access, while the student is
+         * about to be told in plain words that it did. Computed AFTER the suspensions.
+         *
+         * can_access_course(), NOT is_enrolled(): the question is whether the learner
+         * can still open the course, and enrolment is only one of the two ways to be
+         * able to. A role granting moodle/course:view at the course or an ancestor
+         * category needs no enrolment at all, so is_enrolled() went false the moment we
+         * suspended and reported a closure the learner could walk straight through
+         * (caught in review on PR #12). is_viewing() inside can_access_course is what
+         * covers that, and course visibility comes along for free.
+         *
+         * `$onlyactive = true` is load-bearing and NOT the default: with the default
+         * false, the row we just suspended still counts as an enrolment and every call
+         * would report the course as still open.
          */
         $warning = '';
-        $context = \context_course::instance($course->id);
-        if (is_enrolled($context, $user, '', true)) {
+        if (can_access_course($course, $user, '', true)) {
             $methods = [];
             foreach (enrol_get_instances($course->id, true) as $instance) {
                 $active = $DB->record_exists_select(
@@ -140,8 +170,14 @@ class unenrol_user_from_course extends external_api {
                     $methods[$instance->enrol] = true;
                 }
             }
-            $warning = 'The course is still open through an enrolment this integration does not manage'
-                . ($methods ? ' (' . implode(', ', array_keys($methods)) . ').' : '.');
+            // Access with no active enrolment behind it is role-based, and naming it that
+            // way matters: an operator told "an enrolment" would go looking for a row
+            // that is not there.
+            $warning = $methods
+                ? 'The course is still open through an enrolment this integration does not manage ('
+                    . implode(', ', array_keys($methods)) . ').'
+                : 'The course is still open through a role that grants course access without an '
+                    . 'enrolment, which this integration does not manage.';
         }
 
         return [

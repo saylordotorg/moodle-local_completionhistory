@@ -183,6 +183,54 @@ final class unenrol_user_from_course_test extends advanced_testcase {
     }
 
     /**
+     * Access that comes from a ROLE rather than an enrolment is reported, not overlooked.
+     *
+     * Raised in review on PR #12. is_enrolled() answers "is there an enrolment record", and a
+     * role granting moodle/course:view at an ancestor category needs none — so the first version
+     * of this endpoint went quiet the moment it suspended the enrolment and reported a closure the
+     * learner could walk straight through. can_access_course() is the check that matches the
+     * promise. The role here keeps the `student` archetype on purpose: anything else is refused by
+     * is_learner_account before this code is reached, so a student-archetype role with the
+     * capability added is the only shape in which the bug can actually reach a learner.
+     */
+    public function test_role_based_access_is_reported_not_overlooked(): void {
+        global $DB;
+
+        $category = $this->getDataGenerator()->create_category();
+        $course = $this->getDataGenerator()->create_course([
+            'idnumber' => 'PSYCH101',
+            'category' => $category->id,
+        ]);
+        $user = $this->getDataGenerator()->create_user(['auth' => 'manual']);
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 'student', 'manual');
+
+        $roleid = create_role('Category browser', 'sis_categorybrowser', 'Sees courses without enrolling', 'student');
+        assign_capability('moodle/course:view', CAP_ALLOW, $roleid, \context_system::instance()->id, true);
+        role_assign($roleid, $user->id, \context_coursecat::instance($category->id)->id);
+        accesslib_clear_all_caches_for_unit_testing();
+
+        $result = unenrol_user_from_course::execute($user->email, 'PSYCH101');
+
+        $this->assertTrue($result['changed'], 'the manual enrolment is still suspended');
+        $ue = $DB->get_record_sql(
+            "SELECT ue.status
+               FROM {user_enrolments} ue
+               JOIN {enrol} e ON e.id = ue.enrolid
+              WHERE e.courseid = :courseid AND ue.userid = :userid",
+            ['courseid' => $course->id, 'userid' => $user->id]
+        );
+        $this->assertEquals(ENROL_USER_SUSPENDED, (int) $ue->status);
+
+        // The enrolment is gone but the door is not shut, and the response must say so.
+        $context = \context_course::instance($course->id);
+        $this->assertFalse(is_enrolled($context, $user, '', true), 'no active enrolment remains');
+        $this->assertTrue(can_access_course($course, $user, '', true), 'the role still opens the course');
+        $this->assertStringContainsString('role', $result['warning']);
+        $this->assertStringNotContainsString('enrolment this integration does not manage', $result['warning'],
+            'there is no such enrolment — naming one sends an operator looking for a row that is not there');
+    }
+
+    /**
      * Staff accounts are not learners, and are refused before anything is changed.
      */
     public function test_staff_account_is_refused(): void {
