@@ -56,7 +56,7 @@ The bundled **Completion History SIS** external service is disabled and restrict
 | `local/completionhistory:resetpasswords` | Complete the one-time initial password flow | None |
 | `local/completionhistory:createloginkeys` | Mint short-lived learner SSO keys | None |
 | `local/completionhistory:updateprofiles` | Change the six whitelisted learner contact fields | None |
-| `local/completionhistory:enrolusers` | Create manual learner enrolments | None |
+| `local/completionhistory:enrolusers` | Create manual learner enrolments, and suspend the ones it created | None |
 
 The initial-password endpoint is not a general reset API: it accepts only local manual-auth learner accounts carrying Moodle's force-change marker, enforces the site password policy, and consumes the marker after one successful call. Email identity lookups reject duplicate/ambiguous addresses.
 

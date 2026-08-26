@@ -229,6 +229,31 @@ foreach (array_unique($rmcaps[0]) as $cap) {
 }
 
 // ---------------------------------------------------------------------------
+// D. Every INTEGRATION function is actually exposed by the SIS service.
+//
+//    A function declared in $functions but missing from the service's function
+//    list is registered on the site and callable by nobody: the SIS token
+//    authorises one service, so the endpoint answers "invalid parameter"-shaped
+//    nothing and the feature is simply absent. Same failure class as an
+//    ungranted capability, same invisibility, and one more line to forget.
+//
+//    Scoped to functions requiring :integrate on purpose. That capability is the
+//    marker for "server-to-server only", so those and only those must be reachable
+//    by the SIS token; the browser-facing reads (viewown, ajax) are a separate set
+//    whose membership here is a judgement rather than a rule.
+// ---------------------------------------------------------------------------
+
+foreach ($functions as $fnname => $fn) {
+    if (!in_array('local/completionhistory:integrate', $fn['capabilities'], true)) {
+        continue;
+    }
+    if (!in_array($fnname, $sisfunctions, true)) {
+        $note("{$fnname}: requires :integrate but the completionhistory_sis service does not expose it, "
+            . 'so no SIS token can call it');
+    }
+}
+
+// ---------------------------------------------------------------------------
 
 echo "SIS service capability declarations:\n";
 printf("  %-48s %d\n", 'capabilities defined in db/access.php', count($declaredcaps));

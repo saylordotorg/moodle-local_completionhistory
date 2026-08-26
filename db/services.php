@@ -159,6 +159,16 @@ $functions = [
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:enrolusers',
     ],
+    // The counterpart of the enrolment above, and 'write' for the same reason: it changes
+    // what a learner can open. SUSPENDS rather than deletes — see the class comment for why
+    // a link labelled "Leave" must not be able to remove a student's grades.
+    'local_completionhistory_unenrol_user_from_course' => [
+        'classname'    => 'local_completionhistory\external\unenrol_user_from_course',
+        'description'  => 'Suspend a learner\'s manual enrolment in a course by email + idnumber, keeping grades and attempts (SIS "Leave course").',
+        'type'         => 'write',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:enrolusers',
+    ],
     // The one function here that can produce a LOGGED-IN BROWSER SESSION rather than
     // just data. 'write' rather than 'read' for that reason, even though it writes only
     // a key: the type is what an administrator reads when deciding what a token can do,
@@ -194,6 +204,7 @@ $services = [
             'local_completionhistory_list_programs',
             'local_completionhistory_get_user_inprogress_courses',
             'local_completionhistory_enrol_user_in_course',
+            'local_completionhistory_unenrol_user_from_course',
             'local_completionhistory_create_login_key',
             'local_completionhistory_update_user_profile',
         ],
