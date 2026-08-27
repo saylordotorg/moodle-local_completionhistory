@@ -82,7 +82,7 @@ EOT;
 }
 
 if (!get_config('local_completionhistory', 'enabled')) {
-    cli_error('Completion History plugin is disabled. Enable it in Site Administration > Plugins > Local plugins > Completion History.');
+    cli_error('Saylor SIS Integration plugin is disabled. Enable it in Site Administration > Plugins > Local plugins > Saylor SIS Integration.');
 }
 
 $dryrun = (bool) $options['dry-run'];

@@ -22,8 +22,24 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// Plugin name.
-$string['pluginname'] = 'Completion History';
+/*
+ * Plugin name.
+ *
+ * THE DISPLAYED NAME ONLY. The frankenstyle component stays `local_completionhistory`, and this
+ * string is deliberately the one thing that moves: the component name is the primary key for
+ * eight tables, twelve capabilities, nineteen web service functions and every config_plugins row,
+ * and Moodle has no supported way to change it — a new component installs empty tables and leaves
+ * the ledger orphaned.
+ *
+ * What staff actually read is this string, in Plugins > Local plugins and in the settings tree.
+ * "Completion History" described the plugin when the ledger was all it did; provisioning,
+ * enrolment, SSO, password setup, profile corrections and certificates have long since made the
+ * integration the larger half.
+ *
+ * NOT to be confused with the 'Completion History SIS' external service in db/services.php, which
+ * must keep its name — see the note there.
+ */
+$string['pluginname'] = 'Saylor SIS Integration';
 
 // Capabilities.
 $string['completionhistory:viewcertificates'] = 'Read learners\' issued certificates through the integration';
@@ -54,7 +70,7 @@ $string['sso_linkexpired'] = 'That sign-in link has expired or was already used.
 
 // Settings.
 $string['setting_enabled']               = 'Enable plugin';
-$string['setting_enabled_desc']          = 'Enable or disable the Completion History plugin.';
+$string['setting_enabled_desc']          = 'Enable or disable the Saylor SIS Integration plugin.';
 $string['setting_autocapture']           = 'Auto-capture completions';
 $string['setting_autocapture_desc']      = 'Automatically capture an achievement record when a course is completed.';
 $string['setting_capturegrades']         = 'Capture grade snapshots';
@@ -241,7 +257,7 @@ $string['replacementavailable']   = 'A replacement course is available';
 // ── Status messages ──────────────────────────────────────────────────────────
 $string['noachievements']  = 'No achievement records found.';
 $string['nomappings']      = 'No course replacement mappings found.';
-$string['plugindisabled']  = 'The Completion History plugin is currently disabled.';
+$string['plugindisabled']  = 'The Saylor SIS Integration plugin is currently disabled.';
 $string['gradepassed']     = 'Passed';
 $string['gradefailed']     = 'Not passed';
 $string['gradeunknown']    = 'N/A';
@@ -387,4 +403,4 @@ $string['flagspresetsloaded']         = 'Preset flags loaded: {$a} inserted.';
 $string['error_nocourse']       = 'Course not found.';
 $string['error_nouser']         = 'User not found.';
 $string['error_duplicatehash']  = 'Achievement already recorded (duplicate event hash).';
-$string['error_plugindisabled'] = 'Completion History plugin is disabled.';
+$string['error_plugindisabled'] = 'Saylor SIS Integration plugin is disabled.';
