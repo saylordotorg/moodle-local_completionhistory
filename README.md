@@ -26,9 +26,11 @@ So the name stays until there is an independent reason to migrate the data — s
 from the integration would be one. Renaming for the label alone would put the record of record, the
 production web service token, and twelve capability grants at risk to fix a word.
 
-Two names inside the plugin must **not** be changed for the same reason, and both say so where they
-live: the `'Completion History SIS'` external service in `db/services.php` (renaming it deletes the
-production token — see the note there) and the `completionhistory:*` capability strings.
+Two names inside the plugin did not follow the display name either, and both say so where they
+live: the `'Completion History SIS'` external service in `db/services.php` — renaming that key
+deletes the production token on the next upgrade, so it is a token rotation rather than an edit —
+and the `completionhistory:*` capability strings, whose grants have been missed twice and fail
+silently.
 
 ## Requirements
 
@@ -71,7 +73,7 @@ Database and cached service/event changes are applied through `db/install.xml`, 
 
 ## Security model
 
-The bundled **Completion History SIS** external service (named for the component, not the display name — and unrenameable, see `db/services.php`) is disabled and restricted to explicitly authorized users by default. Use a dedicated, non-human service account and a dedicated system role. Do not use an administrator account or grant broad core capabilities to the service account.
+The bundled **Completion History SIS** external service keeps its original name, which is now neither the component nor the displayed plugin name. That is deliberate: Moodle matches services on their name and deletes any it cannot find, tokens first, so renaming it is a token rotation rather than an edit — see the note in `db/services.php`. It is disabled and restricted to explicitly authorized users by default. Use a dedicated, non-human service account and a dedicated system role. Do not use an administrator account or grant broad core capabilities to the service account.
 
 `local/completionhistory:integrate` permits the curated integration reads and outbox acknowledgements. Grant the following additional capabilities only when that operation is required:
 
