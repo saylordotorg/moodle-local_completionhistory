@@ -1,8 +1,34 @@
-# Completion History (`local_completionhistory`)
+# Saylor SIS Integration (`local_completionhistory`)
 
-[![Moodle Plugin CI for 4.5](https://github.com/saylordotorg/moodle-local_completionhistory/actions/workflows/moodle-plugin-ci.yml/badge.svg)](https://github.com/saylordotorg/moodle-local_completionhistory/actions/workflows/moodle-plugin-ci.yml)
+[![Moodle Plugin CI for 4.5](https://github.com/saylordotorg/moodle-local_saylorsis/actions/workflows/moodle-plugin-ci.yml/badge.svg)](https://github.com/saylordotorg/moodle-local_saylorsis/actions/workflows/moodle-plugin-ci.yml)
 
-A Moodle local plugin providing a durable academic-history ledger, exam-attempt audit data, course-replacement mappings, and a deliberately narrow integration surface for the Saylor SIS.
+The Moodle half of the link between this site and the Saylor SIS. It exposes a deliberately narrow
+server-to-server surface — nineteen web service functions covering account provisioning, enrolment
+and unenrolment, single sign-on, initial password setup, whitelisted profile corrections,
+certificates, courses and programmes — and it keeps the records that surface reports on: a durable
+academic-history ledger with grade snapshots, exam-attempt audit data, course-replacement mappings,
+and a transactional outbox the SIS drains.
+
+## Why the component is still `local_completionhistory`
+
+The ledger came first and named the plugin; the integration is now the larger half, so the
+**displayed** name is "Saylor SIS Integration". The frankenstyle component deliberately did not
+follow it.
+
+In Moodle a component name is not a label. It is the key for eight database tables, twelve
+capabilities, nineteen web service functions, every `config_plugins` row, and the observer, hook and
+task registrations — and there is no supported way to change it. A renamed component is a *new*
+plugin: Moodle runs `db/install.xml`, creates empty tables, and offers to uninstall the old plugin,
+which drops the academic ledger. `db/upgrade.php` cannot bridge the gap, because it is keyed to the
+old component too.
+
+So the name stays until there is an independent reason to migrate the data — splitting the ledger
+from the integration would be one. Renaming for the label alone would put the record of record, the
+production web service token, and twelve capability grants at risk to fix a word.
+
+Two names inside the plugin must **not** be changed for the same reason, and both say so where they
+live: the `'Completion History SIS'` external service in `db/services.php` (renaming it deletes the
+production token — see the note there) and the `completionhistory:*` capability strings.
 
 ## Requirements
 
@@ -15,7 +41,7 @@ A Moodle local plugin providing a durable academic-history ledger, exam-attempt 
 
 1. Install this directory as `local/completionhistory`.
 2. Visit **Site administration > Notifications** or run the standard Moodle CLI upgrade.
-3. Review the settings under **Plugins > Local plugins > Completion History**.
+3. Review the settings under **Plugins > Local plugins > Saylor SIS Integration**.
 4. If the SIS service is used, update its dedicated role for the capabilities described below. New integration capabilities intentionally have no archetype grants.
 5. Verify the grant took, from the Moodle root:
 
@@ -45,7 +71,7 @@ Database and cached service/event changes are applied through `db/install.xml`, 
 
 ## Security model
 
-The bundled **Completion History SIS** external service is disabled and restricted to explicitly authorized users by default. Use a dedicated, non-human service account and a dedicated system role. Do not use an administrator account or grant broad core capabilities to the service account.
+The bundled **Completion History SIS** external service (named for the component, not the display name — and unrenameable, see `db/services.php`) is disabled and restricted to explicitly authorized users by default. Use a dedicated, non-human service account and a dedicated system role. Do not use an administrator account or grant broad core capabilities to the service account.
 
 `local/completionhistory:integrate` permits the curated integration reads and outbox acknowledgements. Grant the following additional capabilities only when that operation is required:
 

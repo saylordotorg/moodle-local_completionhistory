@@ -185,6 +185,26 @@ $functions = [
     ],
 ];
 
+/*
+ * THIS SERVICE NAME MUST NOT BE CHANGED, despite the plugin now being displayed as "Saylor SIS
+ * Integration". It is not a label — it is the key Moodle matches on.
+ *
+ * `external_update_descriptions()` (lib/upgradelib.php) loads the site's services for this
+ * component and, for any whose `name` is absent from the array below, runs:
+ *
+ *     delete_records('external_tokens',            ['externalserviceid' => $dbservice->id]);
+ *     delete_records('external_services_functions', ...);
+ *     delete_records('external_services_users',     ...);
+ *     delete_records('external_services',           ['id' => $dbservice->id]);
+ *
+ * It matches on NAME, not on `shortname` — the shortname below is only kept in step afterwards.
+ * So renaming this key does not rename the service: it DELETES the production token and the
+ * authorised-user grant on the next upgrade, then creates an empty new service. The SIS would
+ * start failing to authenticate the moment the plugin was upgraded, with nothing in the plugin
+ * pointing at the cause.
+ *
+ * Rename it only alongside minting a new token and updating the Moodle secret, deliberately.
+ */
 $services = [
     'Completion History SIS' => [
         'functions'       => [

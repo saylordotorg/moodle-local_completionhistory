@@ -120,7 +120,7 @@ if ($configured === 0) {
     cli_writeln('');
     cli_writeln('No course has an exam configuration, so no quiz is a tracked exam and');
     cli_writeln('there is nothing to back-fill. Configure a course exam first');
-    cli_writeln('(Site administration > Plugins > Local > Completion history > Course exams),');
+    cli_writeln('(Site administration > Plugins > Local > Saylor SIS Integration > Course exams),');
     cli_writeln('then run this again.');
     exit(0);
 }
