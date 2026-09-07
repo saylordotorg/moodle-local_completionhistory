@@ -99,8 +99,7 @@ if ($action === 'edit') {
 
     echo html_writer::tag('h4', $courseid
         ? get_string('examconfig_edit', 'local_completionhistory') . ': ' . format_string($course->fullname ?? "Course {$courseid}")
-        : get_string('examconfig_add', 'local_completionhistory')
-    );
+        : get_string('examconfig_add', 'local_completionhistory'));
 
     // Fetch all quizzes for the selected course (for quiz dropdowns).
     $quizzes = [];
@@ -147,8 +146,13 @@ if ($action === 'edit') {
     echo html_writer::start_div('form-group row');
     echo html_writer::tag('label', get_string('examconfig_type', 'local_completionhistory'), ['class' => 'col-sm-3 col-form-label font-weight-bold', 'for' => 'course_type']);
     echo html_writer::start_div('col-sm-9');
-    echo html_writer::select($type_options, 'course_type', $config->course_type, false,
-        ['id' => 'course_type', 'class' => 'form-control']);
+    echo html_writer::select(
+        $type_options,
+        'course_type',
+        $config->course_type,
+        false,
+        ['id' => 'course_type', 'class' => 'form-control']
+    );
     echo html_writer::end_div();
     echo html_writer::end_div();
 
@@ -160,8 +164,13 @@ if ($action === 'edit') {
     echo html_writer::start_div('form-group row');
     echo html_writer::tag('label', get_string('examconfig_quiz', 'local_completionhistory'), ['class' => 'col-sm-3 col-form-label', 'for' => 'program_final_quizid']);
     echo html_writer::start_div('col-sm-4');
-    echo html_writer::select($quiz_options, 'program_final_quizid', $config->program_final_quizid ?? '', false,
-        ['id' => 'program_final_quizid', 'class' => 'form-control']);
+    echo html_writer::select(
+        $quiz_options,
+        'program_final_quizid',
+        $config->program_final_quizid ?? '',
+        false,
+        ['id' => 'program_final_quizid', 'class' => 'form-control']
+    );
     echo html_writer::end_div();
     echo html_writer::end_div();
 
@@ -186,8 +195,13 @@ if ($action === 'edit') {
     echo html_writer::start_div('form-group row');
     echo html_writer::tag('label', get_string('examconfig_quiz', 'local_completionhistory'), ['class' => 'col-sm-3 col-form-label', 'for' => 'dc_quizid']);
     echo html_writer::start_div('col-sm-4');
-    echo html_writer::select($quiz_options, 'dc_quizid', $config->dc_quizid ?? '', false,
-        ['id' => 'dc_quizid', 'class' => 'form-control']);
+    echo html_writer::select(
+        $quiz_options,
+        'dc_quizid',
+        $config->dc_quizid ?? '',
+        false,
+        ['id' => 'dc_quizid', 'class' => 'form-control']
+    );
     echo html_writer::end_div();
     echo html_writer::end_div();
 
@@ -212,8 +226,13 @@ if ($action === 'edit') {
     echo html_writer::start_div('form-group row');
     echo html_writer::tag('label', get_string('examconfig_quiz', 'local_completionhistory'), ['class' => 'col-sm-3 col-form-label', 'for' => 'cert_quizid']);
     echo html_writer::start_div('col-sm-4');
-    echo html_writer::select($quiz_options, 'cert_quizid', $config->cert_quizid ?? '', false,
-        ['id' => 'cert_quizid', 'class' => 'form-control']);
+    echo html_writer::select(
+        $quiz_options,
+        'cert_quizid',
+        $config->cert_quizid ?? '',
+        false,
+        ['id' => 'cert_quizid', 'class' => 'form-control']
+    );
     echo html_writer::end_div();
     echo html_writer::end_div();
 
@@ -281,8 +300,11 @@ $perpage = 25;
 ['configs' => $configs, 'total' => $total] = course_config_service::get_all_configs($page, $perpage);
 
 $addurl  = new moodle_url('/local/completionhistory/course_exam_config.php', ['action' => 'edit', 'courseid' => 0]);
-echo html_writer::tag('a', '+ ' . get_string('examconfig_add', 'local_completionhistory'),
-    ['href' => $addurl->out(false), 'class' => 'btn btn-primary mb-3']);
+echo html_writer::tag(
+    'a',
+    '+ ' . get_string('examconfig_add', 'local_completionhistory'),
+    ['href' => $addurl->out(false), 'class' => 'btn btn-primary mb-3']
+);
 
 if (empty($configs)) {
     echo $OUTPUT->notification(get_string('examconfig_none', 'local_completionhistory'), 'info');
@@ -302,12 +324,16 @@ if (empty($configs)) {
     foreach ($configs as $cfg) {
         $course = $DB->get_record('course', ['id' => $cfg->courseid], 'id, fullname, shortname');
 
-        $editurl   = new moodle_url('/local/completionhistory/course_exam_config.php',
-            ['action' => 'edit',   'courseid' => $cfg->courseid]);
+        $editurl   = new moodle_url(
+            '/local/completionhistory/course_exam_config.php',
+            ['action' => 'edit', 'courseid' => $cfg->courseid]
+        );
         $deleteurl = new moodle_url('/local/completionhistory/course_exam_config.php');
 
-        $quiz_name = function(?int $qid) use ($DB): string {
-            if (!$qid) return '—';
+        $quiz_name = function (?int $qid) use ($DB): string {
+            if (!$qid) {
+                return '—';
+            }
             $q = $DB->get_record('quiz', ['id' => $qid], 'id, name');
             return $q ? format_string($q->name) : "Quiz #{$qid}";
         };
@@ -322,7 +348,8 @@ if (empty($configs)) {
             course_config_service::TYPE_OPEN_CERT  => 'success',
         ];
         $badge_cls = $type_badge_map[$cfg->course_type] ?? 'secondary';
-        $type_html = html_writer::tag('span',
+        $type_html = html_writer::tag(
+            'span',
             s($type_labels[$cfg->course_type] ?? $cfg->course_type),
             ['class' => "badge badge-{$badge_cls}"]
         );
@@ -365,8 +392,12 @@ if (empty($configs)) {
     echo html_writer::end_tag('tbody');
     echo html_writer::end_tag('table');
 
-    echo $OUTPUT->paging_bar($total, $page, $perpage,
-        new moodle_url('/local/completionhistory/course_exam_config.php'));
+    echo $OUTPUT->paging_bar(
+        $total,
+        $page,
+        $perpage,
+        new moodle_url('/local/completionhistory/course_exam_config.php')
+    );
 }
 
 echo $OUTPUT->footer();

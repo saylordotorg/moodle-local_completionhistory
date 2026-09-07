@@ -69,7 +69,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class exam_backfill_service {
-
     /**
      * Find finished quiz attempts on currently-tracked exam quizzes.
      *
@@ -250,8 +249,12 @@ class exam_backfill_service {
             if ((int) $row->attempt_number !== $expected) {
                 $changed++;
                 if (!$dryrun) {
-                    $DB->set_field('local_completionhistory_exam_attempt',
-                        'attempt_number', $expected, ['id' => $row->id]);
+                    $DB->set_field(
+                        'local_completionhistory_exam_attempt',
+                        'attempt_number',
+                        $expected,
+                        ['id' => $row->id]
+                    );
                 }
             }
         }
@@ -306,8 +309,13 @@ class exam_backfill_service {
             if (self::already_recorded((int) $row->userid, (int) $row->courseid, $track, $timetaken)) {
                 $skipped++;
                 if ($log) {
-                    $log(sprintf('skip  quizattempt=%d user=%d course=%d %s: already recorded',
-                        $row->quizattemptid, $row->userid, $row->courseid, $track));
+                    $log(sprintf(
+                        'skip  quizattempt=%d user=%d course=%d %s: already recorded',
+                        $row->quizattemptid,
+                        $row->userid,
+                        $row->courseid,
+                        $track
+                    ));
                 }
                 continue;
             }
@@ -331,12 +339,17 @@ class exam_backfill_service {
             ];
 
             if ($log) {
-                $log(sprintf('%s quizattempt=%d user=%d course=%d %s grade=%s passed=%s taken=%d',
+                $log(sprintf(
+                    '%s quizattempt=%d user=%d course=%d %s grade=%s passed=%s taken=%d',
                     $dryrun ? 'would' : 'write',
-                    $row->quizattemptid, $row->userid, $row->courseid, $track,
+                    $row->quizattemptid,
+                    $row->userid,
+                    $row->courseid,
+                    $track,
                     $grade === null ? 'null' : number_format($grade, 2),
                     $passed === null ? 'null' : ($passed ? '1' : '0'),
-                    $timetaken));
+                    $timetaken
+                ));
             }
 
             if (!$dryrun) {
@@ -373,8 +386,13 @@ class exam_backfill_service {
                 $log($dryrun
                     ? sprintf('note  user=%d course=%d %s: %d existing row(s) already out of '
                         . 'chronological order (pre-insert)', $u, $c, $t, $moved)
-                    : sprintf('renum user=%d course=%d %s: %d row(s) moved into chronological order',
-                        $u, $c, $t, $moved));
+                    : sprintf(
+                        'renum user=%d course=%d %s: %d row(s) moved into chronological order',
+                        $u,
+                        $c,
+                        $t,
+                        $moved
+                    ));
             }
         }
 

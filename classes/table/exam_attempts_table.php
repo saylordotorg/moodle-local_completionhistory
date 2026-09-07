@@ -41,31 +41,30 @@ require_once($CFG->libdir . '/tablelib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class exam_attempts_table extends table_sql {
-
     private const TRACK_BADGE = [
         course_config_service::TRACK_PROGRAM_FINAL => ['Program Final', 'badge-primary'],
         course_config_service::TRACK_DIRECT_CREDIT => ['Direct Credit', 'badge-info'],
-        course_config_service::TRACK_CERTIFICATE   => ['Certificate',   'badge-success'],
+        course_config_service::TRACK_CERTIFICATE   => ['Certificate', 'badge-success'],
     ];
 
     private const NOSORT_COLS = ['achievement', 'duration', 'flags'];
 
     private const COLS = [
-        ['user_firstname',  'col_firstname'],
-        ['user_lastname',   'col_lastname'],
-        ['user_email',      'col_email'],
-        ['user_country',    'col_country'],
-        ['useridnumber',    'col_useridnumber'],
+        ['user_firstname', 'col_firstname'],
+        ['user_lastname', 'col_lastname'],
+        ['user_email', 'col_email'],
+        ['user_country', 'col_country'],
+        ['useridnumber', 'col_useridnumber'],
         ['course_fullname', 'col_coursename'],
-        ['course_shortname','col_courseshortname'],
-        ['exam_track',      'col_exam_track'],
-        ['attempt_number',  'col_attempt_number'],
-        ['grade_decimal',   'col_grade'],
-        ['grade_passed',    'col_attempt_result'],
-        ['timetaken',       'col_attempt_date'],
-        ['duration',        'col_duration'],
-        ['flags',           'col_flags'],
-        ['achievement',     'col_achievement_link'],
+        ['course_shortname', 'col_courseshortname'],
+        ['exam_track', 'col_exam_track'],
+        ['attempt_number', 'col_attempt_number'],
+        ['grade_decimal', 'col_grade'],
+        ['grade_passed', 'col_attempt_result'],
+        ['timetaken', 'col_attempt_date'],
+        ['duration', 'col_duration'],
+        ['flags', 'col_flags'],
+        ['achievement', 'col_achievement_link'],
     ];
 
     public function __construct(string $uniqueid, array $visiblecols = []) {
@@ -140,13 +139,13 @@ class exam_attempts_table extends table_sql {
      */
     public static function category_labels(): array {
         return [
-            'user'   => get_string('colcat_user',   'local_completionhistory'),
+            'user'   => get_string('colcat_user', 'local_completionhistory'),
             'course' => get_string('colcat_course', 'local_completionhistory'),
-            'exam'   => get_string('colcat_exam',   'local_completionhistory'),
-            'grade'  => get_string('colcat_grade',  'local_completionhistory'),
-            'time'   => get_string('colcat_time',   'local_completionhistory'),
-            'flags'  => get_string('colcat_flags',  'local_completionhistory'),
-            'other'  => get_string('colcat_other',  'local_completionhistory'),
+            'exam'   => get_string('colcat_exam', 'local_completionhistory'),
+            'grade'  => get_string('colcat_grade', 'local_completionhistory'),
+            'time'   => get_string('colcat_time', 'local_completionhistory'),
+            'flags'  => get_string('colcat_flags', 'local_completionhistory'),
+            'other'  => get_string('colcat_other', 'local_completionhistory'),
         ];
     }
 
@@ -179,20 +178,28 @@ class exam_attempts_table extends table_sql {
     }
 
     public function col_user_lastname($row): string {
-        if ((int) $row->userid === 0) return '';
+        if ((int) $row->userid === 0) {
+            return '';
+        }
         return s($row->user_lastname ?? '');
     }
 
     public function col_user_email($row): string {
-        if ((int) $row->userid === 0) return '';
+        if ((int) $row->userid === 0) {
+            return '';
+        }
         $email = $row->user_email ?? '';
         return $email ? html_writer::link('mailto:' . s($email), s($email)) : '-';
     }
 
     public function col_user_country($row): string {
-        if ((int) $row->userid === 0) return '';
+        if ((int) $row->userid === 0) {
+            return '';
+        }
         $code = trim((string) ($row->user_country ?? ''));
-        if ($code === '') return '-';
+        if ($code === '') {
+            return '-';
+        }
         $countries = get_string_manager()->get_list_of_countries(true);
         return isset($countries[$code]) ? s($countries[$code]) : s($code);
     }
@@ -243,7 +250,9 @@ class exam_attempts_table extends table_sql {
     // ── Grade ────────────────────────────────────────────────────────────────
 
     public function col_grade_decimal($row): string {
-        if ($row->grade_decimal === null) return '-';
+        if ($row->grade_decimal === null) {
+            return '-';
+        }
         return format_float((float) $row->grade_decimal, 1) . '%';
     }
 
@@ -255,30 +264,41 @@ class exam_attempts_table extends table_sql {
         $passed  = $row->grade_passed;
 
         if ($passed === null || $passed === '') {
-            return html_writer::tag('span', '— N/A',
-                ['class' => 'badge badge-secondary', 'style' => 'font-size:0.85em']);
+            return html_writer::tag(
+                'span',
+                '— N/A',
+                ['class' => 'badge badge-secondary', 'style' => 'font-size:0.85em']
+            );
         }
 
         if ((int) $passed === 1) {
             $icon = (int) $row->resulted_in_completion
                 ? '&#10003; Passed &#127775;'
                 : '&#10003; Passed';
-            return html_writer::tag('span', $icon,
-                ['class' => 'badge badge-success', 'style' => 'font-size:0.85em']);
+            return html_writer::tag(
+                'span',
+                $icon,
+                ['class' => 'badge badge-success', 'style' => 'font-size:0.85em']
+            );
         }
 
         $exhausted = ($allowed > 0 && $n >= $allowed);
         $label = $exhausted
             ? '&#10007; Failed — track exhausted'
             : '&#10007; Failed';
-        return html_writer::tag('span', $label,
-            ['class' => 'badge badge-danger', 'style' => 'font-size:0.85em']);
+        return html_writer::tag(
+            'span',
+            $label,
+            ['class' => 'badge badge-danger', 'style' => 'font-size:0.85em']
+        );
     }
 
     // ── Date ─────────────────────────────────────────────────────────────────
 
     public function col_timetaken($row): string {
-        if (empty($row->timetaken)) return '-';
+        if (empty($row->timetaken)) {
+            return '-';
+        }
         $ts   = (int) $row->timetaken;
         $days = (int) floor((time() - $ts) / 86400);
 
@@ -287,15 +307,20 @@ class exam_attempts_table extends table_sql {
               : ($days === 1 ? '1 day ago'
               : number_format($days) . ' days ago');
 
-        return $date . html_writer::tag('span', ' (' . $ago . ')',
-            ['class' => 'text-muted small']);
+        return $date . html_writer::tag(
+            'span',
+            ' (' . $ago . ')',
+            ['class' => 'text-muted small']
+        );
     }
 
     // ── Duration ─────────────────────────────────────────────────────────────
 
     public function col_duration($row): string {
         $secs = isset($row->duration) ? (int) $row->duration : 0;
-        if ($secs <= 0) return '-';
+        if ($secs <= 0) {
+            return '-';
+        }
 
         $h = intdiv($secs, 3600);
         $m = intdiv($secs % 3600, 60);
@@ -333,15 +358,22 @@ class exam_attempts_table extends table_sql {
     // ── Achievement link ─────────────────────────────────────────────────────
 
     public function col_achievement($row): string {
-        if ((int) $row->userid === 0) return '-';
-        if (empty($row->achievementid)) return '-';
+        if ((int) $row->userid === 0) {
+            return '-';
+        }
+        if (empty($row->achievementid)) {
+            return '-';
+        }
 
         $url = new moodle_url('/local/completionhistory/achievement_ledger.php', [
             'filteruserid'     => (int) $row->userid,
             'filtercoursename' => $row->course_fullname ?? '',
         ]);
-        return html_writer::link($url->out(false), '&#8594; Ledger',
+        return html_writer::link(
+            $url->out(false),
+            '&#8594; Ledger',
             ['class' => 'btn btn-outline-secondary btn-sm',
-             'style' => 'font-size:0.75em; padding:2px 8px;']);
+            'style' => 'font-size:0.75em; padding:2px 8px;']
+        );
     }
 }

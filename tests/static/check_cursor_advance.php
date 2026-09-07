@@ -126,11 +126,13 @@ $rows = static function (array $pairs, string $field): array {
 
 foreach ($targets as $name => $t) {
     $code = file_get_contents($t['file']);
-    if (!preg_match(
-        '/public static function next_cursor\(array \$rows, int \$sincets, int \$sinceid\): array \{(.+?)\n    \}/s',
-        $code,
-        $m
-    )) {
+    if (
+        !preg_match(
+            '/public static function next_cursor\(array \$rows, int \$sincets, int \$sinceid\): array \{(.+?)\n    \}/s',
+            $code,
+            $m
+        )
+    ) {
         fwrite(STDERR, "{$name}: next_cursor() not found in the expected shape; "
             . "update this check rather than deleting it.\n");
         exit(2);
@@ -253,6 +255,8 @@ if ($failed) {
     echo "\nFAIL: {$failed} problem(s)\n";
     exit(1);
 }
-printf("\nPASS: all %d paging functions ascend, use a keyset predicate, and advance correctly.\n",
-    count($targets));
+printf(
+    "\nPASS: all %d paging functions ascend, use a keyset predicate, and advance correctly.\n",
+    count($targets)
+);
 exit(0);

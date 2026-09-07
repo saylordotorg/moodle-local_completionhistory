@@ -184,8 +184,8 @@ foreach ($functions as $fnname => $fn) {
 
 // ---------------------------------------------------------------------------
 // B. Every capability the METADATA names actually exists in db/access.php.
-//    A typo here is invisible: Moodle stores the string verbatim and the
-//    endpoint keeps working, so only the operator reading it is misled.
+// A typo here is invisible: Moodle stores the string verbatim and the
+// endpoint keeps working, so only the operator reading it is misled.
 // ---------------------------------------------------------------------------
 
 foreach ($functions as $fnname => $fn) {
@@ -198,13 +198,13 @@ foreach ($functions as $fnname => $fn) {
 
 // ---------------------------------------------------------------------------
 // C. Every capability an operator MUST grant by hand is in the RUNBOOK, and the
-//    runbook names nothing that no longer exists.
+// runbook names nothing that no longer exists.
 //
-//    "Must grant by hand" is the precise set: required by a function in the SIS
-//    service AND declared with no archetypes, so no role inherits it. That is
-//    the set whose omission takes the integration down, and it is exactly what
-//    drifted — viewcertificates was needed and undocumented, setdeadlines was
-//    documented and gone.
+// "Must grant by hand" is the precise set: required by a function in the SIS
+// service AND declared with no archetypes, so no role inherits it. That is
+// the set whose omission takes the integration down, and it is exactly what
+// drifted — viewcertificates was needed and undocumented, setdeadlines was
+// documented and gone.
 // ---------------------------------------------------------------------------
 
 $mustgrant = [];
@@ -231,16 +231,16 @@ foreach (array_unique($rmcaps[0]) as $cap) {
 // ---------------------------------------------------------------------------
 // D. Every INTEGRATION function is actually exposed by the SIS service.
 //
-//    A function declared in $functions but missing from the service's function
-//    list is registered on the site and callable by nobody: the SIS token
-//    authorises one service, so the endpoint answers "invalid parameter"-shaped
-//    nothing and the feature is simply absent. Same failure class as an
-//    ungranted capability, same invisibility, and one more line to forget.
+// A function declared in $functions but missing from the service's function
+// list is registered on the site and callable by nobody: the SIS token
+// authorises one service, so the endpoint answers "invalid parameter"-shaped
+// nothing and the feature is simply absent. Same failure class as an
+// ungranted capability, same invisibility, and one more line to forget.
 //
-//    Scoped to functions requiring :integrate on purpose. That capability is the
-//    marker for "server-to-server only", so those and only those must be reachable
-//    by the SIS token; the browser-facing reads (viewown, ajax) are a separate set
-//    whose membership here is a judgement rather than a rule.
+// Scoped to functions requiring :integrate on purpose. That capability is the
+// marker for "server-to-server only", so those and only those must be reachable
+// by the SIS token; the browser-facing reads (viewown, ajax) are a separate set
+// whose membership here is a judgement rather than a rule.
 // ---------------------------------------------------------------------------
 
 foreach ($functions as $fnname => $fn) {

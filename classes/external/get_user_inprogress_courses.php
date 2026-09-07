@@ -34,7 +34,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_user_inprogress_courses extends external_api {
-
     /** Defensive ceiling for pathological enrolment sets. */
     private const MAX_COURSES = 1000;
 

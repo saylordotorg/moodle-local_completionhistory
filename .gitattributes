@@ -1,0 +1,7 @@
+# Moodle plugin sources are LF regardless of the host OS: the coding-standard
+# checker, grunt and the deployed tree all expect it.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary

@@ -35,7 +35,6 @@ use local_completionhistory\local\outbox_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_recent_achievements extends external_api {
-
     /** Hard ceiling on rows per call. */
     private const MAX_LIMIT = 1000;
 

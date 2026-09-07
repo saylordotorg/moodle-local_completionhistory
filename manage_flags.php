@@ -50,9 +50,12 @@ if ($action === 'loadpresets') {
     }
     require_sesskey();
     $inserted = flag_service::load_presets();
-    redirect($PAGE->url,
+    redirect(
+        $PAGE->url,
         get_string('flagspresetsloaded', 'local_completionhistory', $inserted),
-        null, \core\output\notification::NOTIFY_SUCCESS);
+        null,
+        \core\output\notification::NOTIFY_SUCCESS
+    );
 }
 
 if ($action && $flagid) {
@@ -66,16 +69,22 @@ if ($action && $flagid) {
     if ($action === 'toggle') {
         $flag->enabled = $flag->enabled ? 0 : 1;
         flag_service::save($flag);
-        redirect($PAGE->url,
+        redirect(
+            $PAGE->url,
             get_string($flag->enabled ? 'flagenabled' : 'flagdisabled', 'local_completionhistory'),
-            null, \core\output\notification::NOTIFY_SUCCESS);
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
     }
 
     if ($action === 'delete') {
         flag_service::delete((int) $flag->id);
-        redirect($PAGE->url,
+        redirect(
+            $PAGE->url,
             get_string('flagdeleted', 'local_completionhistory'),
-            null, \core\output\notification::NOTIFY_SUCCESS);
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
     }
 }
 
@@ -84,9 +93,11 @@ echo $OUTPUT->header();
 $editurl    = new moodle_url('/local/completionhistory/edit_flag.php');
 $presetsurl = new moodle_url($PAGE->url);
 
-echo html_writer::tag('a',
+echo html_writer::tag(
+    'a',
     '&#43; ' . get_string('addflag', 'local_completionhistory'),
-    ['href' => $editurl->out(false), 'class' => 'btn btn-primary btn-sm mr-2 mb-3']);
+    ['href' => $editurl->out(false), 'class' => 'btn btn-primary btn-sm mr-2 mb-3']
+);
 
 echo html_writer::start_tag('form', [
     'method' => 'post',
@@ -99,22 +110,27 @@ echo html_writer::empty_tag('input', [
 echo html_writer::empty_tag('input', [
     'type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey(),
 ]);
-echo html_writer::tag('button',
+echo html_writer::tag(
+    'button',
     '&#8681; ' . get_string('flagsloadpresets', 'local_completionhistory'),
     [
         'type'    => 'submit',
         'class'   => 'btn btn-outline-secondary btn-sm mb-3',
         'title'   => get_string('flagsloadpresets_help', 'local_completionhistory'),
         'onclick' => 'return confirm(' . json_encode(get_string('flagsloadpresets_confirm', 'local_completionhistory')) . ');',
-    ]);
+    ]
+);
 echo html_writer::end_tag('form');
 
 global $DB;
 $flags = $DB->get_records('local_completionhistory_flag_def', null, 'severity DESC, name ASC');
 
 if (empty($flags)) {
-    echo html_writer::tag('p', get_string('flags_none', 'local_completionhistory'),
-        ['class' => 'alert alert-info']);
+    echo html_writer::tag(
+        'p',
+        get_string('flags_none', 'local_completionhistory'),
+        ['class' => 'alert alert-info']
+    );
     echo $OUTPUT->footer();
     return;
 }
@@ -124,19 +140,19 @@ $sevlabels  = flag_service::severity_labels();
 
 $table = new html_table();
 $table->head = [
-    get_string('flag_name',        'local_completionhistory'),
-    get_string('flag_code',        'local_completionhistory'),
-    get_string('flag_type',        'local_completionhistory'),
-    get_string('flag_severity',    'local_completionhistory'),
-    get_string('flag_config',      'local_completionhistory'),
-    get_string('flag_enabled',     'local_completionhistory'),
+    get_string('flag_name', 'local_completionhistory'),
+    get_string('flag_code', 'local_completionhistory'),
+    get_string('flag_type', 'local_completionhistory'),
+    get_string('flag_severity', 'local_completionhistory'),
+    get_string('flag_config', 'local_completionhistory'),
+    get_string('flag_enabled', 'local_completionhistory'),
     get_string('actions'),
 ];
 $table->attributes = ['class' => 'generaltable'];
 
 foreach ($flags as $f) {
     $typelabel = $typelabels[$f->flag_type] ?? $f->flag_type;
-    $sevlabel  = $sevlabels[$f->severity]    ?? $f->severity;
+    $sevlabel  = $sevlabels[$f->severity] ?? $f->severity;
     $sevcls    = flag_service::severity_badge_class($f->severity);
 
     $configsummary = '';
@@ -157,7 +173,7 @@ foreach ($flags as $f) {
     $actionurl = new moodle_url('/local/completionhistory/manage_flags.php');
     $togglelabel = $f->enabled
         ? get_string('flagdisable', 'local_completionhistory')
-        : get_string('flagenable',  'local_completionhistory');
+        : get_string('flagenable', 'local_completionhistory');
     $togglelink = html_writer::start_tag('form', [
         'method' => 'post', 'action' => $actionurl->out(false), 'class' => 'd-inline',
     ]);
@@ -197,7 +213,7 @@ foreach ($flags as $f) {
 
     $enabledbadge = $f->enabled
         ? html_writer::tag('span', get_string('yes'), ['class' => 'badge badge-success'])
-        : html_writer::tag('span', get_string('no'),  ['class' => 'badge badge-secondary']);
+        : html_writer::tag('span', get_string('no'), ['class' => 'badge badge-secondary']);
 
     $table->data[] = [
         s($f->name),

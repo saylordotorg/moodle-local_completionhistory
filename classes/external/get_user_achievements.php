@@ -30,7 +30,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_user_achievements extends external_api {
-
     /** Hard ceiling on rows per call. */
     private const MAX_LIMIT = 500;
 

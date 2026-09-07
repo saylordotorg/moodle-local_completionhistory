@@ -33,7 +33,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class course_config_service {
-
     // ── Course type constants ────────────────────────────────────────────────
 
     const TYPE_STANDARD  = 'standard';
@@ -186,10 +185,12 @@ class course_config_service {
         $quizids = [];
         foreach ($quizfields as $field) {
             $quizid = empty($config->$field) ? null : (int) $config->$field;
-            if ($quizid !== null && !$DB->record_exists('quiz', [
+            if (
+                $quizid !== null && !$DB->record_exists('quiz', [
                     'id' => $quizid,
                     'course' => $config->courseid,
-                ])) {
+                ])
+            ) {
                 throw new \invalid_parameter_exception('Every selected quiz must belong to the configured course.');
             }
             if ($quizid !== null && in_array($quizid, $quizids, true)) {
@@ -248,7 +249,7 @@ class course_config_service {
         if ((int) $row->program_final_quizid === $quizid) {
             $result->track            = self::TRACK_PROGRAM_FINAL;
             $result->attempts_allowed = (int) $row->program_attempts_allowed;
-        } elseif ((int) $row->dc_quizid === $quizid) {
+        } else if ((int) $row->dc_quizid === $quizid) {
             $result->track            = self::TRACK_DIRECT_CREDIT;
             $result->attempts_allowed = (int) $row->dc_attempts_allowed;
         } else {

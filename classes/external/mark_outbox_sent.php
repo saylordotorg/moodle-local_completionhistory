@@ -31,7 +31,6 @@ use local_completionhistory\local\outbox_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mark_outbox_sent extends external_api {
-
     /** Maximum acknowledgements accepted in one request. */
     private const MAX_IDS = 1000;
 
@@ -63,11 +62,13 @@ class mark_outbox_sent extends external_api {
         if (count($params['ids']) > self::MAX_IDS) {
             throw new \invalid_parameter_exception('Too many outbox ids; maximum is ' . self::MAX_IDS . '.');
         }
-        if (!in_array($params['status'], [
+        if (
+            !in_array($params['status'], [
             outbox_service::STATUS_SENT,
             outbox_service::STATUS_FAILED,
             outbox_service::STATUS_CANCELLED,
-        ], true)) {
+            ], true)
+        ) {
             throw new \invalid_parameter_exception('Unknown outbox status.');
         }
         $error = \core_text::substr((string) $params['error'], 0, self::MAX_ERROR_LENGTH);

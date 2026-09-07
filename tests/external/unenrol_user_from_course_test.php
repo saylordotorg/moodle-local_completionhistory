@@ -45,7 +45,6 @@ use advanced_testcase;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class unenrol_user_from_course_test extends advanced_testcase {
-
     /**
      * Set up test state.
      */
@@ -169,16 +168,22 @@ final class unenrol_user_from_course_test extends advanced_testcase {
         }
         $selfplugin->update_status($self, ENROL_INSTANCE_ENABLED);
         $self = $DB->get_record('enrol', ['id' => $self->id], '*', MUST_EXIST);
-        $selfplugin->enrol_user($self, $user->id,
-            (int) $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST));
+        $selfplugin->enrol_user(
+            $self,
+            $user->id,
+            (int) $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST)
+        );
 
         $result = unenrol_user_from_course::execute($user->email, 'PSYCH101');
 
         $this->assertTrue($result['changed'], 'the manual enrolment is still suspended');
         $this->assertStringContainsString('self', $result['warning']);
         $selfue = $DB->get_record('user_enrolments', ['enrolid' => $self->id, 'userid' => $user->id]);
-        $this->assertEquals(ENROL_USER_ACTIVE, (int) $selfue->status,
-            'an enrolment the SIS did not create is not the SIS\'s to withdraw');
+        $this->assertEquals(
+            ENROL_USER_ACTIVE,
+            (int) $selfue->status,
+            'an enrolment the SIS did not create is not the SIS\'s to withdraw'
+        );
         $this->assertTrue(is_enrolled(\context_course::instance($course->id), $user, '', true));
     }
 
@@ -226,8 +231,11 @@ final class unenrol_user_from_course_test extends advanced_testcase {
         $this->assertFalse(is_enrolled($context, $user, '', true), 'no active enrolment remains');
         $this->assertTrue(can_access_course($course, $user, '', true), 'the role still opens the course');
         $this->assertStringContainsString('role', $result['warning']);
-        $this->assertStringNotContainsString('enrolment this integration does not manage', $result['warning'],
-            'there is no such enrolment — naming one sends an operator looking for a row that is not there');
+        $this->assertStringNotContainsString(
+            'enrolment this integration does not manage',
+            $result['warning'],
+            'there is no such enrolment — naming one sends an operator looking for a row that is not there'
+        );
     }
 
     /**

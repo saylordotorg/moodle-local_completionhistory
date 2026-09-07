@@ -22,7 +22,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class local_completionhistory_generator extends testing_module_generator {
-
     /** @var int Counter for unique records. */
     protected int $achievementcount = 0;
 

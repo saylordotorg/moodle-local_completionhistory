@@ -26,7 +26,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class grade_snapshot_service {
-
     /**
      * Get the course total grade for a user.
      *

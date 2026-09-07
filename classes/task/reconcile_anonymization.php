@@ -31,7 +31,6 @@ use local_completionhistory\local\ledger_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class reconcile_anonymization extends \core\task\scheduled_task {
-
     public function get_name(): string {
         return get_string('task_reconcile_anonymization', 'local_completionhistory');
     }

@@ -28,7 +28,6 @@ namespace local_completionhistory\local;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class program_context_resolver {
-
     /** @var bool|null Cached result of table existence check. */
     private static ?bool $tablesexist = null;
 

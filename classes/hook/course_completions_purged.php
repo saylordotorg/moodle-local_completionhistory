@@ -31,7 +31,6 @@ namespace local_completionhistory\hook;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class course_completions_purged {
-
     /** @var int The user whose completions are being purged. */
     public readonly int $userid;
 

@@ -32,7 +32,6 @@ use local_completionhistory\hook\course_completions_purged;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class callbacks {
-
     /**
      * Decimal places `local_completionhistory_achievement.grade_decimal` actually stores.
      *
@@ -200,7 +199,8 @@ class callbacks {
 
         global $DB;
 
-        $attempt = $DB->get_record('quiz_attempts',
+        $attempt = $DB->get_record(
+            'quiz_attempts',
             ['id' => (int) $event->objectid],
             'id, quiz, userid, sumgrades, timestart, timefinish, state'
         );

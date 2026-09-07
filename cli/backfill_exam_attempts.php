@@ -126,15 +126,19 @@ if ($configured === 0) {
 }
 cli_writeln("courses with an exam configuration: {$configured}");
 
-$log = $verbose ? function ($msg) { cli_writeln('  ' . $msg); } : null;
+$log = $verbose ? function ($msg) {
+    cli_writeln('  ' . $msg);
+} : null;
 $result = exam_backfill_service::run($commit ? false : true, $courseid, $userid, $limit, $log);
 
 cli_writeln('');
 cli_writeln(sprintf('scanned:  %d finished attempts on tracked exam quizzes', $result['scanned']));
 cli_writeln(sprintf('%s: %d', $commit ? 'recorded' : 'would record', $result['recorded']));
 cli_writeln(sprintf('skipped:  %d (already recorded, or no submission time)', $result['skipped']));
-cli_writeln(sprintf('no grade: %d of those recorded had no usable grade (stored as null, not zero)',
-    $result['nograde']));
+cli_writeln(sprintf(
+    'no grade: %d of those recorded had no usable grade (stored as null, not zero)',
+    $result['nograde']
+));
 cli_writeln(sprintf('sequences touched: %d', $result['sequences']));
 if ($commit) {
     // record_attempt can only APPEND, so an attempt older than one the observer already
@@ -142,8 +146,10 @@ if ($commit) {
     // "the Nth exam this learner sat" instead of "the Nth row we wrote".
     cli_writeln(sprintf('renumbered: %d row(s) moved into chronological order', $result['renumbered']));
 } else {
-    cli_writeln(sprintf('already out of order: %d existing row(s) — NOT a prediction of what the',
-        $result['renumbered']));
+    cli_writeln(sprintf(
+        'already out of order: %d existing row(s) — NOT a prediction of what the',
+        $result['renumbered']
+    ));
     cli_writeln('           inserts would need, which cannot be known without performing them');
 }
 

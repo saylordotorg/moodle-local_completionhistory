@@ -27,7 +27,6 @@ require_once($CFG->libdir . '/formslib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class course_mapping_form extends \moodleform {
-
     /**
      * Form definition.
      */
@@ -42,26 +41,37 @@ class course_mapping_form extends \moodleform {
 
         // Old course selector.
         $options = ['ajax' => 'core_course/form_course_selector', 'multiple' => false];
-        $mform->addElement('autocomplete', 'oldcourseid',
+        $mform->addElement(
+            'autocomplete',
+            'oldcourseid',
             get_string('col_oldcourse', 'local_completionhistory'),
-            [], $options);
+            [],
+            $options
+        );
         $mform->addRule('oldcourseid', get_string('required'), 'required', null, 'client');
         $mform->setType('oldcourseid', PARAM_INT);
 
         // New course selector.
-        $mform->addElement('autocomplete', 'newcourseid',
+        $mform->addElement(
+            'autocomplete',
+            'newcourseid',
             get_string('col_newcourse', 'local_completionhistory'),
-            [], $options);
+            [],
+            $options
+        );
         $mform->addRule('newcourseid', get_string('required'), 'required', null, 'client');
         $mform->setType('newcourseid', PARAM_INT);
 
         // Migration rule.
-        $mform->addElement('select', 'migrationrule',
+        $mform->addElement(
+            'select',
+            'migrationrule',
             get_string('col_migrationrule', 'local_completionhistory'),
             [
                 'redirect_incomplete' => get_string('migrationrule_redirect_incomplete', 'local_completionhistory'),
                 'recommend' => get_string('migrationrule_recommend', 'local_completionhistory'),
-            ]);
+            ]
+        );
         $mform->setDefault('migrationrule', 'redirect_incomplete');
 
         // Active toggle.
@@ -69,13 +79,20 @@ class course_mapping_form extends \moodleform {
         $mform->setDefault('active', 1);
 
         // Effective time.
-        $mform->addElement('date_selector', 'effectivetime',
+        $mform->addElement(
+            'date_selector',
+            'effectivetime',
             get_string('col_effectivetime', 'local_completionhistory'),
-            ['optional' => true]);
+            ['optional' => true]
+        );
 
         // Note.
-        $mform->addElement('textarea', 'note', get_string('col_note', 'local_completionhistory'),
-            ['rows' => 3, 'cols' => 60]);
+        $mform->addElement(
+            'textarea',
+            'note',
+            get_string('col_note', 'local_completionhistory'),
+            ['rows' => 3, 'cols' => 60]
+        );
         $mform->setType('note', PARAM_TEXT);
 
         $this->add_action_buttons();
@@ -87,8 +104,10 @@ class course_mapping_form extends \moodleform {
     public function validation($data, $files): array {
         $errors = parent::validation($data, $files);
 
-        if (!empty($data['oldcourseid']) && !empty($data['newcourseid'])
-            && $data['oldcourseid'] == $data['newcourseid']) {
+        if (
+            !empty($data['oldcourseid']) && !empty($data['newcourseid'])
+            && $data['oldcourseid'] == $data['newcourseid']
+        ) {
             $errors['newcourseid'] = 'Old and new course must be different.';
         }
 

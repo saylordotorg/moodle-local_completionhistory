@@ -71,7 +71,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class create_login_key extends external_api {
-
     /** Script name the key is scoped to. Keys minted here work nowhere else. */
     public const SCRIPT = 'local_completionhistory/sso';
 

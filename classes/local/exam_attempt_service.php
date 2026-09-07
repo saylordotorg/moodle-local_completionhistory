@@ -47,7 +47,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class exam_attempt_service {
-
     /**
      * Record a single exam attempt.
      *
@@ -220,7 +219,7 @@ class exam_attempt_service {
             $summary[$track]['total']++;
             if ($row->grade_passed === '1' || $row->grade_passed === 1) {
                 $summary[$track]['passed']++;
-            } elseif ($row->grade_passed === '0' || $row->grade_passed === 0) {
+            } else if ($row->grade_passed === '0' || $row->grade_passed === 0) {
                 $summary[$track]['failed']++;
             }
         }

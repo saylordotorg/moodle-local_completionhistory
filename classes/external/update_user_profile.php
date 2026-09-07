@@ -53,7 +53,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class update_user_profile extends external_api {
-
     /**
      * The only fields this function will ever write, with the PARAM type each is cleaned to.
      *

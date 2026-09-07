@@ -47,18 +47,18 @@ cli_writeln('');
 // ─── 1. Course definitions ───────────────────────────────────────────
 
 $premba_course_defs = [
-    ['shortname' => 'BUS110', 'fullname' => 'Business Communication',    'idnumber' => 'BUS110'],
-    ['shortname' => 'ACC201', 'fullname' => 'Financial Accounting',       'idnumber' => 'ACC201'],
-    ['shortname' => 'STAT200', 'fullname' => 'Business Statistics',       'idnumber' => 'STAT200'],
-    ['shortname' => 'ECON101', 'fullname' => 'Principles of Economics',   'idnumber' => 'ECON101'],
+    ['shortname' => 'BUS110', 'fullname' => 'Business Communication', 'idnumber' => 'BUS110'],
+    ['shortname' => 'ACC201', 'fullname' => 'Financial Accounting', 'idnumber' => 'ACC201'],
+    ['shortname' => 'STAT200', 'fullname' => 'Business Statistics', 'idnumber' => 'STAT200'],
+    ['shortname' => 'ECON101', 'fullname' => 'Principles of Economics', 'idnumber' => 'ECON101'],
 ];
 
 $mba_course_defs = [
-    ['shortname' => 'MBA510', 'fullname' => 'Marketing Management',       'idnumber' => 'MBA510'],
-    ['shortname' => 'MBA520', 'fullname' => 'Organizational Behavior',    'idnumber' => 'MBA520'],
-    ['shortname' => 'MBA530', 'fullname' => 'Corporate Finance',          'idnumber' => 'MBA530'],
-    ['shortname' => 'MBA540', 'fullname' => 'Strategic Management',       'idnumber' => 'MBA540'],
-    ['shortname' => 'MBA550', 'fullname' => 'Operations Management',      'idnumber' => 'MBA550'],
+    ['shortname' => 'MBA510', 'fullname' => 'Marketing Management', 'idnumber' => 'MBA510'],
+    ['shortname' => 'MBA520', 'fullname' => 'Organizational Behavior', 'idnumber' => 'MBA520'],
+    ['shortname' => 'MBA530', 'fullname' => 'Corporate Finance', 'idnumber' => 'MBA530'],
+    ['shortname' => 'MBA540', 'fullname' => 'Strategic Management', 'idnumber' => 'MBA540'],
+    ['shortname' => 'MBA550', 'fullname' => 'Operations Management', 'idnumber' => 'MBA550'],
 ];
 
 // ─── 2. Create courses ───────────────────────────────────────────────
@@ -206,25 +206,25 @@ cli_writeln('Creating students...');
 
 $student_defs = [
     // Group 1: Failed/dropped Pre-MBA (never enter MBA)
-    ['username' => 'nathan.price',      'firstname' => 'Nathan',    'lastname' => 'Price'],
-    ['username' => 'olivia.foster',     'firstname' => 'Olivia',    'lastname' => 'Foster'],
-    ['username' => 'marcus.chen',       'firstname' => 'Marcus',    'lastname' => 'Chen'],
+    ['username' => 'nathan.price', 'firstname' => 'Nathan', 'lastname' => 'Price'],
+    ['username' => 'olivia.foster', 'firstname' => 'Olivia', 'lastname' => 'Foster'],
+    ['username' => 'marcus.chen', 'firstname' => 'Marcus', 'lastname' => 'Chen'],
     // Group 2: In progress Pre-MBA (partially complete, never enter MBA)
-    ['username' => 'sophia.rivera',     'firstname' => 'Sophia',    'lastname' => 'Rivera'],
-    ['username' => 'liam.patel',        'firstname' => 'Liam',      'lastname' => 'Patel'],
-    ['username' => 'ava.nakamura',      'firstname' => 'Ava',       'lastname' => 'Nakamura'],
+    ['username' => 'sophia.rivera', 'firstname' => 'Sophia', 'lastname' => 'Rivera'],
+    ['username' => 'liam.patel', 'firstname' => 'Liam', 'lastname' => 'Patel'],
+    ['username' => 'ava.nakamura', 'firstname' => 'Ava', 'lastname' => 'Nakamura'],
     // Group 3: Completed Pre-MBA, MBA in progress
-    ['username' => 'ethan.brooks',      'firstname' => 'Ethan',     'lastname' => 'Brooks'],
-    ['username' => 'maya.washington',    'firstname' => 'Maya',      'lastname' => 'Washington'],
-    ['username' => 'lucas.hernandez',   'firstname' => 'Lucas',     'lastname' => 'Hernandez'],
+    ['username' => 'ethan.brooks', 'firstname' => 'Ethan', 'lastname' => 'Brooks'],
+    ['username' => 'maya.washington', 'firstname' => 'Maya', 'lastname' => 'Washington'],
+    ['username' => 'lucas.hernandez', 'firstname' => 'Lucas', 'lastname' => 'Hernandez'],
     // Group 4: Completed Pre-MBA, failed/dropped MBA
-    ['username' => 'zara.mitchell',     'firstname' => 'Zara',      'lastname' => 'Mitchell'],
-    ['username' => 'ryan.oconnor',      'firstname' => 'Ryan',      'lastname' => "O'Connor"],
-    ['username' => 'priya.sharma',      'firstname' => 'Priya',     'lastname' => 'Sharma'],
+    ['username' => 'zara.mitchell', 'firstname' => 'Zara', 'lastname' => 'Mitchell'],
+    ['username' => 'ryan.oconnor', 'firstname' => 'Ryan', 'lastname' => "O'Connor"],
+    ['username' => 'priya.sharma', 'firstname' => 'Priya', 'lastname' => 'Sharma'],
     // Group 5: Graduated from both (completed Pre-MBA + MBA)
-    ['username' => 'daniel.kim',        'firstname' => 'Daniel',    'lastname' => 'Kim'],
-    ['username' => 'emma.johansson',    'firstname' => 'Emma',      'lastname' => 'Johansson'],
-    ['username' => 'carlos.mendez',     'firstname' => 'Carlos',    'lastname' => 'Mendez'],
+    ['username' => 'daniel.kim', 'firstname' => 'Daniel', 'lastname' => 'Kim'],
+    ['username' => 'emma.johansson', 'firstname' => 'Emma', 'lastname' => 'Johansson'],
+    ['username' => 'carlos.mendez', 'firstname' => 'Carlos', 'lastname' => 'Mendez'],
 ];
 
 $students = [];
@@ -279,19 +279,19 @@ $student_offsets = [0, 3, -2, 5, -4, 7, 1, -3, 6, -1, 4, -5, 2, -6, 3];
 $profiles = [
     // Group 1: Failed/dropped Pre-MBA
     // Nathan: completed BUS110 only
-    0  => ['premba' => [0 => 72],                             'mba' => null],
+    0  => ['premba' => [0 => 72], 'mba' => null],
     // Olivia: completed BUS110 and STAT200 (skipped ACC201)
-    1  => ['premba' => [0 => 68, 2 => 75],                    'mba' => null],
+    1  => ['premba' => [0 => 68, 2 => 75], 'mba' => null],
     // Marcus: completed 3 of 4 (BUS110, ACC201, STAT200), stuck on ECON101
-    2  => ['premba' => [0 => 81, 1 => 65, 2 => 70],           'mba' => null],
+    2  => ['premba' => [0 => 81, 1 => 65, 2 => 70], 'mba' => null],
 
     // Group 2: In progress Pre-MBA
     // Sophia: completed BUS110 and ACC201
-    3  => ['premba' => [0 => 78, 1 => 71],                    'mba' => null],
+    3  => ['premba' => [0 => 78, 1 => 71], 'mba' => null],
     // Liam: completed BUS110, ACC201, STAT200
-    4  => ['premba' => [0 => 85, 1 => 77, 2 => 82],           'mba' => null],
+    4  => ['premba' => [0 => 85, 1 => 77, 2 => 82], 'mba' => null],
     // Ava: completed BUS110 only (just started)
-    5  => ['premba' => [0 => 69],                             'mba' => null],
+    5  => ['premba' => [0 => 69], 'mba' => null],
 
     // Group 3: Completed Pre-MBA, MBA in progress
     // Ethan: all Pre-MBA done, MBA510 done
@@ -326,8 +326,10 @@ cli_writeln('Allocating students to programs...');
 // All 15 go into Pre-MBA.
 $premba_userids = array_map(fn($s) => (int) $s->id, $students);
 $already_allocated = $DB->get_fieldset_select(
-    'enrol_programs_allocations', 'userid',
-    'programid = :pid', ['pid' => $premba_program->id]
+    'enrol_programs_allocations',
+    'userid',
+    'programid = :pid',
+    ['pid' => $premba_program->id]
 );
 $new_premba = array_diff($premba_userids, $already_allocated);
 if (!empty($new_premba)) {
@@ -348,8 +350,10 @@ for ($i = 6; $i <= 14; $i++) {
     $mba_userids[] = (int) $students[$i]->id;
 }
 $already_mba = $DB->get_fieldset_select(
-    'enrol_programs_allocations', 'userid',
-    'programid = :pid', ['pid' => $mba_program->id]
+    'enrol_programs_allocations',
+    'userid',
+    'programid = :pid',
+    ['pid' => $mba_program->id]
 );
 $new_mba = array_diff($mba_userids, $already_mba);
 if (!empty($new_mba)) {
@@ -507,7 +511,7 @@ $premba_topitem = null;
 foreach ($premba_items as $item) {
     if ($item->topitem) {
         $premba_topitem = $item;
-    } elseif ($item->courseid) {
+    } else if ($item->courseid) {
         $premba_course_items[(int) $item->courseid] = $item;
     }
 }
@@ -518,7 +522,7 @@ $mba_topitem = null;
 foreach ($mba_items as $item) {
     if ($item->topitem) {
         $mba_topitem = $item;
-    } elseif ($item->courseid) {
+    } else if ($item->courseid) {
         $mba_course_items[(int) $item->courseid] = $item;
     }
 }
@@ -578,8 +582,12 @@ foreach ($profiles as $si => $profile) {
             ]);
         }
         if (empty($premba_alloc->timecompleted)) {
-            $DB->set_field('enrol_programs_allocations', 'timecompleted', $last_premba_time,
-                ['id' => $premba_alloc->id]);
+            $DB->set_field(
+                'enrol_programs_allocations',
+                'timecompleted',
+                $last_premba_time,
+                ['id' => $premba_alloc->id]
+            );
         }
     }
 
@@ -637,8 +645,12 @@ foreach ($profiles as $si => $profile) {
             ]);
         }
         if (empty($mba_alloc->timecompleted)) {
-            $DB->set_field('enrol_programs_allocations', 'timecompleted', $last_mba_time,
-                ['id' => $mba_alloc->id]);
+            $DB->set_field(
+                'enrol_programs_allocations',
+                'timecompleted',
+                $last_mba_time,
+                ['id' => $mba_alloc->id]
+            );
         }
     }
 }

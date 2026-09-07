@@ -27,7 +27,6 @@ namespace local_completionhistory\task;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class process_outbox extends \core\task\scheduled_task {
-
     /**
      * Get task name.
      *

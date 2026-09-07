@@ -60,7 +60,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_grade_items extends external_api {
-
     /** Hard ceiling on rows per call, whatever the caller asks for. */
     private const MAX_LIMIT = 1000;
 
@@ -114,28 +113,49 @@ class get_grade_items extends external_api {
 
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'since' => new external_value(PARAM_INT,
+            'since' => new external_value(
+                PARAM_INT,
                 'Return grades changed AFTER this timestamp (0 for all). Pass back next_since.',
-                VALUE_DEFAULT, 0),
-            'since_id' => new external_value(PARAM_INT,
+                VALUE_DEFAULT,
+                0
+            ),
+            'since_id' => new external_value(
+                PARAM_INT,
                 'Tie-break within `since`: include grades at that timestamp only if id is greater. '
                 . 'Load-bearing here, because a large share of rows share changed_at = 0.',
-                VALUE_DEFAULT, 0),
-            'limit' => new external_value(PARAM_INT,
-                'Maximum rows to return (capped at 1000)', VALUE_DEFAULT, 500),
-            'onlygraded' => new external_value(PARAM_BOOL,
+                VALUE_DEFAULT,
+                0
+            ),
+            'limit' => new external_value(
+                PARAM_INT,
+                'Maximum rows to return (capped at 1000)',
+                VALUE_DEFAULT,
+                500
+            ),
+            'onlygraded' => new external_value(
+                PARAM_BOOL,
                 'Only rows with a final grade. On by default: an ungraded row is not a grade, '
-                . 'and including them roughly doubles the feed.', VALUE_DEFAULT, true),
-            'includehidden' => new external_value(PARAM_BOOL,
-                'Include grades hidden from the student. Off by default.', VALUE_DEFAULT, false),
+                . 'and including them roughly doubles the feed.',
+                VALUE_DEFAULT,
+                true
+            ),
+            'includehidden' => new external_value(
+                PARAM_BOOL,
+                'Include grades hidden from the student. Off by default.',
+                VALUE_DEFAULT,
+                false
+            ),
             'itemtypes' => new external_multiple_structure(
                 new external_value(PARAM_ALPHA, 'grade_items.itemtype'),
                 'Restrict to these item types (course, mod, manual, category). Empty means all.',
-                VALUE_DEFAULT, []
+                VALUE_DEFAULT,
+                []
             ),
             'courseids' => new external_multiple_structure(
                 new external_value(PARAM_INT, 'Moodle course id'),
-                'Restrict to these courses. Empty means all.', VALUE_DEFAULT, []
+                'Restrict to these courses. Empty means all.',
+                VALUE_DEFAULT,
+                []
             ),
         ]);
     }
@@ -150,9 +170,15 @@ class get_grade_items extends external_api {
      * @param array $courseids     Restrict to these courses.
      * @return array
      */
-    public static function execute(int $since = 0, int $sinceid = 0, int $limit = 500,
-            bool $onlygraded = true, bool $includehidden = false,
-            array $itemtypes = [], array $courseids = []): array {
+    public static function execute(
+        int $since = 0,
+        int $sinceid = 0,
+        int $limit = 500,
+        bool $onlygraded = true,
+        bool $includehidden = false,
+        array $itemtypes = [],
+        array $courseids = []
+    ): array {
         global $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
@@ -325,12 +351,20 @@ class get_grade_items extends external_api {
                 'gradepass'        => new external_value(PARAM_FLOAT, 'Pass threshold; 0 or null means none set', VALUE_REQUIRED, null, NULL_ALLOWED),
                 'rawgrade'         => new external_value(PARAM_FLOAT, 'Raw grade before adjustment', VALUE_REQUIRED, null, NULL_ALLOWED),
                 'finalgrade'       => new external_value(PARAM_FLOAT, 'Authoritative grade', VALUE_REQUIRED, null, NULL_ALLOWED),
-                'percentage'       => new external_value(PARAM_FLOAT,
+                'percentage'       => new external_value(
+                    PARAM_FLOAT,
                     'finalgrade as a percentage of the item span; null when undefined',
-                    VALUE_REQUIRED, null, NULL_ALLOWED),
-                'passed'           => new external_value(PARAM_BOOL,
+                    VALUE_REQUIRED,
+                    null,
+                    NULL_ALLOWED
+                ),
+                'passed'           => new external_value(
+                    PARAM_BOOL,
                     'Null when the item has no pass threshold — never read null as a fail',
-                    VALUE_REQUIRED, null, NULL_ALLOWED),
+                    VALUE_REQUIRED,
+                    null,
+                    NULL_ALLOWED
+                ),
                 'overridden'       => new external_value(PARAM_BOOL, 'A human replaced the calculated grade'),
                 'overridden_at'    => new external_value(PARAM_INT, 'When it was overridden (0 = never)'),
                 'excluded'         => new external_value(PARAM_BOOL, 'Excluded from aggregation'),
@@ -338,8 +372,10 @@ class get_grade_items extends external_api {
                 'locked'           => new external_value(PARAM_BOOL, 'Locked against recalculation'),
                 'timecreated'      => new external_value(PARAM_INT, 'grade_grades.timecreated (0 when null)'),
                 'timemodified'     => new external_value(PARAM_INT, 'grade_grades.timemodified (0 when null)'),
-                'changed_at'       => new external_value(PARAM_INT,
-                    'coalesce(timemodified, timecreated, 0) — the value the cursor pages on'),
+                'changed_at'       => new external_value(
+                    PARAM_INT,
+                    'coalesce(timemodified, timecreated, 0) — the value the cursor pages on'
+                ),
             ])),
             'count'         => new external_value(PARAM_INT, 'Rows returned'),
             'next_since'    => new external_value(PARAM_INT, 'Pass as `since` on the next call'),

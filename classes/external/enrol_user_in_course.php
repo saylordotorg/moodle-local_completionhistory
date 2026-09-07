@@ -34,7 +34,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class enrol_user_in_course extends external_api {
-
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'email'          => new external_value(PARAM_EMAIL, 'User email (identity key)'),

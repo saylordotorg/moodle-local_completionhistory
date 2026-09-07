@@ -36,15 +36,21 @@ use context_system;
  * @covers     \local_completionhistory\external\get_user_certificates
  */
 final class get_user_certificates_test extends advanced_testcase {
-
     /** Grant the certificate-read capability to the current user via a fresh role. */
     private function grant_capability(): void {
         global $DB;
         $roleid = create_role('Cert reader', 'certreader', '');
-        assign_capability('local/completionhistory:viewcertificates', CAP_ALLOW,
-            $roleid, context_system::instance()->id);
-        role_assign($roleid, $DB->get_field('user', 'id', ['username' => 'certcaller']),
-            context_system::instance()->id);
+        assign_capability(
+            'local/completionhistory:viewcertificates',
+            CAP_ALLOW,
+            $roleid,
+            context_system::instance()->id
+        );
+        role_assign(
+            $roleid,
+            $DB->get_field('user', 'id', ['username' => 'certcaller']),
+            context_system::instance()->id
+        );
     }
 
     /** A logged-in caller holding exactly the read capability. */
@@ -82,7 +88,9 @@ final class get_user_certificates_test extends advanced_testcase {
 
         $result = get_user_certificates::execute('grad@example.com');
         $result = \core_external\external_api::clean_returnvalue(
-            get_user_certificates::execute_returns(), $result);
+            get_user_certificates::execute_returns(),
+            $result
+        );
 
         if ($DB->get_manager()->table_exists('tool_certificate_issues')) {
             // A CI image that DOES carry tool_certificate answers available=true;
@@ -116,7 +124,8 @@ final class get_user_certificates_test extends advanced_testcase {
         if (!$DB->get_manager()->table_exists('tool_certificate_issues')) {
             $result = \core_external\external_api::clean_returnvalue(
                 get_user_certificates::execute_returns(),
-                get_user_certificates::execute('twin@example.com'));
+                get_user_certificates::execute('twin@example.com')
+            );
             $this->assertFalse($result['available']);
             return;
         }

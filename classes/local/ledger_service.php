@@ -33,7 +33,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class ledger_service {
-
     /**
      * Capture an achievement from a course completion record.
      *
@@ -69,18 +68,18 @@ class ledger_service {
 
         // Snapshot course metadata.
         $course          = $DB->get_record('course', ['id' => $courseid]);
-        $coursename      = $course ? $course->fullname  : '[deleted]';
+        $coursename      = $course ? $course->fullname : '[deleted]';
         $courseshortname = $course ? $course->shortname : null;
-        $courseidnumber  = $course ? $course->idnumber  : null;
+        $courseidnumber  = $course ? $course->idnumber : null;
 
         // Snapshot user fields.
         $user = $DB->get_record('user', ['id' => $userid], 'id, deleted, idnumber, firstname, lastname, email');
         $anonymizeonwrite = (bool) get_config('local_completionhistory', 'gdpranonymize') &&
             (!$user || !empty($user->deleted));
-        $useridnumber = ($user && !$anonymizeonwrite) ? $user->idnumber  : null;
+        $useridnumber = ($user && !$anonymizeonwrite) ? $user->idnumber : null;
         $firstname    = ($user && !$anonymizeonwrite) ? $user->firstname : null;
-        $lastname     = ($user && !$anonymizeonwrite) ? $user->lastname  : null;
-        $email        = ($user && !$anonymizeonwrite) ? $user->email     : null;
+        $lastname     = ($user && !$anonymizeonwrite) ? $user->lastname : null;
+        $email        = ($user && !$anonymizeonwrite) ? $user->email : null;
 
         // Snapshot earliest enrolment date for this user+course.
         $enrolments = $DB->get_records_sql(
@@ -134,19 +133,19 @@ class ledger_service {
         $record                           = new stdClass();
         $record->ledgeruuid               = self::generate_uuid();
         $record->userid                   = $anonymizeonwrite ? 0 : $userid;
-        $record->useridnumber_snapshot    = $useridnumber  ?: null;
-        $record->firstname_snapshot       = $firstname     ?: null;
-        $record->lastname_snapshot        = $lastname      ?: null;
-        $record->email_snapshot           = $email         ?: null;
+        $record->useridnumber_snapshot    = $useridnumber ?: null;
+        $record->firstname_snapshot       = $firstname ?: null;
+        $record->lastname_snapshot        = $lastname ?: null;
+        $record->email_snapshot           = $email ?: null;
         $record->courseid                 = $courseid;
-        $record->courseidnumber_snapshot  = $courseidnumber  ?: null;
+        $record->courseidnumber_snapshot  = $courseidnumber ?: null;
         $record->courseshortname_snapshot = $courseshortname;
         $record->coursename_snapshot      = $coursename;
         $record->completiontime           = $timecompleted;
         $record->enrolledtime_snapshot    = $enrolledtime;
         $record->grade_decimal            = $gradedata ? $gradedata->finalgrade : null;
-        $record->grade_passed             = $gradedata ? $gradedata->passed     : null;
-        $record->grade_source             = $gradedata ? 'gradebook'            : null;
+        $record->grade_passed             = $gradedata ? $gradedata->passed : null;
+        $record->grade_source             = $gradedata ? 'gradebook' : null;
         $record->exam_track               = $exam_track;
         $record->attempts_used            = $attempts_used;
         $record->attempts_allowed         = $attempts_allowed;
@@ -166,8 +165,8 @@ class ledger_service {
                 $progrecord                           = new stdClass();
                 $progrecord->achievementid            = $achievementid;
                 $progrecord->allocationid             = $anonymizeonwrite ? null : ($program->allocationid ?? null);
-                $progrecord->programid                = $program->programid    ?? null;
-                $progrecord->programidnumber_snapshot = $program->idnumber     ?? null;
+                $progrecord->programid                = $program->programid ?? null;
+                $progrecord->programidnumber_snapshot = $program->idnumber ?? null;
                 $progrecord->programname_snapshot     = $program->fullname;
                 $progrecord->timecreated              = time();
                 $DB->insert_record('local_completionhistory_ach_program', $progrecord);
@@ -207,8 +206,8 @@ class ledger_service {
     ): void {
         global $DB;
 
-        $DB->set_field('local_completionhistory_achievement', 'exam_track',       $exam_track,       ['id' => $achievementid]);
-        $DB->set_field('local_completionhistory_achievement', 'attempts_used',    $attempts_used,    ['id' => $achievementid]);
+        $DB->set_field('local_completionhistory_achievement', 'exam_track', $exam_track, ['id' => $achievementid]);
+        $DB->set_field('local_completionhistory_achievement', 'attempts_used', $attempts_used, ['id' => $achievementid]);
         $DB->set_field('local_completionhistory_achievement', 'attempts_allowed', $attempts_allowed, ['id' => $achievementid]);
     }
 

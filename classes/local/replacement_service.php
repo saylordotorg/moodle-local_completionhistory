@@ -26,7 +26,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class replacement_service {
-
     /**
      * Get the active replacement mapping for an old course.
      *

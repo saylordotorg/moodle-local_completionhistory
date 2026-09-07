@@ -31,46 +31,45 @@ require_once($CFG->libdir . '/tablelib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class achievements_table extends table_sql {
-
     protected bool $showuser;
     protected array $programcache = [];
 
     private const NOSORT_COLS = ['programs', 'enroldays', 'completiondays', 'attempts', 'artifacturl'];
 
     private const STAFF_COLS = [
-        ['user_firstname',           'col_firstname'],
-        ['user_lastname',            'col_lastname'],
-        ['user_email',               'col_email'],
-        ['useridnumber_snapshot',    'col_useridnumber'],
-        ['coursename_snapshot',      'col_coursename'],
+        ['user_firstname', 'col_firstname'],
+        ['user_lastname', 'col_lastname'],
+        ['user_email', 'col_email'],
+        ['useridnumber_snapshot', 'col_useridnumber'],
+        ['coursename_snapshot', 'col_coursename'],
         ['courseshortname_snapshot', 'col_courseshortname'],
-        ['enroldate',                'col_enroldate'],
-        ['enroldays',                'col_enroldays'],
-        ['completiontime',           'col_completiondate'],
-        ['completiondays',           'col_completiondays'],
-        ['grade_decimal',            'col_grade'],
-        ['grade_passed',             'col_passed'],
-        ['exam_track',               'col_exam_track'],
-        ['attempts',                 'col_attempts'],
-        ['programs',                 'col_programs'],
-        ['source_component',         'col_source'],
-        ['timecreated',              'col_captured'],
+        ['enroldate', 'col_enroldate'],
+        ['enroldays', 'col_enroldays'],
+        ['completiontime', 'col_completiondate'],
+        ['completiondays', 'col_completiondays'],
+        ['grade_decimal', 'col_grade'],
+        ['grade_passed', 'col_passed'],
+        ['exam_track', 'col_exam_track'],
+        ['attempts', 'col_attempts'],
+        ['programs', 'col_programs'],
+        ['source_component', 'col_source'],
+        ['timecreated', 'col_captured'],
     ];
 
     private const STUDENT_COLS = [
-        ['coursename_snapshot',      'col_coursename'],
+        ['coursename_snapshot', 'col_coursename'],
         ['courseshortname_snapshot', 'col_courseshortname'],
-        ['enroldate',                'col_enroldate'],
-        ['enroldays',                'col_enroldays'],
-        ['completiontime',           'col_completiondate'],
-        ['completiondays',           'col_completiondays'],
-        ['grade_decimal',            'col_grade'],
-        ['grade_passed',             'col_passed'],
-        ['exam_track',               'col_exam_track'],
-        ['attempts',                 'col_attempts'],
-        ['programs',                 'col_programs'],
-        ['source_component',         'col_source'],
-        ['timecreated',              'col_captured'],
+        ['enroldate', 'col_enroldate'],
+        ['enroldays', 'col_enroldays'],
+        ['completiontime', 'col_completiondate'],
+        ['completiondays', 'col_completiondays'],
+        ['grade_decimal', 'col_grade'],
+        ['grade_passed', 'col_passed'],
+        ['exam_track', 'col_exam_track'],
+        ['attempts', 'col_attempts'],
+        ['programs', 'col_programs'],
+        ['source_component', 'col_source'],
+        ['timecreated', 'col_captured'],
     ];
 
     private const OPTIONAL_COLS = [
@@ -153,12 +152,16 @@ class achievements_table extends table_sql {
     }
 
     public function col_user_lastname($row): string {
-        if ((int) $row->userid === 0) return '';
+        if ((int) $row->userid === 0) {
+            return '';
+        }
         return s($row->user_lastname ?? '');
     }
 
     public function col_user_email($row): string {
-        if ((int) $row->userid === 0) return '';
+        if ((int) $row->userid === 0) {
+            return '';
+        }
         $email = $row->user_email ?? '';
         return $email ? html_writer::link('mailto:' . s($email), s($email)) : '-';
     }
@@ -184,10 +187,16 @@ class achievements_table extends table_sql {
     }
 
     public function col_enroldays($row): string {
-        if (empty($row->enroldate)) return '-';
+        if (empty($row->enroldate)) {
+            return '-';
+        }
         $days = (int) floor((time() - (int) $row->enroldate) / 86400);
-        if ($days < 0)  return '-';
-        if ($days === 0) return html_writer::tag('span', 'Today', ['class' => 'badge badge-primary', 'style' => 'font-size:0.82em']);
+        if ($days < 0) {
+            return '-';
+        }
+        if ($days === 0) {
+            return html_writer::tag('span', 'Today', ['class' => 'badge badge-primary', 'style' => 'font-size:0.82em']);
+        }
         $label = $days === 1 ? '1 day ago' : number_format($days) . ' days ago';
         return html_writer::tag('span', $label, ['class' => 'text-muted small']);
     }
@@ -209,8 +218,11 @@ class achievements_table extends table_sql {
         }
         $days = (int) floor(($completed - $enroll) / 86400);
         if ($days === 0) {
-            return html_writer::tag('span', 'Same day',
-                ['class' => 'badge badge-primary', 'style' => 'font-size:0.82em']);
+            return html_writer::tag(
+                'span',
+                'Same day',
+                ['class' => 'badge badge-primary', 'style' => 'font-size:0.82em']
+            );
         }
         $label = $days === 1 ? '1 day' : number_format($days) . ' days';
         return html_writer::tag('span', $label, ['class' => 'text-muted small']);
@@ -222,15 +234,24 @@ class achievements_table extends table_sql {
 
     public function col_grade_passed($row): string {
         if ($row->grade_passed === null) {
-            return html_writer::tag('span', '&#8212; ' . get_string('gradeunknown', 'local_completionhistory'),
-                ['class' => 'badge badge-secondary', 'style' => 'font-size:0.85em']);
+            return html_writer::tag(
+                'span',
+                '&#8212; ' . get_string('gradeunknown', 'local_completionhistory'),
+                ['class' => 'badge badge-secondary', 'style' => 'font-size:0.85em']
+            );
         }
         if ($row->grade_passed) {
-            return html_writer::tag('span', '&#10003; ' . get_string('gradepassed', 'local_completionhistory'),
-                ['class' => 'badge badge-success', 'style' => 'font-size:0.85em']);
+            return html_writer::tag(
+                'span',
+                '&#10003; ' . get_string('gradepassed', 'local_completionhistory'),
+                ['class' => 'badge badge-success', 'style' => 'font-size:0.85em']
+            );
         }
-        return html_writer::tag('span', '&#10007; ' . get_string('gradefailed', 'local_completionhistory'),
-            ['class' => 'badge badge-danger', 'style' => 'font-size:0.85em']);
+        return html_writer::tag(
+            'span',
+            '&#10007; ' . get_string('gradefailed', 'local_completionhistory'),
+            ['class' => 'badge badge-danger', 'style' => 'font-size:0.85em']
+        );
     }
 
     // ── Exam track ───────────────────────────────────────────────────────────
@@ -243,7 +264,7 @@ class achievements_table extends table_sql {
         $labels = [
             course_config_service::TRACK_PROGRAM_FINAL => ['Program Final', 'badge-primary'],
             course_config_service::TRACK_DIRECT_CREDIT => ['Direct Credit', 'badge-info'],
-            course_config_service::TRACK_CERTIFICATE   => ['Certificate',   'badge-success'],
+            course_config_service::TRACK_CERTIFICATE   => ['Certificate', 'badge-success'],
         ];
 
         [$label, $cls] = $labels[$row->exam_track] ?? [$row->exam_track, 'badge-secondary'];
@@ -256,7 +277,7 @@ class achievements_table extends table_sql {
      * sub-row below the current table row.
      */
     public function col_attempts($row): string {
-        $used    = $row->attempts_used    ?? null;
+        $used    = $row->attempts_used ?? null;
         $allowed = $row->attempts_allowed ?? null;
 
         if ($used === null) {
@@ -264,8 +285,11 @@ class achievements_table extends table_sql {
             $summary = html_writer::tag('span', '—', ['class' => 'text-muted']);
         } else {
             $allowedlabel = ($allowed === null || (int) $allowed === 0) ? '∞' : (int) $allowed;
-            $summary = html_writer::tag('span', "{$used} / {$allowedlabel}",
-                ['class' => 'font-weight-bold mr-2']);
+            $summary = html_writer::tag(
+                'span',
+                "{$used} / {$allowedlabel}",
+                ['class' => 'font-weight-bold mr-2']
+            );
         }
 
         // Expand button — only shown when we have a userid to look up.
@@ -275,7 +299,7 @@ class achievements_table extends table_sql {
                 'class'        => 'btn btn-outline-secondary btn-sm lch-expand-attempts',
                 'style'        => 'font-size:0.75em; padding:1px 6px;',
                 'data-userid'  => (int) $row->userid,
-                'data-courseid'=> (int) $row->courseid,
+                'data-courseid' => (int) $row->courseid,
                 'data-rowid'   => (int) $row->id,
                 'type'         => 'button',
             ]);
@@ -290,11 +314,14 @@ class achievements_table extends table_sql {
         global $DB;
         if (!isset($this->programcache[$row->id])) {
             $this->programcache[$row->id] = $DB->get_records(
-                'local_completionhistory_ach_program', ['achievementid' => $row->id]
+                'local_completionhistory_ach_program',
+                ['achievementid' => $row->id]
             );
         }
         $programs = $this->programcache[$row->id];
-        if (empty($programs)) return '-';
+        if (empty($programs)) {
+            return '-';
+        }
         $names = [];
         foreach ($programs as $p) {
             $names[] = html_writer::tag('span', format_string($p->programname_snapshot), ['class' => 'badge badge-info']);
@@ -304,7 +331,9 @@ class achievements_table extends table_sql {
 
     // ── Misc ─────────────────────────────────────────────────────────────────
 
-    public function col_source_component($row): string { return s($row->source_component); }
+    public function col_source_component($row): string {
+        return s($row->source_component);
+    }
 
     public function col_timecreated($row): string {
         return userdate($row->timecreated, '%m/%d/%Y');
@@ -312,14 +341,25 @@ class achievements_table extends table_sql {
 
     // ── Optional columns ─────────────────────────────────────────────────────
 
-    public function col_courseidnumber_snapshot($row): string { return s($row->courseidnumber_snapshot ?? ''); }
-    public function col_source_event($row): string            { return s($row->source_event ?? ''); }
+    public function col_courseidnumber_snapshot($row): string {
+        return s($row->courseidnumber_snapshot ?? '');
+    }
+    public function col_source_event($row): string {
+        return s($row->source_event ?? '');
+    }
 
     public function col_artifacturl($row): string {
-        if (empty($row->artifacturl)) return '-';
+        if (empty($row->artifacturl)) {
+            return '-';
+        }
         $url = clean_param((string) $row->artifacturl, PARAM_URL);
-        if ($url === '') return '-';
-        return html_writer::link($url, get_string('col_artifact', 'local_completionhistory'),
-            ['target' => '_blank', 'rel' => 'noopener noreferrer']);
+        if ($url === '') {
+            return '-';
+        }
+        return html_writer::link(
+            $url,
+            get_string('col_artifact', 'local_completionhistory'),
+            ['target' => '_blank', 'rel' => 'noopener noreferrer']
+        );
     }
 }

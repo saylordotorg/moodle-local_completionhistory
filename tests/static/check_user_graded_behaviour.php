@@ -110,8 +110,13 @@ namespace {
     class fake_transaction {
         public $committed = false;
         public $rolledback = false;
-        public function allow_commit() { $this->committed = true; }
-        public function rollback($e) { $this->rolledback = true; throw $e; }
+        public function allow_commit() {
+            $this->committed = true;
+        }
+        public function rollback($e) {
+            $this->rolledback = true;
+            throw $e;
+        }
     }
 
     /**
@@ -142,8 +147,15 @@ namespace {
             return false;
         }
 
-        public function get_records_select($table, $select, array $params, $sort = '', $fields = '*',
-                                          $offset = 0, $limit = 0) {
+        public function get_records_select(
+            $table,
+            $select,
+            array $params,
+            $sort = '',
+            $fields = '*',
+            $offset = 0,
+            $limit = 0
+        ) {
             if ($table !== 'local_completionhistory_achievement') {
                 $this->unexpected[] = "get_records_select({$table})";
                 return [];
@@ -303,15 +315,26 @@ namespace {
     echo "callbacks::user_graded\n\n  the correction itself\n";
 
     $db = run_case([]);
-    check('a changed course total updates the ledger row', count($db->updates) === 1,
-        count($db->updates) . ' updates');
-    check('and enqueues exactly one outbox row', count(outbox_service::$enqueued) === 1,
-        count(outbox_service::$enqueued) . ' enqueued');
-    check('the stored grade is now the new one', (float) $db->rows[500]->grade_decimal === 88.5,
-        'got ' . var_export($db->rows[500]->grade_decimal, true));
+    check(
+        'a changed course total updates the ledger row',
+        count($db->updates) === 1,
+        count($db->updates) . ' updates'
+    );
+    check(
+        'and enqueues exactly one outbox row',
+        count(outbox_service::$enqueued) === 1,
+        count(outbox_service::$enqueued) . ' enqueued'
+    );
+    check(
+        'the stored grade is now the new one',
+        (float) $db->rows[500]->grade_decimal === 88.5,
+        'got ' . var_export($db->rows[500]->grade_decimal, true)
+    );
     check('the stored pass flag is now the new one', (int) $db->rows[500]->grade_passed === 1);
-    check('grade_source records where the figure came from',
-        $db->rows[500]->grade_source === 'gradebook');
+    check(
+        'grade_source records where the figure came from',
+        $db->rows[500]->grade_source === 'gradebook'
+    );
     check('the transaction commits', ($db->transaction->committed ?? false) === true);
     check('the row is revised, not duplicated — one row still', count($db->rows) === 1);
 
@@ -320,28 +343,42 @@ namespace {
     // columns it has no business restoring.
     $written = array_keys(get_object_vars($db->updates[0]));
     sort($written);
-    check('exactly id + the three grade columns are written',
+    check(
+        'exactly id + the three grade columns are written',
         $written === ['grade_decimal', 'grade_passed', 'grade_source', 'id'],
-        'wrote: ' . implode(', ', $written));
-    foreach (['ledgeruuid', 'userid', 'firstname_snapshot', 'lastname_snapshot', 'email_snapshot',
+        'wrote: ' . implode(', ', $written)
+    );
+    foreach (
+        ['ledgeruuid', 'userid', 'firstname_snapshot', 'lastname_snapshot', 'email_snapshot',
               'useridnumber_snapshot', 'artifacturl', 'artifactstorage', 'source_event_hash',
-              'timecreated'] as $f) {
+              'timecreated'] as $f
+    ) {
         check("does not write {$f}", !property_exists($db->updates[0], $f));
     }
-    check('source_event_hash still holds the completion it came from, so the backfill cannot '
+    check(
+        'source_event_hash still holds the completion it came from, so the backfill cannot '
         . 'insert a duplicate',
-        $db->rows[500]->source_event_hash === 'hash-of-the-completion');
-    check('timecreated is preserved, so the row keeps its identity',
-        (int) $db->rows[500]->timecreated === 1750000001);
+        $db->rows[500]->source_event_hash === 'hash-of-the-completion'
+    );
+    check(
+        'timecreated is preserved, so the row keeps its identity',
+        (int) $db->rows[500]->timecreated === 1750000001
+    );
 
     echo "\n  the enqueued record describes what is now stored\n";
     $enq = outbox_service::$enqueued[0] ?? null;
-    check('carries ledgeruuid — the key the SIS matches on',
+    check(
+        'carries ledgeruuid — the key the SIS matches on',
         ($enq->ledgeruuid ?? '') === 'b1f0c0de-0000-4000-8000-000000000abc',
-        'got ' . var_export($enq->ledgeruuid ?? null, true));
-    check('carries the CORRECTED grade, not the old one', (float) ($enq->grade_decimal ?? -1) === 88.5,
-        'got ' . var_export($enq->grade_decimal ?? null, true));
-    foreach ([
+        'got ' . var_export($enq->ledgeruuid ?? null, true)
+    );
+    check(
+        'carries the CORRECTED grade, not the old one',
+        (float) ($enq->grade_decimal ?? -1) === 88.5,
+        'got ' . var_export($enq->grade_decimal ?? null, true)
+    );
+    foreach (
+        [
         'useridnumber_snapshot'    => 'SU-2026-01149',
         'firstname_snapshot'       => 'Ada',
         'lastname_snapshot'        => 'Lovelace',
@@ -351,9 +388,13 @@ namespace {
         'completiontime'           => 1750000000,
         'exam_track'               => 'proctored',
         'artifactstorage'          => 'certificate:ABC123',
-    ] as $field => $want) {
-        check("still carries {$field}", ($enq->$field ?? null) == $want,
-            'got ' . var_export($enq->$field ?? null, true));
+        ] as $field => $want
+    ) {
+        check(
+            "still carries {$field}",
+            ($enq->$field ?? null) == $want,
+            'got ' . var_export($enq->$field ?? null, true)
+        );
     }
 
     echo "\n  idempotence across the string/float boundary (PR #8 review)\n";
@@ -361,9 +402,11 @@ namespace {
     // these differ, and the guard inverts into a write-and-enqueue on every recalculation.
     $db = run_case(['achievements' => [achievement_row(['grade_decimal' => '88.50000',
                                                         'grade_passed' => '1'])]]);
-    check("'88.50000' equals the float 88.5 — no write",
+    check(
+        "'88.50000' equals the float 88.5 — no write",
         $db->updates === [] && outbox_service::$enqueued === [],
-        count($db->updates) . ' updates, ' . count(outbox_service::$enqueued) . ' enqueued');
+        count($db->updates) . ' updates, ' . count(outbox_service::$enqueued) . ' enqueued'
+    );
 
     $db = run_case(['achievements' => [achievement_row(['grade_decimal' => '100.00000',
                                                         'grade_passed' => '1'])],
@@ -373,8 +416,11 @@ namespace {
     $db = run_case(['achievements' => [achievement_row(['grade_decimal' => '88.50000',
                                                         'grade_passed' => '1'])],
                     'total' => total(88.500001, 1)]);
-    check('a change below the column\'s own precision is not a change', $db->updates === [],
-        'wrote for a 1e-6 delta the column cannot store');
+    check(
+        'a change below the column\'s own precision is not a change',
+        $db->updates === [],
+        'wrote for a 1e-6 delta the column cannot store'
+    );
 
     $db = run_case(['achievements' => [achievement_row(['grade_decimal' => '88.50000',
                                                         'grade_passed' => '1'])],
@@ -410,40 +456,63 @@ namespace {
         $r->artifacturl = null;
         $r->artifactstorage = null;
     }]);
-    check('an anonymized row is left alone entirely', $db->updates === [],
-        count($db->updates) . ' updates');
+    check(
+        'an anonymized row is left alone entirely',
+        $db->updates === [],
+        count($db->updates) . ' updates'
+    );
     check('and nothing is enqueued', outbox_service::$enqueued === []);
-    check('the deleted student\'s name is NOT restored', $db->rows[500]->firstname_snapshot === null,
-        'got ' . var_export($db->rows[500]->firstname_snapshot, true));
+    check(
+        'the deleted student\'s name is NOT restored',
+        $db->rows[500]->firstname_snapshot === null,
+        'got ' . var_export($db->rows[500]->firstname_snapshot, true)
+    );
     check('their email is NOT restored', $db->rows[500]->email_snapshot === null);
     check('their id number is NOT restored', $db->rows[500]->useridnumber_snapshot === null);
     check('userid stays anonymized', (int) $db->rows[500]->userid === 0);
-    check('no PII is published', !array_filter(outbox_service::$enqueued,
-        static fn($e) => ($e->email_snapshot ?? null) !== null));
+    check('no PII is published', !array_filter(
+        outbox_service::$enqueued,
+        static fn($e) => ($e->email_snapshot ?? null) !== null
+    ));
 
-    $db = run_case(['on_transaction' => function (\fake_db $db) { unset($db->rows[500]); }]);
-    check('a row purged in the window is handled without a write',
-        $db->updates === [] && outbox_service::$enqueued === []);
-    check('and without throwing out of the observer',
-        ($db->transaction->committed ?? false) === true);
+    $db = run_case(['on_transaction' => function (\fake_db $db) {
+        unset($db->rows[500]);
+    }]);
+    check(
+        'a row purged in the window is handled without a write',
+        $db->updates === [] && outbox_service::$enqueued === []
+    );
+    check(
+        'and without throwing out of the observer',
+        ($db->transaction->committed ?? false) === true
+    );
 
     $db = run_case(['on_transaction' => function (\fake_db $db) {
         $db->rows[500]->grade_decimal = '88.50000';
         $db->rows[500]->grade_passed = '1';
     }]);
-    check('a correction another event already applied is not applied twice',
+    check(
+        'a correction another event already applied is not applied twice',
         $db->updates === [] && outbox_service::$enqueued === [],
-        count($db->updates) . ' updates, ' . count(outbox_service::$enqueued) . ' enqueued');
+        count($db->updates) . ' updates, ' . count(outbox_service::$enqueued) . ' enqueued'
+    );
 
     echo "\n  when the outbox is off (the shipped default)\n";
     $db = run_case(['outboxid' => 0]);
-    check('the ledger is still corrected — the record is right regardless of transport',
-        (float) $db->rows[500]->grade_decimal === 88.5);
-    check('and it says so out loud rather than dropping the correction silently',
-        count($GLOBALS['DEBUGGING']) === 1, count($GLOBALS['DEBUGGING']) . ' messages');
-    check('the warning names the setting to change',
+    check(
+        'the ledger is still corrected — the record is right regardless of transport',
+        (float) $db->rows[500]->grade_decimal === 88.5
+    );
+    check(
+        'and it says so out loud rather than dropping the correction silently',
+        count($GLOBALS['DEBUGGING']) === 1,
+        count($GLOBALS['DEBUGGING']) . ' messages'
+    );
+    check(
+        'the warning names the setting to change',
         str_contains($GLOBALS['DEBUGGING'][0] ?? '', 'enableoutbox'),
-        $GLOBALS['DEBUGGING'][0] ?? '(none)');
+        $GLOBALS['DEBUGGING'][0] ?? '(none)'
+    );
     $db = run_case([]);
     check('and stays quiet when the outbox worked', $GLOBALS['DEBUGGING'] === []);
 
@@ -451,9 +520,11 @@ namespace {
     $db = run_case(['gradeitems' => [
         900 => (object) ['id' => 900, 'courseid' => 7, 'itemtype' => 'mod'],
     ]]);
-    check('an activity grade changes nothing',
+    check(
+        'an activity grade changes nothing',
         $db->updates === [] && outbox_service::$enqueued === [],
-        count($db->updates) . ' updates, ' . count(outbox_service::$enqueued) . ' enqueued');
+        count($db->updates) . ' updates, ' . count(outbox_service::$enqueued) . ' enqueued'
+    );
 
     $db = run_case(['gradeitems' => [
         900 => (object) ['id' => 900, 'courseid' => 99, 'itemtype' => 'course'],
@@ -468,13 +539,17 @@ namespace {
 
     echo "\n  only an already-ledgered completion\n";
     $db = run_case(['achievements' => []]);
-    check('no ledger row means nothing to correct',
-        $db->updates === [] && outbox_service::$enqueued === []);
+    check(
+        'no ledger row means nothing to correct',
+        $db->updates === [] && outbox_service::$enqueued === []
+    );
 
     echo "\n  a cleared total is left alone\n";
     $db = run_case(['total' => null]);
-    check('a null course total does not erase a grade already awarded',
-        $db->updates === [] && outbox_service::$enqueued === []);
+    check(
+        'a null course total does not erase a grade already awarded',
+        $db->updates === [] && outbox_service::$enqueued === []
+    );
 
     echo "\n  the switches\n";
     $db = run_case(['config' => ['enabled' => 0, 'capturegrades' => 1]]);
@@ -487,13 +562,19 @@ namespace {
         achievement_row(['id' => 500, 'completiontime' => 1700000000, 'ledgeruuid' => 'older']),
         achievement_row(['id' => 501, 'completiontime' => 1750000000, 'ledgeruuid' => 'newer']),
     ]]);
-    check('the most recent record is the one corrected', ($db->updates[0]->id ?? null) === 501,
-        'corrected id ' . var_export($db->updates[0]->id ?? null, true));
+    check(
+        'the most recent record is the one corrected',
+        ($db->updates[0]->id ?? null) === 501,
+        'corrected id ' . var_export($db->updates[0]->id ?? null, true)
+    );
     check('and the older one is untouched', (string) $db->rows[500]->grade_decimal === '72.00000');
 
     echo "\n  hygiene\n";
-    check('no unexpected tables were touched', $db->unexpected === [],
-        implode(', ', $db->unexpected));
+    check(
+        'no unexpected tables were touched',
+        $db->unexpected === [],
+        implode(', ', $db->unexpected)
+    );
 
     printf("\n%d passed, %d failed\n", $passes, count($failures));
     if ($failures) {

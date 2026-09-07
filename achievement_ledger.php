@@ -49,9 +49,9 @@ $filterdateto      = optional_param('filterdateto', '', PARAM_TEXT);
 // Unified column state: single comma-separated list carrying both the
 // visible set AND the order.
 // Resolution order:
-//   1. visiblecols URL param (per-request override)
-//   2. saved user preference (per-user persistent layout)
-//   3. built-in staff defaults
+// 1. visiblecols URL param (per-request override)
+// 2. saved user preference (per-user persistent layout)
+// 3. built-in staff defaults
 const LCH_LAYOUT_PREF   = 'local_completionhistory_ledger_cols';
 const LCH_LAYOUT_CONFIG = 'ledger_default_cols';
 
@@ -66,7 +66,7 @@ if ($visiblecolsraw === null) {
     if ($savedpref !== '') {
         $visiblecolsraw = $savedpref;
         $fromsavedpref  = true;
-    } elseif ($siteconfigcols !== '') {
+    } else if ($siteconfigcols !== '') {
         $visiblecolsraw  = $siteconfigcols;
         $fromsitedefault = true;
     }
@@ -94,10 +94,10 @@ $PAGE->set_pagelayout('admin');
 // Presence of these param names means the matching submit button was clicked.
 // PARAM_BOOL (not PARAM_INT) is used because the submitted value is the button
 // label text (e.g. "Save layout"), which would coerce to 0 under PARAM_INT.
-$savelayout    = optional_param('savelayout',    0, PARAM_BOOL);
-$resetlayout   = optional_param('resetlayout',   0, PARAM_BOOL);
-$savedefault   = optional_param('savedefault',   0, PARAM_BOOL);
-$resetdefault  = optional_param('resetdefault',  0, PARAM_BOOL);
+$savelayout    = optional_param('savelayout', 0, PARAM_BOOL);
+$resetlayout   = optional_param('resetlayout', 0, PARAM_BOOL);
+$savedefault   = optional_param('savedefault', 0, PARAM_BOOL);
+$resetdefault  = optional_param('resetdefault', 0, PARAM_BOOL);
 
 if ($savelayout || $resetlayout || $savedefault || $resetdefault) {
     if (!data_submitted()) {
@@ -166,9 +166,9 @@ $availableprograms = $DB->get_records_sql(
 
 // ---------------------------------------------------------------------------
 // Build column UI state:
-//   $allcollabels   — every known column name → translated label
-//   $orderedvisible — ordered map of currently-visible columns (ordering from $visiblecols)
-//   $hiddencols     — every known column NOT in the visible set
+// $allcollabels   — every known column name → translated label
+// $orderedvisible — ordered map of currently-visible columns (ordering from $visiblecols)
+// $hiddencols     — every known column NOT in the visible set
 // ---------------------------------------------------------------------------
 $allcollabels = achievements_table::all_col_labels(true);
 
@@ -234,8 +234,13 @@ $passedoptions = [
     '0'    => get_string('filter_passed_no', 'local_completionhistory'),
     'null' => get_string('filter_passed_unknown', 'local_completionhistory'),
 ];
-echo html_writer::select($passedoptions, 'filterpassed', $filterpassed, false,
-    ['id' => 'filterpassed', 'class' => 'form-control form-control-sm']);
+echo html_writer::select(
+    $passedoptions,
+    'filterpassed',
+    $filterpassed,
+    false,
+    ['id' => 'filterpassed', 'class' => 'form-control form-control-sm']
+);
 echo html_writer::end_div();
 
 echo html_writer::end_div(); // row 1
@@ -271,7 +276,9 @@ $hasprogattrs = [
     'type' => 'checkbox', 'name' => 'filterhasprograms', 'id' => 'filterhasprograms',
     'value' => '1', 'class' => 'form-check-input',
 ];
-if ($filterhasprograms) $hasprogattrs['checked'] = 'checked';
+if ($filterhasprograms) {
+    $hasprogattrs['checked'] = 'checked';
+}
 echo html_writer::empty_tag('input', $hasprogattrs);
 echo html_writer::label(get_string('filter_hasprograms', 'local_completionhistory'), 'filterhasprograms', true, ['class' => 'form-check-label small']);
 echo html_writer::end_div();
@@ -282,11 +289,15 @@ echo html_writer::label(get_string('filter_programs', 'local_completionhistory')
 echo html_writer::tag('small', get_string('filter_programs_help', 'local_completionhistory'), ['class' => 'd-block text-muted mb-1']);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'filterprogramids', 'id' => 'filterprogramids', 'value' => $filterprogramids]);
 $selopts = ['id' => 'filterprogramselector', 'multiple' => 'multiple', 'class' => 'form-control form-control-sm', 'size' => '4'];
-if (empty($availableprograms)) $selopts['disabled'] = 'disabled';
+if (empty($availableprograms)) {
+    $selopts['disabled'] = 'disabled';
+}
 echo html_writer::start_tag('select', $selopts);
 foreach ($availableprograms as $prog) {
     $optattrs = ['value' => $prog->programid];
-    if (in_array((int)$prog->programid, $programids)) $optattrs['selected'] = 'selected';
+    if (in_array((int)$prog->programid, $programids)) {
+        $optattrs['selected'] = 'selected';
+    }
     echo html_writer::tag('option', format_string($prog->programname_snapshot), $optattrs);
 }
 echo html_writer::end_tag('select');
@@ -298,19 +309,29 @@ echo html_writer::end_div(); // row 3
 echo html_writer::start_div('form-row mb-3');
 echo html_writer::start_div('col-12');
 
-echo html_writer::tag('p', get_string('filter_columns', 'local_completionhistory'),
-    ['class' => 'small font-weight-bold mb-1']);
-echo html_writer::tag('p', get_string('filter_columns_help', 'local_completionhistory'),
-    ['class' => 'small text-muted mb-2']);
+echo html_writer::tag(
+    'p',
+    get_string('filter_columns', 'local_completionhistory'),
+    ['class' => 'small font-weight-bold mb-1']
+);
+echo html_writer::tag(
+    'p',
+    get_string('filter_columns_help', 'local_completionhistory'),
+    ['class' => 'small text-muted mb-2']
+);
 
 if ($fromsavedpref) {
-    echo html_writer::tag('p',
+    echo html_writer::tag(
+        'p',
         '&#128190; ' . get_string('layout_using_saved', 'local_completionhistory'),
-        ['class' => 'small text-success mb-2']);
+        ['class' => 'small text-success mb-2']
+    );
 } else if ($fromsitedefault) {
-    echo html_writer::tag('p',
+    echo html_writer::tag(
+        'p',
         '&#127960; ' . get_string('layout_using_default', 'local_completionhistory'),
-        ['class' => 'small text-info mb-2']);
+        ['class' => 'small text-info mb-2']
+    );
 }
 
 // 4a: checkbox grid — one checkbox per known column. Checked = visible.
@@ -368,8 +389,11 @@ echo html_writer::empty_tag('input', [
     'type' => 'submit', 'value' => get_string('search'),
     'class' => 'btn btn-primary btn-sm mr-2',
 ]);
-echo html_writer::tag('a', get_string('reset'),
-    ['href' => $reseturl->out(false), 'class' => 'btn btn-secondary btn-sm mr-2']);
+echo html_writer::tag(
+    'a',
+    get_string('reset'),
+    ['href' => $reseturl->out(false), 'class' => 'btn btn-secondary btn-sm mr-2']
+);
 
 echo html_writer::empty_tag('input', [
     'type'  => 'submit',
@@ -532,16 +556,16 @@ if (!empty($filtersource)) {
 }
 if ($filterpassed === '1') {
     $conditions[] = 'a.grade_passed = 1';
-} elseif ($filterpassed === '0') {
+} else if ($filterpassed === '0') {
     $conditions[] = 'a.grade_passed = 0';
-} elseif ($filterpassed === 'null') {
+} else if ($filterpassed === 'null') {
     $conditions[] = 'a.grade_passed IS NULL';
 }
 if (!empty($programids)) {
     [$insql, $inparams] = $DB->get_in_or_equal($programids, SQL_PARAMS_NAMED, 'progid');
     $conditions[] = "EXISTS (SELECT 1 FROM {local_completionhistory_ach_program} ap WHERE ap.achievementid = a.id AND ap.programid $insql)";
     $params = array_merge($params, $inparams);
-} elseif ($filterhasprograms) {
+} else if ($filterhasprograms) {
     $conditions[] = "EXISTS (SELECT 1 FROM {local_completionhistory_ach_program} ap WHERE ap.achievementid = a.id)";
 }
 if (!empty($filterdatefrom)) {
@@ -600,7 +624,7 @@ $tableurl = new moodle_url('/local/completionhistory/achievement_ledger.php', $u
 // ---------------------------------------------------------------------------
 $table = new achievements_table(
     'local_completionhistory_ledger',
-    true,                    // showuser (staff view)
+    true, // showuser (staff view)
     array_keys($orderedvisible)
 );
 

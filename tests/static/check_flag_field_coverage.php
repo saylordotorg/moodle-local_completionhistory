@@ -98,8 +98,11 @@ echo "\nper flag type:\n";
 $broken = [];
 foreach ($deps as $type => $fields) {
     $lack = array_diff($fields, $provided);
-    printf("  %-20s %s\n", $type,
-        $lack ? '*** would never fire: needs ' . implode(', ', $lack) . ' ***' : 'evaluable');
+    printf(
+        "  %-20s %s\n",
+        $type,
+        $lack ? '*** would never fire: needs ' . implode(', ', $lack) . ' ***' : 'evaluable'
+    );
     if ($lack) {
         $broken[] = $type;
     }

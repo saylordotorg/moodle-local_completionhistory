@@ -146,9 +146,11 @@ $lock->release();
 // is worst — a service token escalating to a staff or administrator session — and a key
 // minted by old or future code still has to get past this door. This makes the guarantee a
 // property of the endpoint rather than of every caller remembering it.
-if (!empty($user->suspended) || empty($user->confirmed)
+if (
+    !empty($user->suspended) || empty($user->confirmed)
         || $user->auth === 'nologin' || !is_enabled_auth($user->auth)
-        || !security::is_learner_account($user)) {
+        || !security::is_learner_account($user)
+) {
     throw new moodle_exception('invaliduser', 'error');
 }
 

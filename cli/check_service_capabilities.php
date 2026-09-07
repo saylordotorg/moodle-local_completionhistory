@@ -354,12 +354,20 @@ foreach ($services as $service) {
 
         printf("    %-40s %d of %d\n", 'functions it can call', $callable, count($registered));
         if ($unprovisioned) {
-            printf("    %-40s %d (%s)\n", 'not provisioned for', count($unprovisioned),
-                implode(', ', array_slice($unprovisioned, 0, 3)) . (count($unprovisioned) > 3 ? ', ...' : ''));
+            printf(
+                "    %-40s %d (%s)\n",
+                'not provisioned for',
+                count($unprovisioned),
+                implode(', ', array_slice($unprovisioned, 0, 3)) . (count($unprovisioned) > 3 ? ', ...' : '')
+            );
         }
         if ($withheld) {
-            printf("    %-40s %d (%s)\n", 'deliberately withheld', count($withheld),
-                implode('; ', array_slice($withheld, 0, 3)) . (count($withheld) > 3 ? '; ...' : ''));
+            printf(
+                "    %-40s %d (%s)\n",
+                'deliberately withheld',
+                count($withheld),
+                implode('; ', array_slice($withheld, 0, 3)) . (count($withheld) > 3 ? '; ...' : '')
+            );
         }
         if ($heldprotocols) {
             printf("    %-40s %s\n", 'transports available', implode(', ', $heldprotocols));

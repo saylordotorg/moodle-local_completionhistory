@@ -55,15 +55,17 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class list_courses extends external_api {
-
     /** Maximum rows returned by this snapshot-style catalog endpoint. */
     private const MAX_CATALOG_ROWS = 5000;
 
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'includehidden' => new external_value(PARAM_BOOL,
+            'includehidden' => new external_value(
+                PARAM_BOOL,
                 'Include courses with visible=0 (default true — the SIS records visibility rather than filtering on it)',
-                VALUE_DEFAULT, true),
+                VALUE_DEFAULT,
+                true
+            ),
         ]);
     }
 
@@ -154,25 +156,25 @@ class list_courses extends external_api {
         return new external_single_structure([
             'courses' => new external_multiple_structure(
                 new external_single_structure([
-                    'id'           => new external_value(PARAM_INT,  'Moodle internal course id — VOLATILE across delete/restore'),
-                    'categoryid'   => new external_value(PARAM_INT,  'Category id'),
+                    'id'           => new external_value(PARAM_INT, 'Moodle internal course id — VOLATILE across delete/restore'),
+                    'categoryid'   => new external_value(PARAM_INT, 'Category id'),
                     'idnumber'     => new external_value(PARAM_TEXT, 'Stable human-readable course key used throughout the SIS'),
                     'shortname'    => new external_value(PARAM_TEXT, 'Course shortname'),
                     'fullname'     => new external_value(PARAM_TEXT, 'Course fullname'),
-                    'visible'      => new external_value(PARAM_INT,  '1 visible, 0 hidden'),
-                    'sortorder'    => new external_value(PARAM_INT,  'Sort order'),
-                    'timemodified' => new external_value(PARAM_INT,  'Last modification timestamp'),
+                    'visible'      => new external_value(PARAM_INT, '1 visible, 0 hidden'),
+                    'sortorder'    => new external_value(PARAM_INT, 'Sort order'),
+                    'timemodified' => new external_value(PARAM_INT, 'Last modification timestamp'),
                 ]),
                 'Courses, including the site front page (id 1) — the caller filters it'
             ),
             'categories' => new external_multiple_structure(
                 new external_single_structure([
-                    'id'          => new external_value(PARAM_INT,  'Category id'),
+                    'id'          => new external_value(PARAM_INT, 'Category id'),
                     'name'        => new external_value(PARAM_TEXT, 'Category name'),
-                    'parent'      => new external_value(PARAM_INT,  'Parent category id, 0 at top level'),
-                    'sortorder'   => new external_value(PARAM_INT,  'Sort order'),
-                    'coursecount' => new external_value(PARAM_INT,  'Courses directly in this category'),
-                    'visible'     => new external_value(PARAM_INT,  '1 visible, 0 hidden'),
+                    'parent'      => new external_value(PARAM_INT, 'Parent category id, 0 at top level'),
+                    'sortorder'   => new external_value(PARAM_INT, 'Sort order'),
+                    'coursecount' => new external_value(PARAM_INT, 'Courses directly in this category'),
+                    'visible'     => new external_value(PARAM_INT, '1 visible, 0 hidden'),
                     'idnumber'    => new external_value(PARAM_TEXT, 'Category idnumber'),
                 ]),
                 'Category tree'

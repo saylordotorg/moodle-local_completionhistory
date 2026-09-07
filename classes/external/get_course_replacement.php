@@ -30,7 +30,6 @@ use local_completionhistory\local\replacement_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_course_replacement extends external_api {
-
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'courseid' => new external_value(PARAM_INT, 'The old/retired course ID'),

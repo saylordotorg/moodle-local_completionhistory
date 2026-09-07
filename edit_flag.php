@@ -125,9 +125,12 @@ if (data_submitted()) {
 
     if (empty($errors)) {
         $savedid = flag_service::save($flag);
-        redirect($listurl,
+        redirect(
+            $listurl,
             get_string('flagsaved', 'local_completionhistory'),
-            null, \core\output\notification::NOTIFY_SUCCESS);
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
     }
 }
 
@@ -149,8 +152,12 @@ echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', '
 
 // Name.
 echo html_writer::start_div('form-group');
-echo html_writer::label(get_string('flag_name', 'local_completionhistory'), 'name',
-    true, ['class' => 'font-weight-bold']);
+echo html_writer::label(
+    get_string('flag_name', 'local_completionhistory'),
+    'name',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'text', 'name' => 'name', 'id' => 'name',
     'value' => s($flag->name), 'class' => 'form-control', 'required' => 'required',
@@ -160,21 +167,32 @@ echo html_writer::end_div();
 
 // Code.
 echo html_writer::start_div('form-group');
-echo html_writer::label(get_string('flag_code', 'local_completionhistory'), 'code',
-    true, ['class' => 'font-weight-bold']);
+echo html_writer::label(
+    get_string('flag_code', 'local_completionhistory'),
+    'code',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'text', 'name' => 'code', 'id' => 'code',
     'value' => s($flag->code), 'class' => 'form-control', 'required' => 'required',
     'maxlength' => 50, 'pattern' => '[A-Za-z0-9_\-]+',
 ]);
-echo html_writer::tag('small', get_string('flag_code_help', 'local_completionhistory'),
-    ['class' => 'form-text text-muted']);
+echo html_writer::tag(
+    'small',
+    get_string('flag_code_help', 'local_completionhistory'),
+    ['class' => 'form-text text-muted']
+);
 echo html_writer::end_div();
 
 // Description.
 echo html_writer::start_div('form-group');
-echo html_writer::label(get_string('flag_description', 'local_completionhistory'), 'description',
-    true, ['class' => 'font-weight-bold']);
+echo html_writer::label(
+    get_string('flag_description', 'local_completionhistory'),
+    'description',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::tag('textarea', s($flag->description), [
     'name' => 'description', 'id' => 'description',
     'class' => 'form-control', 'rows' => '2',
@@ -183,8 +201,12 @@ echo html_writer::end_div();
 
 // Type.
 echo html_writer::start_div('form-group');
-echo html_writer::label(get_string('flag_type', 'local_completionhistory'), 'flag_type',
-    true, ['class' => 'font-weight-bold']);
+echo html_writer::label(
+    get_string('flag_type', 'local_completionhistory'),
+    'flag_type',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::select($typelabels, 'flag_type', $flag->flag_type, false, [
     'id' => 'flag_type', 'class' => 'form-control',
 ]);
@@ -192,8 +214,12 @@ echo html_writer::end_div();
 
 // Severity.
 echo html_writer::start_div('form-group');
-echo html_writer::label(get_string('flag_severity', 'local_completionhistory'), 'severity',
-    true, ['class' => 'font-weight-bold']);
+echo html_writer::label(
+    get_string('flag_severity', 'local_completionhistory'),
+    'severity',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::select($sevlabels, 'severity', $flag->severity, false, [
     'id' => 'severity', 'class' => 'form-control',
 ]);
@@ -205,10 +231,16 @@ $enattrs = [
     'type' => 'checkbox', 'name' => 'enabled', 'id' => 'enabled',
     'value' => '1', 'class' => 'form-check-input',
 ];
-if ($flag->enabled) $enattrs['checked'] = 'checked';
+if ($flag->enabled) {
+    $enattrs['checked'] = 'checked';
+}
 echo html_writer::empty_tag('input', $enattrs);
-echo html_writer::label(get_string('flag_enabled', 'local_completionhistory'), 'enabled',
-    true, ['class' => 'form-check-label']);
+echo html_writer::label(
+    get_string('flag_enabled', 'local_completionhistory'),
+    'enabled',
+    true,
+    ['class' => 'form-check-label']
+);
 echo html_writer::end_div();
 
 // Type-specific config blocks (show/hide via JS based on flag_type).
@@ -223,14 +255,20 @@ echo html_writer::start_div('card-body');
 echo html_writer::start_div('form-group');
 echo html_writer::label(
     get_string('flag_threshold_minutes', 'local_completionhistory'),
-    'threshold_minutes', true, ['class' => 'font-weight-bold']);
+    'threshold_minutes',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'number', 'name' => 'threshold_minutes', 'id' => 'threshold_minutes',
     'value' => (int) ($config['threshold_minutes'] ?? 20),
     'class' => 'form-control', 'min' => '1', 'max' => '600',
 ]);
-echo html_writer::tag('small', get_string('flag_threshold_minutes_help', 'local_completionhistory'),
-    ['class' => 'form-text text-muted']);
+echo html_writer::tag(
+    'small',
+    get_string('flag_threshold_minutes_help', 'local_completionhistory'),
+    ['class' => 'form-text text-muted']
+);
 echo html_writer::end_div();
 echo html_writer::end_div();
 echo html_writer::end_div();
@@ -244,7 +282,10 @@ echo html_writer::start_div('card-body');
 echo html_writer::start_div('form-group');
 echo html_writer::label(
     get_string('flag_duration_minutes', 'local_completionhistory'),
-    'duration_minutes', true, ['class' => 'font-weight-bold']);
+    'duration_minutes',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'number', 'name' => 'duration_minutes', 'id' => 'duration_minutes',
     'value' => (int) ($config['duration_minutes'] ?? 120),
@@ -254,14 +295,20 @@ echo html_writer::end_div();
 echo html_writer::start_div('form-group');
 echo html_writer::label(
     get_string('flag_tolerance_seconds', 'local_completionhistory'),
-    'tolerance_seconds', true, ['class' => 'font-weight-bold']);
+    'tolerance_seconds',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'number', 'name' => 'tolerance_seconds', 'id' => 'tolerance_seconds',
     'value' => (int) ($config['tolerance_seconds'] ?? 10),
     'class' => 'form-control', 'min' => '0', 'max' => '3600',
 ]);
-echo html_writer::tag('small', get_string('flag_tolerance_seconds_help', 'local_completionhistory'),
-    ['class' => 'form-text text-muted']);
+echo html_writer::tag(
+    'small',
+    get_string('flag_tolerance_seconds_help', 'local_completionhistory'),
+    ['class' => 'form-text text-muted']
+);
 echo html_writer::end_div();
 echo html_writer::end_div();
 echo html_writer::end_div();
@@ -276,7 +323,10 @@ echo html_writer::start_div('form-row');
 echo html_writer::start_div('form-group col-md-6');
 echo html_writer::label(
     get_string('flag_score_min', 'local_completionhistory'),
-    'score_min', true, ['class' => 'font-weight-bold']);
+    'score_min',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'number', 'name' => 'score_min', 'id' => 'score_min',
     'value' => (int) ($config['score_min'] ?? 0),
@@ -286,7 +336,10 @@ echo html_writer::end_div();
 echo html_writer::start_div('form-group col-md-6');
 echo html_writer::label(
     get_string('flag_score_max', 'local_completionhistory'),
-    'score_max', true, ['class' => 'font-weight-bold']);
+    'score_max',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'number', 'name' => 'score_max', 'id' => 'score_max',
     'value' => (int) ($config['score_max'] ?? 100),
@@ -294,8 +347,11 @@ echo html_writer::empty_tag('input', [
 ]);
 echo html_writer::end_div();
 echo html_writer::end_div();
-echo html_writer::tag('small', get_string('flag_score_range_help', 'local_completionhistory'),
-    ['class' => 'form-text text-muted']);
+echo html_writer::tag(
+    'small',
+    get_string('flag_score_range_help', 'local_completionhistory'),
+    ['class' => 'form-text text-muted']
+);
 echo html_writer::end_div();
 echo html_writer::end_div();
 
@@ -308,14 +364,20 @@ echo html_writer::start_div('card-body');
 echo html_writer::start_div('form-group');
 echo html_writer::label(
     get_string('flag_max_days_before', 'local_completionhistory'),
-    'max_days_before', true, ['class' => 'font-weight-bold']);
+    'max_days_before',
+    true,
+    ['class' => 'font-weight-bold']
+);
 echo html_writer::empty_tag('input', [
     'type' => 'number', 'name' => 'max_days_before', 'id' => 'max_days_before',
     'value' => (int) ($config['max_days_before'] ?? 2),
     'class' => 'form-control', 'min' => '1', 'max' => '3650',
 ]);
-echo html_writer::tag('small', get_string('flag_max_days_before_help', 'local_completionhistory'),
-    ['class' => 'form-text text-muted']);
+echo html_writer::tag(
+    'small',
+    get_string('flag_max_days_before_help', 'local_completionhistory'),
+    ['class' => 'form-text text-muted']
+);
 echo html_writer::end_div();
 echo html_writer::end_div();
 echo html_writer::end_div();
@@ -331,14 +393,22 @@ $domattrs = [
     'type' => 'checkbox', 'name' => 'same_email_domain', 'id' => 'same_email_domain',
     'value' => '1', 'class' => 'form-check-input',
 ];
-if (!empty($config['same_email_domain'])) $domattrs['checked'] = 'checked';
+if (!empty($config['same_email_domain'])) {
+    $domattrs['checked'] = 'checked';
+}
 echo html_writer::empty_tag('input', $domattrs);
 echo html_writer::label(
     get_string('flag_same_email_domain', 'local_completionhistory'),
-    'same_email_domain', true, ['class' => 'form-check-label']);
+    'same_email_domain',
+    true,
+    ['class' => 'form-check-label']
+);
 echo html_writer::end_div();
-echo html_writer::tag('small', get_string('flag_duplicate_account_help', 'local_completionhistory'),
-    ['class' => 'form-text text-muted']);
+echo html_writer::tag(
+    'small',
+    get_string('flag_duplicate_account_help', 'local_completionhistory'),
+    ['class' => 'form-text text-muted']
+);
 echo html_writer::end_div();
 echo html_writer::end_div();
 

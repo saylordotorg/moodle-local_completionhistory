@@ -44,7 +44,7 @@ if (!get_config('local_completionhistory', 'enabled')) {
     throw new moodle_exception('plugindisabled', 'local_completionhistory');
 }
 
-$userid   = required_param('userid',   PARAM_INT);
+$userid   = required_param('userid', PARAM_INT);
 $courseid = required_param('courseid', PARAM_INT);
 
 header('Content-Type: text/html; charset=utf-8');
@@ -83,7 +83,7 @@ echo '<tbody>';
 
 foreach ($attempts as $a) {
     $trackname  = $track_labels[$a->exam_track] ?? $a->exam_track;
-    $trackclass = $track_badge[$a->exam_track]  ?? 'badge-secondary';
+    $trackclass = $track_badge[$a->exam_track] ?? 'badge-secondary';
 
     $allowed_label = ((int) $a->attempts_allowed === 0) ? '∞' : (int) $a->attempts_allowed;
     $attempt_label = "{$a->attempt_number} / {$allowed_label}";
@@ -96,7 +96,7 @@ foreach ($attempts as $a) {
 
     if ($a->grade_passed === null || $a->grade_passed === '') {
         $result_html = '<span class="badge badge-secondary">N/A</span>';
-    } elseif ((int) $a->grade_passed === 1) {
+    } else if ((int) $a->grade_passed === 1) {
         $icon = $a->resulted_in_completion ? '&#10003; Passed &#127775;' : '&#10003; Passed';
         $result_html = '<span class="badge badge-success">' . $icon . '</span>';
     } else {

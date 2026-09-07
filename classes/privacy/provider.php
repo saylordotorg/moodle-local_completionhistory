@@ -36,12 +36,7 @@ use local_completionhistory\local\ledger_service;
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class provider implements
-    \core_privacy\local\metadata\provider,
-    \core_privacy\local\request\plugin\provider,
-    \core_privacy\local\request\core_userlist_provider,
-    \core_privacy\local\request\user_preference_provider
-{
+class provider implements \core_privacy\local\metadata\provider, \core_privacy\local\request\core_userlist_provider, \core_privacy\local\request\plugin\provider, \core_privacy\local\request\user_preference_provider {
     /**
      * Describe the types of data stored by this plugin.
      */
@@ -344,10 +339,12 @@ class provider implements
      * @param int $userid User id.
      */
     public static function export_user_preferences(int $userid): void {
-        foreach ([
+        foreach (
+            [
             'local_completionhistory_ledger_cols' => 'privacy:metadata:preference:ledger_cols',
             'local_completionhistory_attempts_cols' => 'privacy:metadata:preference:attempts_cols',
-        ] as $name => $description) {
+            ] as $name => $description
+        ) {
             $value = get_user_preferences($name, null, $userid);
             if ($value !== null) {
                 writer::export_user_preference(

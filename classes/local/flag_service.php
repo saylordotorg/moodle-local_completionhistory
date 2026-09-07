@@ -32,7 +32,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class flag_service {
-
     const TYPE_FAST_COMPLETION   = 'fast_completion';
     const TYPE_DURATION_EXACT    = 'duration_exact';
     const TYPE_SCORE_RANGE       = 'score_range';
@@ -53,11 +52,11 @@ class flag_service {
      */
     public static function type_labels(): array {
         return [
-            self::TYPE_SCORE_RANGE       => get_string('flagtype_score_range',       'local_completionhistory'),
-            self::TYPE_FAST_COMPLETION   => get_string('flagtype_fast_completion',   'local_completionhistory'),
-            self::TYPE_DURATION_EXACT    => get_string('flagtype_duration_exact',    'local_completionhistory'),
+            self::TYPE_SCORE_RANGE       => get_string('flagtype_score_range', 'local_completionhistory'),
+            self::TYPE_FAST_COMPLETION   => get_string('flagtype_fast_completion', 'local_completionhistory'),
+            self::TYPE_DURATION_EXACT    => get_string('flagtype_duration_exact', 'local_completionhistory'),
             self::TYPE_DUPLICATE_ACCOUNT => get_string('flagtype_duplicate_account', 'local_completionhistory'),
-            self::TYPE_NEW_ACCOUNT       => get_string('flagtype_new_account',       'local_completionhistory'),
+            self::TYPE_NEW_ACCOUNT       => get_string('flagtype_new_account', 'local_completionhistory'),
         ];
     }
 
@@ -66,8 +65,8 @@ class flag_service {
      */
     public static function severity_labels(): array {
         return [
-            self::SEVERITY_INFO     => get_string('flagseverity_info',     'local_completionhistory'),
-            self::SEVERITY_WARNING  => get_string('flagseverity_warning',  'local_completionhistory'),
+            self::SEVERITY_INFO     => get_string('flagseverity_info', 'local_completionhistory'),
+            self::SEVERITY_WARNING  => get_string('flagseverity_warning', 'local_completionhistory'),
             self::SEVERITY_CRITICAL => get_string('flagseverity_critical', 'local_completionhistory'),
         ];
     }
@@ -91,8 +90,11 @@ class flag_service {
     public static function get_enabled_defs(): array {
         global $DB;
         if (self::$cached_defs === null) {
-            self::$cached_defs = $DB->get_records('local_completionhistory_flag_def',
-                ['enabled' => 1], 'severity DESC, name ASC');
+            self::$cached_defs = $DB->get_records(
+                'local_completionhistory_flag_def',
+                ['enabled' => 1],
+                'severity DESC, name ASC'
+            );
         }
         return self::$cached_defs;
     }
@@ -139,7 +141,7 @@ class flag_service {
                 return $duration > 0 && $duration <= ($thresholdmins * 60);
 
             case self::TYPE_DURATION_EXACT:
-                $durmins   = (int) ($config['duration_minutes']  ?? 0);
+                $durmins   = (int) ($config['duration_minutes'] ?? 0);
                 $tolerance = (int) ($config['tolerance_seconds'] ?? 10);
                 if ($durmins <= 0) {
                     return false;

@@ -31,7 +31,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class list_programs extends external_api {
-
     /** Maximum programs returned in one registry snapshot. */
     private const MAX_PROGRAMS = 1000;
 
@@ -51,8 +50,10 @@ class list_programs extends external_api {
         require_capability('local/completionhistory:integrate', $systemcontext);
 
         $dbman = $DB->get_manager();
-        if (!$dbman->table_exists(new \xmldb_table('enrol_programs_programs')) ||
-                !$dbman->table_exists(new \xmldb_table('enrol_programs_items'))) {
+        if (
+            !$dbman->table_exists(new \xmldb_table('enrol_programs_programs')) ||
+                !$dbman->table_exists(new \xmldb_table('enrol_programs_items'))
+        ) {
             return ['programs' => []];
         }
 
