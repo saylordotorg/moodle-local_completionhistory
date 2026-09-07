@@ -46,13 +46,15 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// phpcs:disable PSR1.Classes.ClassDeclaration.MultipleClasses, Generic.Classes.DuplicateClassName.Found -- standalone harness pre-defines fake collaborators; see header.
+// phpcs:disable PSR1.Classes.ClassDeclaration.MultipleClasses -- standalone harness pre-defines fake collaborators; see header.
 // phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
 
 // ---------------------------------------------------------------------------
 // Collaborators, pre-defined so the real callbacks.php resolves to these rather
-// than reaching for an autoloader that is not present.
-namespace local_completionhistory\local {
+// than reaching for an autoloader that is not present. They live under their own
+// namespace and are aliased to the real names below, so a tool scanning the whole
+// tree never sees two declarations of the same class.
+namespace local_completionhistory\harness {
 
     /**
      * Fake grade_snapshot_service: returns whatever total the case under test has set.
@@ -375,6 +377,20 @@ namespace {
             return $this->transaction;
         }
     }
+
+    // The real names the observer resolves, bound to the fakes above.
+    class_alias(
+        \local_completionhistory\harness\grade_snapshot_service::class,
+        'local_completionhistory\\local\\grade_snapshot_service'
+    );
+    class_alias(
+        \local_completionhistory\harness\outbox_service::class,
+        'local_completionhistory\\local\\outbox_service'
+    );
+    class_alias(
+        \local_completionhistory\harness\ledger_service::class,
+        'local_completionhistory\\local\\ledger_service'
+    );
 
     require($root . '/classes/callbacks.php');
 

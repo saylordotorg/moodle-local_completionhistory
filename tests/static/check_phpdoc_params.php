@@ -19,16 +19,16 @@
  *
  * WHY THIS EXISTS. The Catalyst review ran Moodle's PHPDoc checker and found "31 incomplete parameter
  * lists". The Moodle coding-standard sniffs (moodle-cs) flag a MISSING docblock but not a docblock whose
- * `@param` tags disagree with the signature, and the PHPDoc checker itself needs an installed Moodle
+ * parameter tags disagree with the signature, and the PHPDoc checker itself needs an installed Moodle
  * with a database to run. This check needs only the source tree, so it can run in the same breath as
  * the other static checks and in CI, and a docblock that drifts from its signature fails here first.
  *
  * WHAT IT CHECKS, for every named function and method in the plugin (closures and arrow functions are
  * skipped, as the PHPDoc checker skips them):
  *   - a docblock exists;
- *   - it carries one `@param` per parameter, naming the same variable, in the same order;
- *   - it carries no `@param` for a parameter that does not exist;
- *   - each `@param` has a type before the variable name.
+ *   - it carries one parameter tag per parameter, naming the same variable, in the same order;
+ *   - it carries no parameter tag for a parameter that does not exist;
+ *   - each parameter tag has a type before the variable name.
  *
  * Usage:  php tests/static/check_phpdoc_params.php [path ...]
  * Exit:   0 = clean, 1 = at least one defect (each is printed as file:line message).
