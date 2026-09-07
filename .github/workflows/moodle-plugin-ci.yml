@@ -158,7 +158,7 @@ jobs:
         if: ${{ failure() && steps.behat.outcome == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
-          name: Behat faildump (${{ join(matrix.*, ', ') }})
+          name: Behat faildump (${{ matrix.moodle.branch }}, PHP ${{ matrix.moodle.php }}, ${{ matrix.database }})
           path: ${{ github.workspace }}/moodledata/behat_dump
           retention-days: 7
           if-no-files-found: ignore
