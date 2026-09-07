@@ -29,7 +29,6 @@ use local_completionhistory\local\backfill_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class reconcile_ledger extends \core\task\scheduled_task {
-
     /**
      * Get task name.
      *

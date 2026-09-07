@@ -25,9 +25,12 @@ use stdClass;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\local\outbox_service
  */
-class outbox_service_test extends advanced_testcase {
-
+final class outbox_service_test extends advanced_testcase {
+    /**
+     * Reset the site after each test.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
@@ -35,6 +38,11 @@ class outbox_service_test extends advanced_testcase {
 
     /**
      * Build a completion stub for capture_achievement.
+     *
+     * @param int $userid The user who completed.
+     * @param int $courseid The course completed.
+     * @param int|null $time Completion timestamp; defaults to an hour ago.
+     * @return stdClass The completion stub.
      */
     private function make_completion(int $userid, int $courseid, ?int $time = null): stdClass {
         $completion = new stdClass();
@@ -44,6 +52,9 @@ class outbox_service_test extends advanced_testcase {
         return $completion;
     }
 
+    /**
+     * Enqueueing writes a pending row carrying the payload.
+     */
     public function test_enqueue_creates_pending_row(): void {
         global $DB;
 
@@ -59,6 +70,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertEquals($payload, json_decode($row->payloadjson, true));
     }
 
+    /**
+     * Unsynced rows come back oldest first.
+     */
     public function test_get_unsynced_returns_fifo(): void {
         $id1 = outbox_service::enqueue('achievement', 1, ['n' => 1]);
         $id2 = outbox_service::enqueue('achievement', 2, ['n' => 2]);
@@ -67,6 +81,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertEquals([$id1, $id2], array_keys($rows));
     }
 
+    /**
+     * Marking a row sent updates its status and removes it from the pending set.
+     */
     public function test_mark_sent_updates_status_and_hides_from_pending(): void {
         global $DB;
 
@@ -78,6 +95,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertEmpty(outbox_service::get_unsynced(10));
     }
 
+    /**
+     * Marking a row failed bumps the retry count and stores the error text.
+     */
     public function test_mark_failed_increments_retry_and_stores_error(): void {
         global $DB;
 
@@ -90,6 +110,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertEquals('connection refused', $row->lasterror);
     }
 
+    /**
+     * The achievement payload carries the expected keys and types.
+     */
     public function test_build_achievement_payload_shape(): void {
         global $CFG;
 
@@ -126,6 +149,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertIsArray($payload['programs']);
     }
 
+    /**
+     * The payload's sourcesite comes from the plugin setting, falling back to wwwroot.
+     */
     public function test_build_achievement_payload_uses_sourcesite_setting(): void {
         /** @var \local_completionhistory_generator $gen */
         $gen = $this->getDataGenerator()->get_plugin_generator('local_completionhistory');
@@ -141,6 +167,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertSame($CFG->wwwroot, $payload['sourcesite']);
     }
 
+    /**
+     * A certificate artifact on the row is carried into the payload.
+     */
     public function test_build_achievement_payload_includes_certificate_artifact(): void {
         /** @var \local_completionhistory_generator $gen */
         $gen = $this->getDataGenerator()->get_plugin_generator('local_completionhistory');
@@ -156,6 +185,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertSame('ABC123', $payload['artifactcode']);
     }
 
+    /**
+     * Capturing an achievement enqueues it when the outbox is enabled.
+     */
     public function test_capture_enqueues_when_outbox_enabled(): void {
         global $DB;
 
@@ -187,6 +219,9 @@ class outbox_service_test extends advanced_testcase {
         $this->assertEquals($course->fullname, $payload['coursename']);
     }
 
+    /**
+     * Capturing an achievement enqueues nothing when the outbox is disabled.
+     */
     public function test_capture_does_not_enqueue_when_outbox_disabled(): void {
         global $DB;
 

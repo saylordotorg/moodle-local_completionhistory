@@ -126,7 +126,8 @@ $functions = [
     // academic activity and could not be answered at all before (SIS-43).
     'local_completionhistory_get_grade_items' => [
         'classname'    => 'local_completionhistory\external\get_grade_items',
-        'description'  => 'Per-grade-item grades for SIS grade ingestion (SIS-42). Authorised alternative to the core gradereport_user_get_grade_items, which the SIS token cannot call.',
+        'description'  => 'Per-grade-item grades for SIS grade ingestion (SIS-42). Authorised alternative to the core '
+            . 'gradereport_user_get_grade_items, which the SIS token cannot call.',
         'type'         => 'read',
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate',
@@ -164,7 +165,8 @@ $functions = [
     // a link labelled "Leave" must not be able to remove a student's grades.
     'local_completionhistory_unenrol_user_from_course' => [
         'classname'    => 'local_completionhistory\external\unenrol_user_from_course',
-        'description'  => 'Suspend a learner\'s manual enrolment in a course by email + idnumber, keeping grades and attempts (SIS "Leave course").',
+        'description'  => 'Suspend a learner\'s manual enrolment in a course by email + idnumber, keeping grades and '
+            . 'attempts (SIS "Leave course").',
         'type'         => 'write',
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:enrolusers',
@@ -175,7 +177,8 @@ $functions = [
     // and calling this a read would understate it (SIS-29).
     'local_completionhistory_create_login_key' => [
         'classname'    => 'local_completionhistory\external\create_login_key',
-        'description'  => 'Mint a single-use, IP-bound, 60-second key that logs one student into Moodle in a browser (SIS "Open in Moodle" deep links).',
+        'description'  => 'Mint a single-use, IP-bound, 60-second key that logs one student into Moodle in a browser '
+            . '(SIS "Open in Moodle" deep links).',
         'type'         => 'write',
         // Not callable from page JavaScript. An AJAX-exposed login-key minter would be
         // reachable with any logged-in user's session cookie, which is a different and

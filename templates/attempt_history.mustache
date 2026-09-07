@@ -1,0 +1,90 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_completionhistory/attempt_history
+
+    Per-attempt exam history for one user and course, injected under a ledger row
+    by the local_completionhistory/attempt_details AMD module.
+
+    Context variables required for this template:
+    * hasattempts - whether any attempt records exist
+    * attempts - array of rows:
+        * track - translated exam track label
+        * trackclass - badge modifier class for the track
+        * attempt - "N / M" attempt summary
+        * grade - formatted grade or the empty-value string
+        * result - translated result label
+        * resultclass - badge modifier class for the result
+        * ispassed, isfailed, isunknown - which result icon to show
+        * completing - whether this attempt completed the course
+        * date - formatted attempt date
+
+    Example context (json):
+    {
+        "hasattempts": true,
+        "attempts": [
+            {
+                "track": "Program Final",
+                "trackclass": "badge-primary",
+                "attempt": "2 / 3",
+                "grade": "85.0%",
+                "result": "Passed",
+                "resultclass": "badge-success",
+                "ispassed": true,
+                "isfailed": false,
+                "isunknown": false,
+                "completing": true,
+                "date": "03/14/2026"
+            }
+        ]
+    }
+}}
+{{^hasattempts}}
+    <p class="text-muted m-2"><em>{{#str}}attempts_none, local_completionhistory{{/str}}</em></p>
+{{/hasattempts}}
+{{#hasattempts}}
+    <div class="p-2 lch-attempt-history">
+        <table class="table table-sm table-bordered mb-0 lch-attempt-history-table">
+            <caption class="sr-only">{{#str}}attempts_panel_title, local_completionhistory{{/str}}</caption>
+            <thead class="thead-light">
+                <tr>
+                    <th scope="col">{{#str}}attempt_track, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}attempt_number, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}attempt_grade, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}attempt_result, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}attempt_date, local_completionhistory{{/str}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#attempts}}
+                    <tr{{#completing}} class="table-success"{{/completing}}>
+                        <td><span class="badge {{trackclass}} lch-badge-sm">{{track}}</span></td>
+                        <td>{{attempt}}</td>
+                        <td>{{grade}}</td>
+                        <td>
+                            <span class="badge {{resultclass}}">
+                                {{#ispassed}}&#10003; {{/ispassed}}{{#isfailed}}&#10007; {{/isfailed}}{{result}}
+                                {{#completing}}<span title="{{#str}}attempt_completing, local_completionhistory{{/str}}">&#127775;</span>{{/completing}}
+                            </span>
+                        </td>
+                        <td>{{date}}</td>
+                    </tr>
+                {{/attempts}}
+            </tbody>
+        </table>
+    </div>
+{{/hasattempts}}

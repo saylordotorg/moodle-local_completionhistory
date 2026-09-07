@@ -70,30 +70,49 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_user_activity extends external_api {
-
     /** Hard ceiling on users per call, whatever the caller asks for. */
     private const MAX_LIMIT = 1000;
 
     /** Maximum per-course access rows included in one response. */
     private const MAX_COURSE_ROWS = 10000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'userids' => new external_multiple_structure(
                 new external_value(PARAM_INT, 'Moodle user id'),
                 'Restrict to these users; empty means all confirmed, undeleted users',
-                VALUE_DEFAULT, []
+                VALUE_DEFAULT,
+                []
             ),
-            'since' => new external_value(PARAM_INT,
+            'since' => new external_value(
+                PARAM_INT,
                 'Return users whose lastaccess is AFTER this timestamp (0 for all). Pass back next_since.',
-                VALUE_DEFAULT, 0),
-            'since_id' => new external_value(PARAM_INT,
-                'Tie-break within `since`: include users at that timestamp only if id is greater. Pass back next_since_id.',
-                VALUE_DEFAULT, 0),
-            'limit' => new external_value(PARAM_INT,
-                'Maximum users to return (capped at 1000)', VALUE_DEFAULT, 500),
-            'includecourses' => new external_value(PARAM_BOOL,
-                'Include per-course last access (heavier; off by default)', VALUE_DEFAULT, false),
+                VALUE_DEFAULT,
+                0
+            ),
+            'since_id' => new external_value(
+                PARAM_INT,
+                'Tie-break within since: include users at that timestamp only if id is greater. Pass back next_since_id.',
+                VALUE_DEFAULT,
+                0
+            ),
+            'limit' => new external_value(
+                PARAM_INT,
+                'Maximum users to return (capped at 1000)',
+                VALUE_DEFAULT,
+                500
+            ),
+            'includecourses' => new external_value(
+                PARAM_BOOL,
+                'Include per-course last access (heavier; off by default)',
+                VALUE_DEFAULT,
+                false
+            ),
         ]);
     }
 
@@ -119,6 +138,8 @@ class get_user_activity extends external_api {
     }
 
     /**
+     * Return a page of login and last-access timestamps after a keyset cursor on (lastaccess, id).
+     *
      * @param array $userids        Restrict to these user ids.
      * @param int   $since          Exclusive lower bound on lastaccess.
      * @param int   $sinceid        Tie-break id within $since.
@@ -126,8 +147,13 @@ class get_user_activity extends external_api {
      * @param bool  $includecourses Include per-course last access.
      * @return array
      */
-    public static function execute(array $userids = [], int $since = 0, int $sinceid = 0,
-            int $limit = 500, bool $includecourses = false): array {
+    public static function execute(
+        array $userids = [],
+        int $since = 0,
+        int $sinceid = 0,
+        int $limit = 500,
+        bool $includecourses = false
+    ): array {
         global $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
@@ -233,13 +259,21 @@ class get_user_activity extends external_api {
         ];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'users' => new external_multiple_structure(
                 new external_single_structure([
                     'userid'       => new external_value(PARAM_INT, 'Moodle user id'),
                     'firstaccess'  => new external_value(PARAM_INT, 'First site access, 0 if never'),
-                    'lastaccess'   => new external_value(PARAM_INT, 'Last site access, 0 if never — NOT the same as academic activity'),
+                    'lastaccess'   => new external_value(
+                        PARAM_INT,
+                        'Last site access, 0 if never — NOT the same as academic activity'
+                    ),
                     'lastlogin'    => new external_value(PARAM_INT, 'Previous login, 0 if never'),
                     'currentlogin' => new external_value(PARAM_INT, 'Most recent login, 0 if never'),
                     'suspended'    => new external_value(PARAM_INT, '1 if the Moodle account is suspended'),
@@ -254,9 +288,9 @@ class get_user_activity extends external_api {
                 ]),
                 'Users, LEAST recently active first — ascending, so the cursor is resumable'
             ),
-            'count'         => new external_value(PARAM_INT,  'Users returned'),
-            'next_since'    => new external_value(PARAM_INT,  'Pass back as `since` on the next call'),
-            'next_since_id' => new external_value(PARAM_INT,  'Pass back as `since_id` on the next call'),
+            'count'         => new external_value(PARAM_INT, 'Users returned'),
+            'next_since'    => new external_value(PARAM_INT, 'Pass back as since on the next call'),
+            'next_since_id' => new external_value(PARAM_INT, 'Pass back as since_id on the next call'),
             'truncated'     => new external_value(PARAM_BOOL, 'True when more users remain beyond this page'),
         ]);
     }

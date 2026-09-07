@@ -1,0 +1,122 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_completionhistory/course_exam_config_list
+
+    The course exam configuration list: an add button, one row per configured
+    course with edit and delete controls, and a paging bar.
+
+    Delete is a POST form protected by sesskey; its submit button carries the
+    core/utility declarative confirmation attributes, so core shows a modal
+    before the form is submitted.
+
+    Context variables required for this template:
+    * addurl - URL of the add form.
+    * listurl - URL the delete forms post to.
+    * sesskey - Current session key.
+    * hasconfigs - Whether there are any rows.
+    * rows - Array of configured courses, each with courseid, coursename, shortname,
+      typelabel, typebadgeclass, programquiz, dcquiz, certquiz, attempts and editurl.
+    * deleteconfirm - Object with title, content and yes: JSON-encoded string
+      identifier arrays for the confirmation modal.
+    * pagingbar - Pre-rendered paging bar HTML.
+
+    Example context (json):
+    {
+        "addurl": "/local/completionhistory/course_exam_config.php?action=edit&courseid=0",
+        "listurl": "/local/completionhistory/course_exam_config.php",
+        "sesskey": "abc123",
+        "hasconfigs": true,
+        "rows": [
+            {
+                "courseid": 12,
+                "coursename": "Introduction to Business",
+                "shortname": "BUS101",
+                "typelabel": "Program course",
+                "typebadgeclass": "badge-primary",
+                "programquiz": "Final Exam",
+                "dcquiz": "—",
+                "certquiz": "—",
+                "attempts": "3 / 3 / ∞",
+                "editurl": "/local/completionhistory/course_exam_config.php?action=edit&courseid=12"
+            }
+        ],
+        "deleteconfirm": {
+            "title": "[\"delete\",\"core\"]",
+            "content": "[\"examconfig_confirmdelete\",\"local_completionhistory\"]",
+            "yes": "[\"delete\",\"core\"]"
+        },
+        "pagingbar": ""
+    }
+}}
+<div class="lch-exam-config-list">
+    <a href="{{addurl}}" class="btn btn-primary mb-3">
+        {{#pix}}t/add, core{{/pix}} {{#str}}examconfig_add, local_completionhistory{{/str}}
+    </a>
+
+    {{^hasconfigs}}
+        <div class="alert alert-info">{{#str}}examconfig_none, local_completionhistory{{/str}}</div>
+    {{/hasconfigs}}
+
+    {{#hasconfigs}}
+        <table class="table table-hover table-sm generaltable">
+            <thead>
+                <tr>
+                    <th scope="col">{{#str}}course, core{{/str}}</th>
+                    <th scope="col">{{#str}}col_courseshortname, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}col_examconfig_type, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}col_program_final_quiz, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}col_dc_quiz, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}col_cert_quiz, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}col_attempts_summary, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}actions, core{{/str}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#rows}}
+                    <tr>
+                        {{! Course and quiz names are format_string() output: already escaped and filtered. }}
+                        <td>{{{coursename}}}</td>
+                        <td>{{shortname}}</td>
+                        <td><span class="badge {{typebadgeclass}}">{{typelabel}}</span></td>
+                        <td>{{{programquiz}}}</td>
+                        <td>{{{dcquiz}}}</td>
+                        <td>{{{certquiz}}}</td>
+                        <td>{{attempts}}</td>
+                        <td class="lch-actions">
+                            <a href="{{editurl}}" class="btn btn-sm btn-outline-primary">{{#str}}edit, core{{/str}}</a>
+                            <form method="post" action="{{listurl}}" class="d-inline">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="courseid" value="{{courseid}}">
+                                <input type="hidden" name="sesskey" value="{{sesskey}}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        data-confirmation="modal"
+                                        data-confirmation-type="delete"
+                                        data-confirmation-title-str="{{deleteconfirm.title}}"
+                                        data-confirmation-content-str="{{deleteconfirm.content}}"
+                                        data-confirmation-yes-button-str="{{deleteconfirm.yes}}">
+                                    {{#str}}delete, core{{/str}}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {{/rows}}
+            </tbody>
+        </table>
+        {{{pagingbar}}}
+    {{/hasconfigs}}
+</div>

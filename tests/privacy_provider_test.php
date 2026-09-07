@@ -28,14 +28,20 @@ use local_completionhistory\privacy\provider;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\privacy\provider
  */
-class privacy_provider_test extends advanced_testcase {
-
+final class privacy_provider_test extends advanced_testcase {
+    /**
+     * Reset the site after each test.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
     }
 
+    /**
+     * A user with a ledger row is found in the system context.
+     */
     public function test_get_contexts_for_userid(): void {
         $user = $this->getDataGenerator()->create_user();
         $generator = $this->getDataGenerator()->get_plugin_generator('local_completionhistory');
@@ -45,6 +51,9 @@ class privacy_provider_test extends advanced_testcase {
         $this->assertNotEmpty($contextlist->get_contextids());
     }
 
+    /**
+     * Exporting a user's data writes something for the system context.
+     */
     public function test_export_user_data(): void {
         $user = $this->getDataGenerator()->create_user();
         $generator = $this->getDataGenerator()->get_plugin_generator('local_completionhistory');
@@ -91,6 +100,9 @@ class privacy_provider_test extends advanced_testcase {
         $this->assertEquals(0, $attempt->userid);
     }
 
+    /**
+     * Deleting a user's data anonymizes the ledger rows rather than removing them.
+     */
     public function test_delete_data_anonymizes(): void {
         global $DB;
 

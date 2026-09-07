@@ -47,26 +47,26 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class exam_attempt_service {
-
     /**
      * Record a single exam attempt.
      *
-     * @param int        $userid
-     * @param int        $courseid
-     * @param int|null   $quizid           Quiz instance ID (null if recorded manually).
-     * @param string     $exam_track       One of course_config_service::TRACK_* constants.
-     * @param int        $attempts_allowed Max attempts on this track (0 = unlimited).
-     * @param float|null $grade            Raw grade (0–100 scale or null).
-     * @param bool|null  $passed           True/false/null if no pass threshold.
-     * @param int        $timetaken        Unix timestamp when attempt was submitted.
+     * @param int        $userid          Learner's user id.
+     * @param int        $courseid        Course the exam belongs to.
+     * @param int|null   $quizid          Quiz instance ID (null if recorded manually).
+     * @param string     $examtrack       One of course_config_service::TRACK_* constants.
+     * @param int        $attemptsallowed Max attempts on this track (0 = unlimited).
+     * @param float|null $grade           Raw grade (0–100 scale or null).
+     * @param bool|null  $passed          True/false/null if no pass threshold.
+     * @param int        $timetaken       Unix timestamp when attempt was submitted.
+     * @param int|null   $duration        Attempt duration in seconds; null or negative is stored as null.
      * @return int New attempt record ID.
      */
     public static function record_attempt(
         int $userid,
         int $courseid,
         ?int $quizid,
-        string $exam_track,
-        int $attempts_allowed,
+        string $examtrack,
+        int $attemptsallowed,
         ?float $grade,
         ?bool $passed,
         int $timetaken,
@@ -75,15 +75,15 @@ class exam_attempt_service {
         global $DB;
 
         // Compute next attempt number for this user/course/track.
-        $attempt_number = self::count_attempts_on_track($userid, $courseid, $exam_track) + 1;
+        $attemptnumber = self::count_attempts_on_track($userid, $courseid, $examtrack) + 1;
 
         $record = new stdClass();
         $record->userid                  = $userid;
         $record->courseid                = $courseid;
         $record->quizid                  = $quizid;
-        $record->exam_track              = $exam_track;
-        $record->attempt_number          = $attempt_number;
-        $record->attempts_allowed        = $attempts_allowed;
+        $record->exam_track              = $examtrack;
+        $record->attempt_number          = $attemptnumber;
+        $record->attempts_allowed        = $attemptsallowed;
         $record->grade_decimal           = $grade !== null ? round($grade, 5) : null;
         $record->grade_passed            = $passed !== null ? ($passed ? 1 : 0) : null;
         $record->resulted_in_completion  = 0; // Updated later if course completes.
@@ -112,43 +112,43 @@ class exam_attempt_service {
     /**
      * Count attempts a user has made on a specific track for a course.
      *
-     * @param int    $userid
-     * @param int    $courseid
-     * @param string $exam_track
+     * @param int    $userid    Learner's user id.
+     * @param int    $courseid  Course the exam belongs to.
+     * @param string $examtrack Exam track to count attempts on.
      * @return int
      */
-    public static function count_attempts_on_track(int $userid, int $courseid, string $exam_track): int {
+    public static function count_attempts_on_track(int $userid, int $courseid, string $examtrack): int {
         global $DB;
 
         return (int) $DB->count_records('local_completionhistory_exam_attempt', [
             'userid'     => $userid,
             'courseid'   => $courseid,
-            'exam_track' => $exam_track,
+            'exam_track' => $examtrack,
         ]);
     }
 
     /**
      * Check whether a user has exhausted all allowed attempts on a track.
      *
-     * @param int    $userid
-     * @param int    $courseid
-     * @param string $exam_track
-     * @param int    $attempts_allowed 0 = unlimited (never exhausted).
+     * @param int    $userid          Learner's user id.
+     * @param int    $courseid        Course the exam belongs to.
+     * @param string $examtrack       Exam track to check.
+     * @param int    $attemptsallowed 0 = unlimited (never exhausted).
      * @return bool
      */
-    public static function has_exhausted_track(int $userid, int $courseid, string $exam_track, int $attempts_allowed): bool {
-        if ($attempts_allowed === 0) {
+    public static function has_exhausted_track(int $userid, int $courseid, string $examtrack, int $attemptsallowed): bool {
+        if ($attemptsallowed === 0) {
             return false; // Unlimited.
         }
-        return self::count_attempts_on_track($userid, $courseid, $exam_track) >= $attempts_allowed;
+        return self::count_attempts_on_track($userid, $courseid, $examtrack) >= $attemptsallowed;
     }
 
     /**
      * Get all attempt records for a user/course, ordered by track then attempt number.
      *
-     * @param int      $userid
-     * @param int      $courseid
-     * @param string[] $tracks Optional filter to specific tracks.
+     * @param int      $userid   Learner's user id.
+     * @param int      $courseid Course the exams belong to.
+     * @param string[] $tracks   Optional filter to specific tracks.
      * @return stdClass[]
      */
     public static function get_attempts(int $userid, int $courseid, array $tracks = []): array {
@@ -175,7 +175,7 @@ class exam_attempt_service {
      * Get attempt records for a specific achievement (the completing attempt
      * plus all prior attempts on the same user/course).
      *
-     * @param int $achievementid
+     * @param int $achievementid Achievement whose user/course attempts to return.
      * @return stdClass[]
      */
     public static function get_attempts_for_achievement(int $achievementid): array {
@@ -195,8 +195,8 @@ class exam_attempt_service {
      * Returns an array keyed by track name, each with:
      *   total, passed, failed, exhausted, attempts_allowed.
      *
-     * @param int $userid
-     * @param int $courseid
+     * @param int $userid   Learner's user id.
+     * @param int $courseid Course the exams belong to.
      * @return array
      */
     public static function summarise_by_track(int $userid, int $courseid): array {
@@ -220,7 +220,7 @@ class exam_attempt_service {
             $summary[$track]['total']++;
             if ($row->grade_passed === '1' || $row->grade_passed === 1) {
                 $summary[$track]['passed']++;
-            } elseif ($row->grade_passed === '0' || $row->grade_passed === 0) {
+            } else if ($row->grade_passed === '0' || $row->grade_passed === 0) {
                 $summary[$track]['failed']++;
             }
         }

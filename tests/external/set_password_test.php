@@ -24,6 +24,7 @@ use advanced_testcase;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\external\set_password
  */
 final class set_password_test extends advanced_testcase {
     /**

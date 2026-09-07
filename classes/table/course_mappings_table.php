@@ -19,6 +19,7 @@ namespace local_completionhistory\table;
 use table_sql;
 use html_writer;
 use moodle_url;
+use stdClass;
 
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/tablelib.php');
@@ -31,11 +32,10 @@ require_once($CFG->libdir . '/tablelib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class course_mappings_table extends table_sql {
-
     /**
      * Constructor.
      *
-     * @param string $uniqueid
+     * @param string $uniqueid Unique id for this table instance.
      */
     public function __construct(string $uniqueid) {
         parent::__construct($uniqueid);
@@ -56,7 +56,7 @@ class course_mappings_table extends table_sql {
             get_string('col_active', 'local_completionhistory'),
             get_string('col_note', 'local_completionhistory'),
             get_string('col_captured', 'local_completionhistory'),
-            '',
+            get_string('actions'),
         ]);
         $this->no_sorting('actions');
         $this->sortable(true, 'timecreated', SORT_DESC);
@@ -64,30 +64,46 @@ class course_mappings_table extends table_sql {
 
     /**
      * Format the old course name column.
+     *
+     * @param stdClass $row Mapping record.
+     * @return string HTML.
      */
-    public function col_oldcoursename_snapshot($row): string {
-        $name = format_string($row->oldcoursename_snapshot);
-        if (!empty($row->oldcourseidnumber_snapshot)) {
-            $name .= ' ' . html_writer::tag('small', '(' . s($row->oldcourseidnumber_snapshot) . ')', ['class' => 'text-muted']);
-        }
-        return $name;
+    public function col_oldcoursename_snapshot(stdClass $row): string {
+        return $this->format_course_snapshot($row->oldcoursename_snapshot, $row->oldcourseidnumber_snapshot);
     }
 
     /**
      * Format the new course name column.
+     *
+     * @param stdClass $row Mapping record.
+     * @return string HTML.
      */
-    public function col_newcoursename_snapshot($row): string {
-        $name = format_string($row->newcoursename_snapshot);
-        if (!empty($row->newcourseidnumber_snapshot)) {
-            $name .= ' ' . html_writer::tag('small', '(' . s($row->newcourseidnumber_snapshot) . ')', ['class' => 'text-muted']);
+    public function col_newcoursename_snapshot(stdClass $row): string {
+        return $this->format_course_snapshot($row->newcoursename_snapshot, $row->newcourseidnumber_snapshot);
+    }
+
+    /**
+     * Course name with its ID number, as captured when the mapping was saved.
+     *
+     * @param string|null $name     Course full name snapshot.
+     * @param string|null $idnumber Course ID number snapshot.
+     * @return string HTML.
+     */
+    private function format_course_snapshot(?string $name, ?string $idnumber): string {
+        $html = format_string((string) $name);
+        if (!empty($idnumber)) {
+            $html .= ' ' . html_writer::tag('small', '(' . s($idnumber) . ')', ['class' => 'text-muted']);
         }
-        return $name;
+        return $html;
     }
 
     /**
      * Format the migration rule column.
+     *
+     * @param stdClass $row Mapping record.
+     * @return string Localised rule name.
      */
-    public function col_migrationrule($row): string {
+    public function col_migrationrule(stdClass $row): string {
         $key = 'migrationrule_' . $row->migrationrule;
         if (get_string_manager()->string_exists($key, 'local_completionhistory')) {
             return get_string($key, 'local_completionhistory');
@@ -97,15 +113,21 @@ class course_mappings_table extends table_sql {
 
     /**
      * Format the active column.
+     *
+     * @param stdClass $row Mapping record.
+     * @return string Yes or no.
      */
-    public function col_active($row): string {
+    public function col_active(stdClass $row): string {
         return $row->active ? get_string('yes') : get_string('no');
     }
 
     /**
      * Format the note column.
+     *
+     * @param stdClass $row Mapping record.
+     * @return string HTML.
      */
-    public function col_note($row): string {
+    public function col_note(stdClass $row): string {
         if (empty($row->note)) {
             return '-';
         }
@@ -114,23 +136,31 @@ class course_mappings_table extends table_sql {
 
     /**
      * Format the created time column.
+     *
+     * @param stdClass $row Mapping record.
+     * @return string Formatted date.
      */
-    public function col_timecreated($row): string {
+    public function col_timecreated(stdClass $row): string {
         return userdate($row->timecreated, get_string('strftimedatetimeshort', 'langconfig'));
     }
 
     /**
-     * Format the actions column.
+     * Format the actions column: an edit link and a sesskey-protected delete form.
+     *
+     * The delete button uses core/utility's declarative confirmation
+     * (data-confirmation="modal"), which core initialises on every page.
+     *
+     * @param stdClass $row Mapping record.
+     * @return string HTML.
      */
-    public function col_actions($row): string {
+    public function col_actions(stdClass $row): string {
         $editurl = new moodle_url('/local/completionhistory/course_mappings.php', [
             'action' => 'edit',
             'id' => $row->id,
         ]);
-        $deleteurl = new moodle_url('/local/completionhistory/course_mappings.php', [
-        ]);
+        $deleteurl = new moodle_url('/local/completionhistory/course_mappings.php');
 
-        $actions = html_writer::link($editurl, get_string('edit'), ['class' => 'btn btn-sm btn-secondary mr-1']);
+        $actions = html_writer::link($editurl, get_string('edit'), ['class' => 'btn btn-sm btn-secondary']);
         $actions .= html_writer::start_tag('form', [
             'method' => 'post',
             'action' => $deleteurl->out(false),
@@ -148,11 +178,13 @@ class course_mappings_table extends table_sql {
         $actions .= html_writer::tag('button', get_string('delete'), [
             'type' => 'submit',
             'class' => 'btn btn-sm btn-danger',
-            'onclick' => 'return confirm(' . json_encode(
-                get_string('confirmdeletemapping', 'local_completionhistory')
-            ) . ');',
+            'data-confirmation' => 'modal',
+            'data-confirmation-type' => 'delete',
+            'data-confirmation-title-str' => json_encode(['deletemapping', 'local_completionhistory']),
+            'data-confirmation-content-str' => json_encode(['confirmdeletemapping', 'local_completionhistory']),
+            'data-confirmation-yes-button-str' => json_encode(['delete', 'core']),
         ]);
         $actions .= html_writer::end_tag('form');
-        return $actions;
+        return html_writer::div($actions, 'lch-actions');
     }
 }

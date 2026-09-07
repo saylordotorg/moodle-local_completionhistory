@@ -44,25 +44,31 @@ $USER = get_admin();
 cli_writeln('=== MBA Program Data Seeder ===');
 cli_writeln('');
 
-// ─── 1. Course definitions ───────────────────────────────────────────
+// 1. Course definitions ───────────────────────────────────────────
 
-$premba_course_defs = [
-    ['shortname' => 'BUS110', 'fullname' => 'Business Communication',    'idnumber' => 'BUS110'],
-    ['shortname' => 'ACC201', 'fullname' => 'Financial Accounting',       'idnumber' => 'ACC201'],
-    ['shortname' => 'STAT200', 'fullname' => 'Business Statistics',       'idnumber' => 'STAT200'],
-    ['shortname' => 'ECON101', 'fullname' => 'Principles of Economics',   'idnumber' => 'ECON101'],
+$prembacoursedefs = [
+    ['shortname' => 'BUS110', 'fullname' => 'Business Communication', 'idnumber' => 'BUS110'],
+    ['shortname' => 'ACC201', 'fullname' => 'Financial Accounting', 'idnumber' => 'ACC201'],
+    ['shortname' => 'STAT200', 'fullname' => 'Business Statistics', 'idnumber' => 'STAT200'],
+    ['shortname' => 'ECON101', 'fullname' => 'Principles of Economics', 'idnumber' => 'ECON101'],
 ];
 
-$mba_course_defs = [
-    ['shortname' => 'MBA510', 'fullname' => 'Marketing Management',       'idnumber' => 'MBA510'],
-    ['shortname' => 'MBA520', 'fullname' => 'Organizational Behavior',    'idnumber' => 'MBA520'],
-    ['shortname' => 'MBA530', 'fullname' => 'Corporate Finance',          'idnumber' => 'MBA530'],
-    ['shortname' => 'MBA540', 'fullname' => 'Strategic Management',       'idnumber' => 'MBA540'],
-    ['shortname' => 'MBA550', 'fullname' => 'Operations Management',      'idnumber' => 'MBA550'],
+$mbacoursedefs = [
+    ['shortname' => 'MBA510', 'fullname' => 'Marketing Management', 'idnumber' => 'MBA510'],
+    ['shortname' => 'MBA520', 'fullname' => 'Organizational Behavior', 'idnumber' => 'MBA520'],
+    ['shortname' => 'MBA530', 'fullname' => 'Corporate Finance', 'idnumber' => 'MBA530'],
+    ['shortname' => 'MBA540', 'fullname' => 'Strategic Management', 'idnumber' => 'MBA540'],
+    ['shortname' => 'MBA550', 'fullname' => 'Operations Management', 'idnumber' => 'MBA550'],
 ];
 
-// ─── 2. Create courses ───────────────────────────────────────────────
+// 2. Create courses ───────────────────────────────────────────────
 
+/**
+ * Create a course from a seed definition, or return the existing one with that shortname.
+ *
+ * @param array $def Course definition with shortname, fullname and idnumber keys.
+ * @return object The course record.
+ */
 function seed_create_course(array $def): object {
     global $DB;
     $existing = $DB->get_record('course', ['shortname' => $def['shortname']]);
@@ -84,18 +90,18 @@ function seed_create_course(array $def): object {
 }
 
 cli_writeln('Creating Pre-MBA courses...');
-$premba_courses = [];
-foreach ($premba_course_defs as $def) {
-    $premba_courses[] = seed_create_course($def);
+$prembacourses = [];
+foreach ($prembacoursedefs as $def) {
+    $prembacourses[] = seed_create_course($def);
 }
 
 cli_writeln('Creating MBA courses...');
-$mba_courses = [];
-foreach ($mba_course_defs as $def) {
-    $mba_courses[] = seed_create_course($def);
+$mbacourses = [];
+foreach ($mbacoursedefs as $def) {
+    $mbacourses[] = seed_create_course($def);
 }
 
-// ─── 3. Create programs ──────────────────────────────────────────────
+// 3. Create programs ──────────────────────────────────────────────
 
 cli_writeln('');
 cli_writeln('Creating programs...');
@@ -103,9 +109,9 @@ cli_writeln('Creating programs...');
 $syscontext = context_system::instance();
 
 // Pre-MBA program.
-$premba_program = $DB->get_record('enrol_programs_programs', ['idnumber' => 'PREMBA']);
-if (!$premba_program) {
-    $premba_program = program::add_program((object) [
+$prembaprogram = $DB->get_record('enrol_programs_programs', ['idnumber' => 'PREMBA']);
+if (!$prembaprogram) {
+    $prembaprogram = program::add_program((object) [
         'fullname'  => 'Pre-MBA Prerequisites',
         'idnumber'  => 'PREMBA',
         'contextid' => $syscontext->id,
@@ -114,42 +120,50 @@ if (!$premba_program) {
         'public'    => 1,
         'archived'  => 0,
     ]);
-    cli_writeln("  Created Pre-MBA program (id {$premba_program->id})");
+    cli_writeln("  Created Pre-MBA program (id {$prembaprogram->id})");
 } else {
-    cli_writeln("  Pre-MBA program already exists (id {$premba_program->id})");
+    cli_writeln("  Pre-MBA program already exists (id {$prembaprogram->id})");
 }
 
 // MBA program.
-$mba_program = $DB->get_record('enrol_programs_programs', ['idnumber' => 'MBA']);
-if (!$mba_program) {
-    $mba_program = program::add_program((object) [
+$mbaprogram = $DB->get_record('enrol_programs_programs', ['idnumber' => 'MBA']);
+if (!$mbaprogram) {
+    $mbaprogram = program::add_program((object) [
         'fullname'  => 'Master of Business Administration',
         'idnumber'  => 'MBA',
         'contextid' => $syscontext->id,
-        'description' => 'The MBA program builds on Pre-MBA prerequisites with advanced business courses. Completion of Pre-MBA is required for admission.',
+        'description' => 'The MBA program builds on Pre-MBA prerequisites with advanced business courses. '
+            . 'Completion of Pre-MBA is required for admission.',
         'descriptionformat' => FORMAT_PLAIN,
         'public'    => 1,
         'archived'  => 0,
     ]);
-    cli_writeln("  Created MBA program (id {$mba_program->id})");
+    cli_writeln("  Created MBA program (id {$mbaprogram->id})");
 } else {
-    cli_writeln("  MBA program already exists (id {$mba_program->id})");
+    cli_writeln("  MBA program already exists (id {$mbaprogram->id})");
 }
 
-// ─── 4. Add courses to programs ──────────────────────────────────────
+// 4. Add courses to programs ──────────────────────────────────────
 
 cli_writeln('');
 cli_writeln('Adding courses to programs...');
 
+/**
+ * Append courses to a program as an "all in order" set, skipping any already present.
+ *
+ * @param object $program The enrol_programs program record.
+ * @param array $courses Course records to add.
+ * @param string $label Program label used in progress output.
+ */
 function seed_add_courses_to_program(object $program, array $courses, string $label): void {
     global $DB;
 
     // Check if courses are already added.
-    $existing_items = $DB->get_records('enrol_programs_items', ['programid' => $program->id]);
-    $existing_courseids = [];
-    foreach ($existing_items as $item) {
+    $existingitems = $DB->get_records('enrol_programs_items', ['programid' => $program->id]);
+    $existingcourseids = [];
+    foreach ($existingitems as $item) {
         if ($item->courseid) {
-            $existing_courseids[] = (int) $item->courseid;
+            $existingcourseids[] = (int) $item->courseid;
         }
     }
 
@@ -159,7 +173,7 @@ function seed_add_courses_to_program(object $program, array $courses, string $la
     $top->update_set($top, ['sequencetype' => 'allinorder']);
 
     foreach ($courses as $course) {
-        if (in_array((int) $course->id, $existing_courseids)) {
+        if (in_array((int) $course->id, $existingcourseids)) {
             cli_writeln("  {$label}: {$course->shortname} already in program");
             continue;
         }
@@ -168,14 +182,20 @@ function seed_add_courses_to_program(object $program, array $courses, string $la
     }
 }
 
-seed_add_courses_to_program($premba_program, $premba_courses, 'Pre-MBA');
-seed_add_courses_to_program($mba_program, $mba_courses, 'MBA');
+seed_add_courses_to_program($prembaprogram, $prembacourses, 'Pre-MBA');
+seed_add_courses_to_program($mbaprogram, $mbacourses, 'MBA');
 
-// ─── 5. Create manual allocation sources ─────────────────────────────
+// 5. Create manual allocation sources ─────────────────────────────
 
 cli_writeln('');
 cli_writeln('Setting up allocation sources...');
 
+/**
+ * Return the manual allocation source for a program, creating it if absent.
+ *
+ * @param object $program The enrol_programs program record.
+ * @return object The enrol_programs_sources record.
+ */
 function seed_get_or_create_manual_source(object $program): object {
     global $DB;
     $source = $DB->get_record('enrol_programs_sources', [
@@ -196,39 +216,39 @@ function seed_get_or_create_manual_source(object $program): object {
     return $source;
 }
 
-$premba_source = seed_get_or_create_manual_source($premba_program);
-$mba_source = seed_get_or_create_manual_source($mba_program);
+$prembasource = seed_get_or_create_manual_source($prembaprogram);
+$mbasource = seed_get_or_create_manual_source($mbaprogram);
 
-// ─── 6. Create 15 students ──────────────────────────────────────────
+// 6. Create 15 students ──────────────────────────────────────────
 
 cli_writeln('');
 cli_writeln('Creating students...');
 
-$student_defs = [
-    // Group 1: Failed/dropped Pre-MBA (never enter MBA)
-    ['username' => 'nathan.price',      'firstname' => 'Nathan',    'lastname' => 'Price'],
-    ['username' => 'olivia.foster',     'firstname' => 'Olivia',    'lastname' => 'Foster'],
-    ['username' => 'marcus.chen',       'firstname' => 'Marcus',    'lastname' => 'Chen'],
-    // Group 2: In progress Pre-MBA (partially complete, never enter MBA)
-    ['username' => 'sophia.rivera',     'firstname' => 'Sophia',    'lastname' => 'Rivera'],
-    ['username' => 'liam.patel',        'firstname' => 'Liam',      'lastname' => 'Patel'],
-    ['username' => 'ava.nakamura',      'firstname' => 'Ava',       'lastname' => 'Nakamura'],
-    // Group 3: Completed Pre-MBA, MBA in progress
-    ['username' => 'ethan.brooks',      'firstname' => 'Ethan',     'lastname' => 'Brooks'],
-    ['username' => 'maya.washington',    'firstname' => 'Maya',      'lastname' => 'Washington'],
-    ['username' => 'lucas.hernandez',   'firstname' => 'Lucas',     'lastname' => 'Hernandez'],
-    // Group 4: Completed Pre-MBA, failed/dropped MBA
-    ['username' => 'zara.mitchell',     'firstname' => 'Zara',      'lastname' => 'Mitchell'],
-    ['username' => 'ryan.oconnor',      'firstname' => 'Ryan',      'lastname' => "O'Connor"],
-    ['username' => 'priya.sharma',      'firstname' => 'Priya',     'lastname' => 'Sharma'],
-    // Group 5: Graduated from both (completed Pre-MBA + MBA)
-    ['username' => 'daniel.kim',        'firstname' => 'Daniel',    'lastname' => 'Kim'],
-    ['username' => 'emma.johansson',    'firstname' => 'Emma',      'lastname' => 'Johansson'],
-    ['username' => 'carlos.mendez',     'firstname' => 'Carlos',    'lastname' => 'Mendez'],
+$studentdefs = [
+    // Group 1: Failed/dropped Pre-MBA (never enter MBA).
+    ['username' => 'nathan.price', 'firstname' => 'Nathan', 'lastname' => 'Price'],
+    ['username' => 'olivia.foster', 'firstname' => 'Olivia', 'lastname' => 'Foster'],
+    ['username' => 'marcus.chen', 'firstname' => 'Marcus', 'lastname' => 'Chen'],
+    // Group 2: In progress Pre-MBA (partially complete, never enter MBA).
+    ['username' => 'sophia.rivera', 'firstname' => 'Sophia', 'lastname' => 'Rivera'],
+    ['username' => 'liam.patel', 'firstname' => 'Liam', 'lastname' => 'Patel'],
+    ['username' => 'ava.nakamura', 'firstname' => 'Ava', 'lastname' => 'Nakamura'],
+    // Group 3: Completed Pre-MBA, MBA in progress.
+    ['username' => 'ethan.brooks', 'firstname' => 'Ethan', 'lastname' => 'Brooks'],
+    ['username' => 'maya.washington', 'firstname' => 'Maya', 'lastname' => 'Washington'],
+    ['username' => 'lucas.hernandez', 'firstname' => 'Lucas', 'lastname' => 'Hernandez'],
+    // Group 4: Completed Pre-MBA, failed/dropped MBA.
+    ['username' => 'zara.mitchell', 'firstname' => 'Zara', 'lastname' => 'Mitchell'],
+    ['username' => 'ryan.oconnor', 'firstname' => 'Ryan', 'lastname' => "O'Connor"],
+    ['username' => 'priya.sharma', 'firstname' => 'Priya', 'lastname' => 'Sharma'],
+    // Group 5: Graduated from both (completed Pre-MBA + MBA).
+    ['username' => 'daniel.kim', 'firstname' => 'Daniel', 'lastname' => 'Kim'],
+    ['username' => 'emma.johansson', 'firstname' => 'Emma', 'lastname' => 'Johansson'],
+    ['username' => 'carlos.mendez', 'firstname' => 'Carlos', 'lastname' => 'Mendez'],
 ];
 
 $students = [];
-foreach ($student_defs as $def) {
+foreach ($studentdefs as $def) {
     $existing = $DB->get_record('user', ['username' => $def['username']]);
     if ($existing) {
         cli_writeln("  {$def['username']} already exists (id {$existing->id})");
@@ -249,7 +269,7 @@ foreach ($student_defs as $def) {
     $students[] = $user;
 }
 
-// ─── 7. Student completion profiles ──────────────────────────────────
+// 7. Student completion profiles ──────────────────────────────────
 //
 // Each profile: [premba_completions => [course_index => grade], mba_completions => [...] | null]
 // null mba_completions = not allocated to MBA.
@@ -257,114 +277,118 @@ foreach ($student_defs as $def) {
 //
 // Timestamps: Pre-MBA period Oct 2024 – Mar 2025, MBA period Apr 2025 – Feb 2026.
 
-$ts_premba_base = [
-    strtotime('2024-11-15'), // BUS110
-    strtotime('2025-01-10'), // ACC201
-    strtotime('2025-02-15'), // STAT200
-    strtotime('2025-03-20'), // ECON101
+$tsprembabase = [
+    strtotime('2024-11-15'), // BUS110.
+    strtotime('2025-01-10'), // ACC201.
+    strtotime('2025-02-15'), // STAT200.
+    strtotime('2025-03-20'), // ECON101.
 ];
 
-$ts_mba_base = [
-    strtotime('2025-06-01'), // MBA510
-    strtotime('2025-08-01'), // MBA520
-    strtotime('2025-10-01'), // MBA530
-    strtotime('2025-12-01'), // MBA540
-    strtotime('2026-02-01'), // MBA550
+$tsmbabase = [
+    strtotime('2025-06-01'), // MBA510.
+    strtotime('2025-08-01'), // MBA520.
+    strtotime('2025-10-01'), // MBA530.
+    strtotime('2025-12-01'), // MBA540.
+    strtotime('2026-02-01'), // MBA550.
 ];
 
 // Per-student day offsets for variety.
 $day = 86400;
-$student_offsets = [0, 3, -2, 5, -4, 7, 1, -3, 6, -1, 4, -5, 2, -6, 3];
+$studentoffsets = [0, 3, -2, 5, -4, 7, 1, -3, 6, -1, 4, -5, 2, -6, 3];
 
 $profiles = [
-    // Group 1: Failed/dropped Pre-MBA
-    // Nathan: completed BUS110 only
-    0  => ['premba' => [0 => 72],                             'mba' => null],
-    // Olivia: completed BUS110 and STAT200 (skipped ACC201)
-    1  => ['premba' => [0 => 68, 2 => 75],                    'mba' => null],
-    // Marcus: completed 3 of 4 (BUS110, ACC201, STAT200), stuck on ECON101
-    2  => ['premba' => [0 => 81, 1 => 65, 2 => 70],           'mba' => null],
+    // Group 1: Failed/dropped Pre-MBA.
+    // Nathan: completed BUS110 only.
+    0  => ['premba' => [0 => 72], 'mba' => null],
+    // Olivia: completed BUS110 and STAT200 (skipped ACC201).
+    1  => ['premba' => [0 => 68, 2 => 75], 'mba' => null],
+    // Marcus: completed 3 of 4 (BUS110, ACC201, STAT200), stuck on ECON101.
+    2  => ['premba' => [0 => 81, 1 => 65, 2 => 70], 'mba' => null],
 
-    // Group 2: In progress Pre-MBA
-    // Sophia: completed BUS110 and ACC201
-    3  => ['premba' => [0 => 78, 1 => 71],                    'mba' => null],
-    // Liam: completed BUS110, ACC201, STAT200
-    4  => ['premba' => [0 => 85, 1 => 77, 2 => 82],           'mba' => null],
-    // Ava: completed BUS110 only (just started)
-    5  => ['premba' => [0 => 69],                             'mba' => null],
+    // Group 2: In progress Pre-MBA.
+    // Sophia: completed BUS110 and ACC201.
+    3  => ['premba' => [0 => 78, 1 => 71], 'mba' => null],
+    // Liam: completed BUS110, ACC201, STAT200.
+    4  => ['premba' => [0 => 85, 1 => 77, 2 => 82], 'mba' => null],
+    // Ava: completed BUS110 only (just started).
+    5  => ['premba' => [0 => 69], 'mba' => null],
 
-    // Group 3: Completed Pre-MBA, MBA in progress
-    // Ethan: all Pre-MBA done, MBA510 done
+    // Group 3: Completed Pre-MBA, MBA in progress.
+    // Ethan: all Pre-MBA done, MBA510 done.
     6  => ['premba' => [0 => 78, 1 => 76, 2 => 80, 3 => 79], 'mba' => [0 => 74]],
-    // Maya: all Pre-MBA done, MBA510-530 done
+    // Maya: all Pre-MBA done, MBA510-530 done.
     7  => ['premba' => [0 => 85, 1 => 80, 2 => 78, 3 => 84], 'mba' => [0 => 80, 1 => 76, 2 => 72]],
-    // Lucas: all Pre-MBA done, MBA510-520 done
+    // Lucas: all Pre-MBA done, MBA510-520 done.
     8  => ['premba' => [0 => 72, 1 => 74, 2 => 76, 3 => 78], 'mba' => [0 => 71, 1 => 68]],
 
-    // Group 4: Completed Pre-MBA, failed/dropped MBA
-    // Zara: all Pre-MBA done, MBA510-520 done then dropped
+    // Group 4: Completed Pre-MBA, failed/dropped MBA.
+    // Zara: all Pre-MBA done, MBA510-520 done then dropped.
     9  => ['premba' => [0 => 82, 1 => 79, 2 => 81, 3 => 77], 'mba' => [0 => 77, 1 => 73]],
-    // Ryan: all Pre-MBA done, MBA510 only then dropped
+    // Ryan: all Pre-MBA done, MBA510 only then dropped.
     10 => ['premba' => [0 => 70, 1 => 72, 2 => 74, 3 => 76], 'mba' => [0 => 65]],
-    // Priya: all Pre-MBA done, MBA510-530 done then dropped
+    // Priya: all Pre-MBA done, MBA510-530 done then dropped.
     11 => ['premba' => [0 => 80, 1 => 78, 2 => 76, 3 => 82], 'mba' => [0 => 82, 1 => 78, 2 => 70]],
 
-    // Group 5: Graduated from both
-    // Daniel: high achiever
+    // Group 5: Graduated from both.
+    // Daniel: high achiever.
     12 => ['premba' => [0 => 90, 1 => 88, 2 => 86, 3 => 89], 'mba' => [0 => 92, 1 => 88, 2 => 85, 3 => 87, 4 => 90]],
-    // Emma: solid performer
+    // Emma: solid performer.
     13 => ['premba' => [0 => 84, 1 => 82, 2 => 80, 3 => 85], 'mba' => [0 => 81, 1 => 79, 2 => 83, 3 => 80, 4 => 82]],
-    // Carlos: passed with moderate grades
+    // Carlos: passed with moderate grades.
     14 => ['premba' => [0 => 75, 1 => 74, 2 => 78, 3 => 77], 'mba' => [0 => 72, 1 => 70, 2 => 74, 3 => 71, 4 => 73]],
 ];
 
-// ─── 8. Allocate students to programs ────────────────────────────────
+// 8. Allocate students to programs ────────────────────────────────
 
 cli_writeln('');
 cli_writeln('Allocating students to programs...');
 
 // All 15 go into Pre-MBA.
-$premba_userids = array_map(fn($s) => (int) $s->id, $students);
-$already_allocated = $DB->get_fieldset_select(
-    'enrol_programs_allocations', 'userid',
-    'programid = :pid', ['pid' => $premba_program->id]
+$prembauserids = array_map(fn($s) => (int) $s->id, $students);
+$alreadyallocated = $DB->get_fieldset_select(
+    'enrol_programs_allocations',
+    'userid',
+    'programid = :pid',
+    ['pid' => $prembaprogram->id]
 );
-$new_premba = array_diff($premba_userids, $already_allocated);
-if (!empty($new_premba)) {
+$newpremba = array_diff($prembauserids, $alreadyallocated);
+if (!empty($newpremba)) {
     manual::allocate_users(
-        (int) $premba_program->id,
-        (int) $premba_source->id,
-        array_values($new_premba),
+        (int) $prembaprogram->id,
+        (int) $prembasource->id,
+        array_values($newpremba),
         ['timestart' => strtotime('2024-10-01')]
     );
-    cli_writeln("  Allocated " . count($new_premba) . " students to Pre-MBA");
+    cli_writeln("  Allocated " . count($newpremba) . " students to Pre-MBA");
 } else {
     cli_writeln("  All students already allocated to Pre-MBA");
 }
 
 // Students 7-15 (indices 6-14) go into MBA.
-$mba_userids = [];
+$mbauserids = [];
 for ($i = 6; $i <= 14; $i++) {
-    $mba_userids[] = (int) $students[$i]->id;
+    $mbauserids[] = (int) $students[$i]->id;
 }
-$already_mba = $DB->get_fieldset_select(
-    'enrol_programs_allocations', 'userid',
-    'programid = :pid', ['pid' => $mba_program->id]
+$alreadymba = $DB->get_fieldset_select(
+    'enrol_programs_allocations',
+    'userid',
+    'programid = :pid',
+    ['pid' => $mbaprogram->id]
 );
-$new_mba = array_diff($mba_userids, $already_mba);
-if (!empty($new_mba)) {
+$newmba = array_diff($mbauserids, $alreadymba);
+if (!empty($newmba)) {
     manual::allocate_users(
-        (int) $mba_program->id,
-        (int) $mba_source->id,
-        array_values($new_mba),
+        (int) $mbaprogram->id,
+        (int) $mbasource->id,
+        array_values($newmba),
         ['timestart' => strtotime('2025-04-01')]
     );
-    cli_writeln("  Allocated " . count($new_mba) . " students to MBA");
+    cli_writeln("  Allocated " . count($newmba) . " students to MBA");
 } else {
     cli_writeln("  All MBA students already allocated");
 }
 
-// ─── 9. Ensure manual enrolment in courses ───────────────────────────
+// 9. Ensure manual enrolment in courses ───────────────────────────
 
 cli_writeln('');
 cli_writeln('Enrolling students in courses...');
@@ -372,6 +396,13 @@ cli_writeln('Enrolling students in courses...');
 $manualenrol = enrol_get_plugin('manual');
 $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
 
+/**
+ * Manually enrol a user in a course as a student unless already enrolled.
+ *
+ * @param object $course The course record.
+ * @param int $userid The user to enrol.
+ * @param int $timestart Enrolment start timestamp.
+ */
 function seed_ensure_enrolled(object $course, int $userid, int $timestart): void {
     global $DB, $manualenrol, $studentroleid;
 
@@ -394,14 +425,14 @@ foreach ($profiles as $si => $profile) {
     $userid = (int) $students[$si]->id;
 
     // Enrol in all Pre-MBA courses (they were allocated to the program).
-    foreach ($premba_courses as $ci => $course) {
+    foreach ($prembacourses as $ci => $course) {
         seed_ensure_enrolled($course, $userid, strtotime('2024-10-01'));
         $enrolcount++;
     }
 
     // Enrol in MBA courses if allocated.
     if ($profile['mba'] !== null) {
-        foreach ($mba_courses as $ci => $course) {
+        foreach ($mbacourses as $ci => $course) {
             seed_ensure_enrolled($course, $userid, strtotime('2025-04-01'));
             $enrolcount++;
         }
@@ -409,7 +440,7 @@ foreach ($profiles as $si => $profile) {
 }
 cli_writeln("  Processed {$enrolcount} enrolment checks");
 
-// ─── 10. Set course completions and grades ───────────────────────────
+// 10. Set course completions and grades ───────────────────────────
 
 cli_writeln('');
 cli_writeln('Setting course completions and grades...');
@@ -419,19 +450,19 @@ $gradecount = 0;
 
 foreach ($profiles as $si => $profile) {
     $userid = (int) $students[$si]->id;
-    $offset = $student_offsets[$si] * $day;
+    $offset = $studentoffsets[$si] * $day;
 
     // Pre-MBA completions.
     foreach ($profile['premba'] as $ci => $grade) {
-        $course = $premba_courses[$ci];
-        $timecompleted = $ts_premba_base[$ci] + $offset;
+        $course = $prembacourses[$ci];
+        $timecompleted = $tsprembabase[$ci] + $offset;
 
         // Insert course_completions if not exists.
-        $existing_cc = $DB->get_record('course_completions', [
+        $existingcc = $DB->get_record('course_completions', [
             'userid' => $userid,
             'course' => $course->id,
         ]);
-        if (!$existing_cc) {
+        if (!$existingcc) {
             $cc = new stdClass();
             $cc->userid = $userid;
             $cc->course = $course->id;
@@ -458,14 +489,14 @@ foreach ($profiles as $si => $profile) {
     // MBA completions.
     if ($profile['mba'] !== null) {
         foreach ($profile['mba'] as $ci => $grade) {
-            $course = $mba_courses[$ci];
-            $timecompleted = $ts_mba_base[$ci] + $offset;
+            $course = $mbacourses[$ci];
+            $timecompleted = $tsmbabase[$ci] + $offset;
 
-            $existing_cc = $DB->get_record('course_completions', [
+            $existingcc = $DB->get_record('course_completions', [
                 'userid' => $userid,
                 'course' => $course->id,
             ]);
-            if (!$existing_cc) {
+            if (!$existingcc) {
                 $cc = new stdClass();
                 $cc->userid = $userid;
                 $cc->course = $course->id;
@@ -493,7 +524,7 @@ foreach ($profiles as $si => $profile) {
 cli_writeln("  Inserted {$completioncount} course completions");
 cli_writeln("  Set {$gradecount} grades");
 
-// ─── 11. Mark program item completions ───────────────────────────────
+// 11. Mark program item completions ───────────────────────────────
 
 cli_writeln('');
 cli_writeln('Marking program item completions...');
@@ -501,47 +532,47 @@ cli_writeln('Marking program item completions...');
 $progcompcount = 0;
 
 // Build item maps: courseid -> item record for each program.
-$premba_items = $DB->get_records('enrol_programs_items', ['programid' => $premba_program->id]);
-$premba_course_items = [];
-$premba_topitem = null;
-foreach ($premba_items as $item) {
+$prembaitems = $DB->get_records('enrol_programs_items', ['programid' => $prembaprogram->id]);
+$prembacourseitems = [];
+$prembatopitem = null;
+foreach ($prembaitems as $item) {
     if ($item->topitem) {
-        $premba_topitem = $item;
-    } elseif ($item->courseid) {
-        $premba_course_items[(int) $item->courseid] = $item;
+        $prembatopitem = $item;
+    } else if ($item->courseid) {
+        $prembacourseitems[(int) $item->courseid] = $item;
     }
 }
 
-$mba_items = $DB->get_records('enrol_programs_items', ['programid' => $mba_program->id]);
-$mba_course_items = [];
-$mba_topitem = null;
-foreach ($mba_items as $item) {
+$mbaitems = $DB->get_records('enrol_programs_items', ['programid' => $mbaprogram->id]);
+$mbacourseitems = [];
+$mbatopitem = null;
+foreach ($mbaitems as $item) {
     if ($item->topitem) {
-        $mba_topitem = $item;
-    } elseif ($item->courseid) {
-        $mba_course_items[(int) $item->courseid] = $item;
+        $mbatopitem = $item;
+    } else if ($item->courseid) {
+        $mbacourseitems[(int) $item->courseid] = $item;
     }
 }
 
 foreach ($profiles as $si => $profile) {
     $userid = (int) $students[$si]->id;
-    $offset = $student_offsets[$si] * $day;
+    $offset = $studentoffsets[$si] * $day;
 
     // Pre-MBA program item completions.
-    $premba_alloc = $DB->get_record('enrol_programs_allocations', [
-        'programid' => $premba_program->id,
+    $prembaalloc = $DB->get_record('enrol_programs_allocations', [
+        'programid' => $prembaprogram->id,
         'userid'    => $userid,
     ]);
-    if (!$premba_alloc) {
+    if (!$prembaalloc) {
         cli_writeln("  WARNING: No Pre-MBA allocation for {$students[$si]->username}");
         continue;
     }
 
-    $last_premba_time = 0;
+    $lastprembatime = 0;
     foreach ($profile['premba'] as $ci => $grade) {
-        $course = $premba_courses[$ci];
-        $timecompleted = $ts_premba_base[$ci] + $offset;
-        $item = $premba_course_items[(int) $course->id] ?? null;
+        $course = $prembacourses[$ci];
+        $timecompleted = $tsprembabase[$ci] + $offset;
+        $item = $prembacourseitems[(int) $course->id] ?? null;
         if (!$item) {
             continue;
         }
@@ -549,37 +580,41 @@ foreach ($profiles as $si => $profile) {
         // Insert program item completion.
         $existing = $DB->get_record('enrol_programs_completions', [
             'itemid'       => $item->id,
-            'allocationid' => $premba_alloc->id,
+            'allocationid' => $prembaalloc->id,
         ]);
         if (!$existing) {
             $DB->insert_record('enrol_programs_completions', (object) [
                 'itemid'        => $item->id,
-                'allocationid'  => $premba_alloc->id,
+                'allocationid'  => $prembaalloc->id,
                 'timecompleted' => $timecompleted,
             ]);
             $progcompcount++;
         }
-        if ($timecompleted > $last_premba_time) {
-            $last_premba_time = $timecompleted;
+        if ($timecompleted > $lastprembatime) {
+            $lastprembatime = $timecompleted;
         }
     }
 
     // If all 4 Pre-MBA courses completed, mark top item + allocation.
-    if (count($profile['premba']) === 4 && $premba_topitem) {
+    if (count($profile['premba']) === 4 && $prembatopitem) {
         $existing = $DB->get_record('enrol_programs_completions', [
-            'itemid'       => $premba_topitem->id,
-            'allocationid' => $premba_alloc->id,
+            'itemid'       => $prembatopitem->id,
+            'allocationid' => $prembaalloc->id,
         ]);
         if (!$existing) {
             $DB->insert_record('enrol_programs_completions', (object) [
-                'itemid'        => $premba_topitem->id,
-                'allocationid'  => $premba_alloc->id,
-                'timecompleted' => $last_premba_time,
+                'itemid'        => $prembatopitem->id,
+                'allocationid'  => $prembaalloc->id,
+                'timecompleted' => $lastprembatime,
             ]);
         }
-        if (empty($premba_alloc->timecompleted)) {
-            $DB->set_field('enrol_programs_allocations', 'timecompleted', $last_premba_time,
-                ['id' => $premba_alloc->id]);
+        if (empty($prembaalloc->timecompleted)) {
+            $DB->set_field(
+                'enrol_programs_allocations',
+                'timecompleted',
+                $lastprembatime,
+                ['id' => $prembaalloc->id]
+            );
         }
     }
 
@@ -588,64 +623,68 @@ foreach ($profiles as $si => $profile) {
         continue;
     }
 
-    $mba_alloc = $DB->get_record('enrol_programs_allocations', [
-        'programid' => $mba_program->id,
+    $mbaalloc = $DB->get_record('enrol_programs_allocations', [
+        'programid' => $mbaprogram->id,
         'userid'    => $userid,
     ]);
-    if (!$mba_alloc) {
+    if (!$mbaalloc) {
         cli_writeln("  WARNING: No MBA allocation for {$students[$si]->username}");
         continue;
     }
 
-    $last_mba_time = 0;
+    $lastmbatime = 0;
     foreach ($profile['mba'] as $ci => $grade) {
-        $course = $mba_courses[$ci];
-        $timecompleted = $ts_mba_base[$ci] + $offset;
-        $item = $mba_course_items[(int) $course->id] ?? null;
+        $course = $mbacourses[$ci];
+        $timecompleted = $tsmbabase[$ci] + $offset;
+        $item = $mbacourseitems[(int) $course->id] ?? null;
         if (!$item) {
             continue;
         }
 
         $existing = $DB->get_record('enrol_programs_completions', [
             'itemid'       => $item->id,
-            'allocationid' => $mba_alloc->id,
+            'allocationid' => $mbaalloc->id,
         ]);
         if (!$existing) {
             $DB->insert_record('enrol_programs_completions', (object) [
                 'itemid'        => $item->id,
-                'allocationid'  => $mba_alloc->id,
+                'allocationid'  => $mbaalloc->id,
                 'timecompleted' => $timecompleted,
             ]);
             $progcompcount++;
         }
-        if ($timecompleted > $last_mba_time) {
-            $last_mba_time = $timecompleted;
+        if ($timecompleted > $lastmbatime) {
+            $lastmbatime = $timecompleted;
         }
     }
 
     // If all 5 MBA courses completed, mark top item + allocation.
-    if (count($profile['mba']) === 5 && $mba_topitem) {
+    if (count($profile['mba']) === 5 && $mbatopitem) {
         $existing = $DB->get_record('enrol_programs_completions', [
-            'itemid'       => $mba_topitem->id,
-            'allocationid' => $mba_alloc->id,
+            'itemid'       => $mbatopitem->id,
+            'allocationid' => $mbaalloc->id,
         ]);
         if (!$existing) {
             $DB->insert_record('enrol_programs_completions', (object) [
-                'itemid'        => $mba_topitem->id,
-                'allocationid'  => $mba_alloc->id,
-                'timecompleted' => $last_mba_time,
+                'itemid'        => $mbatopitem->id,
+                'allocationid'  => $mbaalloc->id,
+                'timecompleted' => $lastmbatime,
             ]);
         }
-        if (empty($mba_alloc->timecompleted)) {
-            $DB->set_field('enrol_programs_allocations', 'timecompleted', $last_mba_time,
-                ['id' => $mba_alloc->id]);
+        if (empty($mbaalloc->timecompleted)) {
+            $DB->set_field(
+                'enrol_programs_allocations',
+                'timecompleted',
+                $lastmbatime,
+                ['id' => $mbaalloc->id]
+            );
         }
     }
 }
 
 cli_writeln("  Inserted {$progcompcount} program item completions");
 
-// ─── 12. Run achievement backfill ────────────────────────────────────
+// 12. Run achievement backfill ────────────────────────────────────
 
 cli_writeln('');
 cli_writeln('Running achievement backfill...');
@@ -661,24 +700,24 @@ cli_writeln("  Inserted:           {$stats->inserted}");
 cli_writeln("  Skipped (existing): {$stats->skipped}");
 cli_writeln("  Errors:             {$stats->errors}");
 
-// ─── 13. Summary ─────────────────────────────────────────────────────
+// 13. Summary ─────────────────────────────────────────────────────
 
 cli_writeln('');
 cli_writeln('=== Summary ===');
 
-$total_achievements = $DB->count_records('local_completionhistory_achievement');
-$total_programs_assoc = $DB->count_records('local_completionhistory_ach_program');
-$achievements_with_programs = $DB->count_records_sql(
+$totalachievements = $DB->count_records('local_completionhistory_achievement');
+$totalprogramsassoc = $DB->count_records('local_completionhistory_ach_program');
+$achievementswithprograms = $DB->count_records_sql(
     "SELECT COUNT(DISTINCT achievementid) FROM {local_completionhistory_ach_program}"
 );
 
-cli_writeln("Total achievements in ledger:        {$total_achievements}");
-cli_writeln("Program association records:          {$total_programs_assoc}");
-cli_writeln("Achievements with program context:    {$achievements_with_programs}");
+cli_writeln("Total achievements in ledger:        {$totalachievements}");
+cli_writeln("Program association records:          {$totalprogramsassoc}");
+cli_writeln("Achievements with program context:    {$achievementswithprograms}");
 cli_writeln('');
 cli_writeln('Programs:');
-cli_writeln("  Pre-MBA (PREMBA): {$premba_program->id}");
-cli_writeln("  MBA (MBA):        {$mba_program->id}");
+cli_writeln("  Pre-MBA (PREMBA): {$prembaprogram->id}");
+cli_writeln("  MBA (MBA):        {$mbaprogram->id}");
 cli_writeln('');
 cli_writeln('Student distribution:');
 cli_writeln('  Students 1-3  (Nathan, Olivia, Marcus):   Pre-MBA incomplete, no MBA');

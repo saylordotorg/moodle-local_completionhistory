@@ -31,17 +31,26 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class list_programs extends external_api {
-
     /** Maximum programs returned in one registry snapshot. */
     private const MAX_PROGRAMS = 1000;
 
     /** Maximum total program-to-course links returned in one snapshot. */
     private const MAX_COURSE_LINKS = 10000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([]);
     }
 
+    /**
+     * Return every enrol_programs program with its member courses.
+     *
+     * @return array The programs under the 'programs' key; empty when enrol_programs is absent.
+     */
     public static function execute(): array {
         global $DB;
 
@@ -51,8 +60,10 @@ class list_programs extends external_api {
         require_capability('local/completionhistory:integrate', $systemcontext);
 
         $dbman = $DB->get_manager();
-        if (!$dbman->table_exists(new \xmldb_table('enrol_programs_programs')) ||
-                !$dbman->table_exists(new \xmldb_table('enrol_programs_items'))) {
+        if (
+            !$dbman->table_exists(new \xmldb_table('enrol_programs_programs')) ||
+                !$dbman->table_exists(new \xmldb_table('enrol_programs_items'))
+        ) {
             return ['programs' => []];
         }
 
@@ -112,6 +123,11 @@ class list_programs extends external_api {
         return ['programs' => $out];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'programs' => new external_multiple_structure(new external_single_structure([

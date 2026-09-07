@@ -59,7 +59,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_user_certificates extends external_api {
-
     /** Hard ceiling on rows per call, matching the plugin's other reads. */
     private const MAX_LIMIT = 500;
 
@@ -136,6 +135,7 @@ class get_user_certificates extends external_api {
                     t.name AS templatename
                FROM {tool_certificate_issues} i
                JOIN {tool_certificate_templates} t ON t.id = i.templateid
+                    {$coursejoin}
               WHERE i.userid = :userid
            ORDER BY i.timecreated DESC, i.id DESC",
             ['userid' => $user->id],
@@ -164,8 +164,10 @@ class get_user_certificates extends external_api {
                 // The public verify page for this exact issue. The SIS links here
                 // rather than re-verifying, so each system vouches only for the
                 // documents it issued.
-                'verifyurl' => (new \moodle_url('/admin/tool/certificate/index.php',
-                    ['code' => $issue->code]))->out(false),
+                'verifyurl' => (new \moodle_url(
+                    '/admin/tool/certificate/index.php',
+                    ['code' => $issue->code]
+                ))->out(false),
                 'courseid' => $issue->courseid !== null ? (int) $issue->courseid : 0,
                 'coursename' => $coursename ?? '',
                 'courseshortname' => $courseshortname ?? '',
@@ -183,8 +185,10 @@ class get_user_certificates extends external_api {
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'available' => new external_value(PARAM_BOOL,
-                'False when this site has no certificate manager to ask'),
+            'available' => new external_value(
+                PARAM_BOOL,
+                'False when this site has no certificate manager to ask'
+            ),
             'certificates' => new external_multiple_structure(
                 new external_single_structure([
                     'id' => new external_value(PARAM_INT, 'Issue id'),

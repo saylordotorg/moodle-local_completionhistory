@@ -22,8 +22,12 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
+/**
+ * Upgrade the plugin's database schema and data from an older version.
+ *
+ * @param int $oldversion The version being upgraded from.
+ * @return bool
+ */
 function xmldb_local_completionhistory_upgrade($oldversion) {
     global $CFG, $DB;
     $dbman = $DB->get_manager();
@@ -31,25 +35,25 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
     if ($oldversion < 2026041701) {
         $table = new xmldb_table('local_completionhistory_achievement');
 
-        // firstname_snapshot — add after useridnumber_snapshot.
+        // Add firstname_snapshot after useridnumber_snapshot.
         $field = new xmldb_field('firstname_snapshot', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'useridnumber_snapshot');
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
 
-        // lastname_snapshot — add after firstname_snapshot.
+        // Add lastname_snapshot after firstname_snapshot.
         $field = new xmldb_field('lastname_snapshot', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'firstname_snapshot');
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
 
-        // email_snapshot — add after lastname_snapshot.
+        // Add email_snapshot after lastname_snapshot.
         $field = new xmldb_field('email_snapshot', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'lastname_snapshot');
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
 
-        // enrolledtime_snapshot — add after completiontime.
+        // Add enrolledtime_snapshot after completiontime.
         $field = new xmldb_field('enrolledtime_snapshot', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'completiontime');
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
@@ -59,8 +63,7 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026041702) {
-
-        // ── 1. Add exam_track, attempts_used, attempts_allowed to achievement ──
+        // Step 1: add exam_track, attempts_used and attempts_allowed to the achievement table.
 
         $table = new xmldb_table('local_completionhistory_achievement');
 
@@ -85,7 +88,7 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
             $dbman->add_index($table, $index);
         }
 
-        // ── 2. Create local_completionhistory_exam_attempt ────────────────────
+        // Step 2: create local_completionhistory_exam_attempt.
 
         $table = new xmldb_table('local_completionhistory_exam_attempt');
         if (!$dbman->table_exists($table)) {
@@ -113,7 +116,7 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
             $dbman->create_table($table);
         }
 
-        // ── 3. Create local_completionhistory_course_exam_config ──────────────
+        // Step 3: create local_completionhistory_course_exam_config.
 
         $table = new xmldb_table('local_completionhistory_course_exam_config');
         if (!$dbman->table_exists($table)) {
@@ -292,11 +295,11 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
         // learning-window pacer, with the deadline endpoint that could bound it also gone
         // (PR #10 review). Two moves, strictly in this order:
         //
-        //   1. BACKFILL: every active course enrolment granted by the 'programs' method gets a
-        //      manual counterpart (same user, same course, same start, student role, active),
-        //      so retiring the allocation cannot cost a learner access to a course they are in.
-        //   2. ARCHIVE: every active allocation is archived, and enrol_programs is asked to
-        //      recalculate the user's enrolments so it withdraws its own grants.
+        // 1. BACKFILL: every active course enrolment granted by the 'programs' method gets a
+        // manual counterpart (same user, same course, same start, student role, active),
+        // so retiring the allocation cannot cost a learner access to a course they are in.
+        // 2. ARCHIVE: every active allocation is archived, and enrol_programs is asked to
+        // recalculate the user's enrolments so it withdraws its own grants.
         //
         // Guarded like list_programs: an install that never had enrol_programs has nothing to
         // retire, and one where it was already uninstalled must not fatal on a missing table.
@@ -304,7 +307,8 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
             require_once($CFG->dirroot . '/lib/enrollib.php');
             $manual = enrol_get_plugin('manual');
             $studentroleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
-            $gaps = $DB->get_records_sql("
+            $gaps = $DB->get_records_sql(
+                "
                 SELECT ue.id, ue.userid, ue.timestart, e.courseid
                   FROM {user_enrolments} ue
                   JOIN {enrol} e ON e.id = ue.enrolid
@@ -315,19 +319,26 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
                          JOIN {enrol} e2 ON e2.id = ue2.enrolid
                         WHERE e2.enrol = 'manual' AND e2.courseid = e.courseid
                           AND ue2.userid = ue.userid AND ue2.status = :active2)",
-                ['active' => ENROL_USER_ACTIVE, 'active2' => ENROL_USER_ACTIVE]);
+                ['active' => ENROL_USER_ACTIVE, 'active2' => ENROL_USER_ACTIVE]
+            );
             if ($gaps && (!$manual || $studentroleid <= 0)) {
                 // Archiving without the backfill would take course access away from live
                 // learners, so refuse the whole step loudly rather than half-run it.
-                throw new \moodle_exception('generalexceptionmessage', 'error', '',
+                throw new \moodle_exception(
+                    'generalexceptionmessage',
+                    'error',
+                    '',
                     'local_completionhistory 0.7.0 upgrade: manual enrolment plugin or student role '
                     . 'unavailable, and ' . count($gaps) . ' programs-method enrolment(s) need a manual '
-                    . 'counterpart before allocations can be archived.');
+                    . 'counterpart before allocations can be archived.'
+                );
             }
             foreach ($gaps as $gap) {
                 $course = $DB->get_record('course', ['id' => $gap->courseid], '*', MUST_EXIST);
-                $instance = $DB->get_record('enrol',
-                    ['courseid' => $gap->courseid, 'enrol' => 'manual', 'status' => ENROL_INSTANCE_ENABLED]);
+                $instance = $DB->get_record(
+                    'enrol',
+                    ['courseid' => $gap->courseid, 'enrol' => 'manual', 'status' => ENROL_INSTANCE_ENABLED]
+                );
                 if (!$instance) {
                     $disabled = $DB->get_record('enrol', ['courseid' => $gap->courseid, 'enrol' => 'manual']);
                     if ($disabled) {
@@ -338,8 +349,14 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
                         $instance = $DB->get_record('enrol', ['id' => $instanceid], '*', MUST_EXIST);
                     }
                 }
-                $manual->enrol_user($instance, $gap->userid, $studentroleid,
-                    (int) $gap->timestart, 0, ENROL_USER_ACTIVE);
+                $manual->enrol_user(
+                    $instance,
+                    $gap->userid,
+                    $studentroleid,
+                    (int) $gap->timestart,
+                    0,
+                    ENROL_USER_ACTIVE
+                );
             }
             $allocations = $DB->get_records('enrol_programs_allocations', ['archived' => 0]);
             foreach ($allocations as $allocation) {
@@ -349,8 +366,10 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
                 // Same guarded call set_program_deadline used while it existed: enrol_programs
                 // recalculates and withdraws its own course grants for this user, if it is
                 // still installed to do so. Leftovers are swept when the plugin is disabled.
-                if (class_exists('\\enrol_programs\\local\\allocation')
-                        && method_exists('\\enrol_programs\\local\\allocation', 'fix_user_enrolments')) {
+                if (
+                    class_exists('\\enrol_programs\\local\\allocation')
+                        && method_exists('\\enrol_programs\\local\\allocation', 'fix_user_enrolments')
+                ) {
                     \enrol_programs\local\allocation::fix_user_enrolments($allocation->programid, $allocation->userid);
                 }
             }
@@ -360,6 +379,38 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
             }
         }
         upgrade_plugin_savepoint(true, 2026082200, 'local', 'completionhistory');
+    }
+
+    if ($oldversion < 2026090700) {
+        // Catalyst review (2026-09): the ledger was documented as immutable while two paths revised rows in
+        // place — the user_graded grade correction and set_exam_context. Rather than lose those corrections
+        // (a wrong grade left standing is worse than a revised one), every revision now leaves a trace here:
+        // one row per changed column with the previous and new value, why, and what triggered it.
+        $table = new xmldb_table('local_completionhistory_ach_revision');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+            $table->add_field('achievementid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('fieldname', XMLDB_TYPE_CHAR, '50', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('oldvalue', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('newvalue', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('reason', XMLDB_TYPE_CHAR, '50', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('source', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key(
+                'achievementid_fk',
+                XMLDB_KEY_FOREIGN,
+                ['achievementid'],
+                'local_completionhistory_achievement',
+                ['id']
+            );
+            $table->add_index('timecreated_ix', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
+
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026090700, 'local', 'completionhistory');
     }
 
     return true;

@@ -33,22 +33,26 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class course_config_service {
-
-    // ── Course type constants ────────────────────────────────────────────────
-
+    /** @var string Course type: no exam tracking (the default for unconfigured courses). */
     const TYPE_STANDARD  = 'standard';
+    /** @var string Course type: one program final exam with limited attempts. */
     const TYPE_PROGRAM   = 'program';
+    /** @var string Course type: direct credit exam plus certificate final exam. */
     const TYPE_OPEN_DUAL = 'open_dual';
+    /** @var string Course type: certificate final exam only. */
     const TYPE_OPEN_CERT = 'open_cert';
 
-    // ── Exam track constants ─────────────────────────────────────────────────
-
+    /** @var string Exam track: the program final exam. */
     const TRACK_PROGRAM_FINAL = 'program_final';
+    /** @var string Exam track: the direct credit exam. */
     const TRACK_DIRECT_CREDIT = 'direct_credit';
+    /** @var string Exam track: the certificate final exam. */
     const TRACK_CERTIFICATE   = 'certificate';
 
     /**
      * Human-readable labels for course types.
+     *
+     * @return string[] Labels keyed by course type constant.
      */
     public static function type_labels(): array {
         return [
@@ -61,6 +65,8 @@ class course_config_service {
 
     /**
      * Human-readable labels for exam tracks.
+     *
+     * @return string[] Labels keyed by track constant.
      */
     public static function track_labels(): array {
         return [
@@ -73,7 +79,7 @@ class course_config_service {
     /**
      * Get the exam config for a course. Returns defaults if not configured.
      *
-     * @param int $courseid
+     * @param int $courseid Course id.
      * @return stdClass Config record with all fields populated.
      */
     public static function get_config(int $courseid): stdClass {
@@ -94,7 +100,7 @@ class course_config_service {
         $default->cert_quizid             = null;
         $default->program_attempts_allowed = 3;
         $default->dc_attempts_allowed      = 3;
-        $default->cert_attempts_allowed    = 0; // unlimited
+        $default->cert_attempts_allowed    = 0; // Unlimited.
         $default->notes                   = '';
         $default->timecreated             = 0;
         $default->timemodified            = 0;
@@ -130,7 +136,8 @@ class course_config_service {
     /**
      * Delete the exam config for a course (resets to 'standard' defaults).
      *
-     * @param int $courseid
+     * @param int $courseid Course id.
+     * @return void
      */
     public static function delete_config(int $courseid): void {
         global $DB;
@@ -186,10 +193,12 @@ class course_config_service {
         $quizids = [];
         foreach ($quizfields as $field) {
             $quizid = empty($config->$field) ? null : (int) $config->$field;
-            if ($quizid !== null && !$DB->record_exists('quiz', [
+            if (
+                $quizid !== null && !$DB->record_exists('quiz', [
                     'id' => $quizid,
                     'course' => $config->courseid,
-                ])) {
+                ])
+            ) {
                 throw new \invalid_parameter_exception('Every selected quiz must belong to the configured course.');
             }
             if ($quizid !== null && in_array($quizid, $quizids, true)) {
@@ -217,8 +226,8 @@ class course_config_service {
      * Determine which exam track a quiz belongs to for a given course.
      * Returns null if the quiz is not configured as a tracked exam.
      *
-     * @param int $quizid
-     * @return stdClass|null Object with ->courseid and ->track, or null.
+     * @param int $quizid Quiz instance id.
+     * @return stdClass|null Object with ->courseid, ->config, ->track and ->attempts_allowed, or null.
      */
     public static function get_track_for_quiz(int $quizid): ?stdClass {
         global $DB;
@@ -248,7 +257,7 @@ class course_config_service {
         if ((int) $row->program_final_quizid === $quizid) {
             $result->track            = self::TRACK_PROGRAM_FINAL;
             $result->attempts_allowed = (int) $row->program_attempts_allowed;
-        } elseif ((int) $row->dc_quizid === $quizid) {
+        } else if ((int) $row->dc_quizid === $quizid) {
             $result->track            = self::TRACK_DIRECT_CREDIT;
             $result->attempts_allowed = (int) $row->dc_attempts_allowed;
         } else {
@@ -263,11 +272,11 @@ class course_config_service {
      * Returns the active exam tracks for a course type.
      * Used to validate attempt recording.
      *
-     * @param string $course_type
-     * @return string[]
+     * @param string $coursetype One of the TYPE_* constants.
+     * @return string[] Track constants active for that type.
      */
-    public static function tracks_for_type(string $course_type): array {
-        return match ($course_type) {
+    public static function tracks_for_type(string $coursetype): array {
+        return match ($coursetype) {
             self::TYPE_PROGRAM   => [self::TRACK_PROGRAM_FINAL],
             self::TYPE_OPEN_DUAL => [self::TRACK_DIRECT_CREDIT, self::TRACK_CERTIFICATE],
             self::TYPE_OPEN_CERT => [self::TRACK_CERTIFICATE],

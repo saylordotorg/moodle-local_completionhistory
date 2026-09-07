@@ -31,11 +31,18 @@ use local_completionhistory\local\ledger_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class reconcile_anonymization extends \core\task\scheduled_task {
-
+    /**
+     * Get task name.
+     *
+     * @return string
+     */
     public function get_name(): string {
         return get_string('task_reconcile_anonymization', 'local_completionhistory');
     }
 
+    /**
+     * Anonymize achievement rows belonging to already-deleted users.
+     */
     public function execute(): void {
         if (!get_config('local_completionhistory', 'enabled')) {
             mtrace('local_completionhistory is disabled, skipping anonymization reconcile.');

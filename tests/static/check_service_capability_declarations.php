@@ -51,20 +51,24 @@
  *
  * Per the house standard, every check below was made to FAIL against a
  * deliberately broken copy before being trusted.
+ *
+ * @package    local_completionhistory
+ * @copyright  2026 Saylor Academy
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-/**
- * Capabilities a function requires only on a CONDITIONAL branch, so db/services.php
- * names the base capability and not this one.
- *
- * Each entry is a deliberate decision rather than a suppression. Adding one means
- * you have satisfied yourself that a token holding only the DECLARED capability
- * still gets a correct answer on the path it is meant to use — where a refusal is
- * a correct answer — instead of a 403 on its ordinary work. get_user_achievements
- * qualifies: reading your OWN history needs viewown, which every authenticated
- * account has by archetype, and the viewall branch is reached only by asking for
- * somebody else's, which a service token has no business doing unattended.
- */
+// phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
+
+// Capabilities a function requires only on a CONDITIONAL branch, so db/services.php
+// names the base capability and not this one.
+//
+// Each entry is a deliberate decision rather than a suppression. Adding one means
+// you have satisfied yourself that a token holding only the DECLARED capability
+// still gets a correct answer on the path it is meant to use — where a refusal is
+// a correct answer — instead of a 403 on its ordinary work. get_user_achievements
+// qualifies: reading your OWN history needs viewown, which every authenticated
+// account has by archetype, and the viewall branch is reached only by asking for
+// somebody else's, which a service token has no business doing unattended.
 $branchonly = [
     'local_completionhistory_get_user_achievements' => ['local/completionhistory:viewall'],
 ];
@@ -81,9 +85,8 @@ $note = static function (string $msg) use (&$problems): void {
 
 // ---------------------------------------------------------------------------
 // Parse the three sources.
-// ---------------------------------------------------------------------------
 
-// db/access.php: capability => archetypes-are-empty?
+// From db/access.php: capability => archetypes-are-empty?
 $declaredcaps = [];
 preg_match_all(
     "/'(local\/completionhistory:\w+)'\s*=>\s*\[(.*?)\n    \],/s",
@@ -95,7 +98,7 @@ foreach ($capmatches as $m) {
     $declaredcaps[$m[1]] = (bool) preg_match("/'archetypes'\s*=>\s*\[\s*\]/", $m[2]);
 }
 
-// db/services.php: function => ['classname' => ..., 'capabilities' => [...]].
+// From db/services.php: function => its classname and the list of capabilities it declares.
 $functions = [];
 preg_match_all(
     "/'(local_completionhistory_\w+)'\s*=>\s*\[(.*?)\n    \],/s",
@@ -132,7 +135,6 @@ $sisfunctions = $sfn[1] ?? [];
 // Sanity: the parsers found something. A silent zero-match regex would turn
 // every check below into a vacuous PASS, which is the failure mode a
 // last-line-of-defence check can least afford.
-// ---------------------------------------------------------------------------
 
 if (!$declaredcaps) {
     $note('parsed no capabilities out of db/access.php');
@@ -149,7 +151,6 @@ if (!$sismarker) {
 
 // ---------------------------------------------------------------------------
 // A. Every capability the CODE requires is named in the METADATA.
-// ---------------------------------------------------------------------------
 
 foreach ($functions as $fnname => $fn) {
     $relative = str_replace(
@@ -184,9 +185,8 @@ foreach ($functions as $fnname => $fn) {
 
 // ---------------------------------------------------------------------------
 // B. Every capability the METADATA names actually exists in db/access.php.
-//    A typo here is invisible: Moodle stores the string verbatim and the
-//    endpoint keeps working, so only the operator reading it is misled.
-// ---------------------------------------------------------------------------
+// A typo here is invisible: Moodle stores the string verbatim and the
+// endpoint keeps working, so only the operator reading it is misled.
 
 foreach ($functions as $fnname => $fn) {
     foreach ($fn['capabilities'] as $cap) {
@@ -198,14 +198,13 @@ foreach ($functions as $fnname => $fn) {
 
 // ---------------------------------------------------------------------------
 // C. Every capability an operator MUST grant by hand is in the RUNBOOK, and the
-//    runbook names nothing that no longer exists.
+// runbook names nothing that no longer exists.
 //
-//    "Must grant by hand" is the precise set: required by a function in the SIS
-//    service AND declared with no archetypes, so no role inherits it. That is
-//    the set whose omission takes the integration down, and it is exactly what
-//    drifted — viewcertificates was needed and undocumented, setdeadlines was
-//    documented and gone.
-// ---------------------------------------------------------------------------
+// "Must grant by hand" is the precise set: required by a function in the SIS
+// service AND declared with no archetypes, so no role inherits it. That is
+// the set whose omission takes the integration down, and it is exactly what
+// drifted — viewcertificates was needed and undocumented, setdeadlines was
+// documented and gone.
 
 $mustgrant = [];
 foreach ($sisfunctions as $fnname) {
@@ -231,17 +230,16 @@ foreach (array_unique($rmcaps[0]) as $cap) {
 // ---------------------------------------------------------------------------
 // D. Every INTEGRATION function is actually exposed by the SIS service.
 //
-//    A function declared in $functions but missing from the service's function
-//    list is registered on the site and callable by nobody: the SIS token
-//    authorises one service, so the endpoint answers "invalid parameter"-shaped
-//    nothing and the feature is simply absent. Same failure class as an
-//    ungranted capability, same invisibility, and one more line to forget.
+// A function declared in $functions but missing from the service's function
+// list is registered on the site and callable by nobody: the SIS token
+// authorises one service, so the endpoint answers "invalid parameter"-shaped
+// nothing and the feature is simply absent. Same failure class as an
+// ungranted capability, same invisibility, and one more line to forget.
 //
-//    Scoped to functions requiring :integrate on purpose. That capability is the
-//    marker for "server-to-server only", so those and only those must be reachable
-//    by the SIS token; the browser-facing reads (viewown, ajax) are a separate set
-//    whose membership here is a judgement rather than a rule.
-// ---------------------------------------------------------------------------
+// Scoped to functions requiring :integrate on purpose. That capability is the
+// marker for "server-to-server only", so those and only those must be reachable
+// by the SIS token; the browser-facing reads (viewown, ajax) are a separate set
+// whose membership here is a judgement rather than a rule.
 
 foreach ($functions as $fnname => $fn) {
     if (!in_array('local/completionhistory:integrate', $fn['capabilities'], true)) {

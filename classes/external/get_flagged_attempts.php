@@ -72,7 +72,6 @@ use local_completionhistory\local\flag_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_flagged_attempts extends external_api {
-
     /** Hard ceiling on rows per call, whatever the caller asks for. */
     private const MAX_LIMIT = 500;
 
@@ -100,29 +99,55 @@ class get_flagged_attempts extends external_api {
         return [(int) $last->timetaken, (int) $last->id];
     }
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'since' => new external_value(PARAM_INT,
-                'Return attempts taken AFTER this Unix timestamp (0 for all). Pass back next_since.', VALUE_DEFAULT, 0),
-            'since_id' => new external_value(PARAM_INT,
-                'Tie-break within `since`: return attempts with this timestamp only if id is greater. Pass back next_since_id.',
-                VALUE_DEFAULT, 0),
-            'limit' => new external_value(PARAM_INT,
-                'Maximum attempts to scan (capped at 500)', VALUE_DEFAULT, 200),
-            'onlyflagged' => new external_value(PARAM_BOOL,
-                'When true (default) omit attempts with no matching flag', VALUE_DEFAULT, true),
+            'since' => new external_value(
+                PARAM_INT,
+                'Return attempts taken AFTER this Unix timestamp (0 for all). Pass back next_since.',
+                VALUE_DEFAULT,
+                0
+            ),
+            'since_id' => new external_value(
+                PARAM_INT,
+                'Tie-break within since: return attempts with this timestamp only if id is greater. Pass back next_since_id.',
+                VALUE_DEFAULT,
+                0
+            ),
+            'limit' => new external_value(
+                PARAM_INT,
+                'Maximum attempts to scan (capped at 500)',
+                VALUE_DEFAULT,
+                200
+            ),
+            'onlyflagged' => new external_value(
+                PARAM_BOOL,
+                'When true (default) omit attempts with no matching flag',
+                VALUE_DEFAULT,
+                true
+            ),
         ]);
     }
 
     /**
+     * Scan exam attempts after a keyset cursor and return those matching the configured flags.
+     *
      * @param int  $since       Exclusive lower bound on timetaken.
      * @param int  $sinceid     Tie-break id within $since.
      * @param int  $limit       Maximum attempts to scan.
      * @param bool $onlyflagged Omit unflagged attempts.
      * @return array
      */
-    public static function execute(int $since = 0, int $sinceid = 0, int $limit = 200,
-            bool $onlyflagged = true): array {
+    public static function execute(
+        int $since = 0,
+        int $sinceid = 0,
+        int $limit = 200,
+        bool $onlyflagged = true
+    ): array {
         global $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
@@ -256,39 +281,65 @@ class get_flagged_attempts extends external_api {
         ];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'scanned'       => new external_value(PARAM_INT, 'Attempts examined'),
             'flagged'       => new external_value(PARAM_INT, 'Attempts with at least one flag (independent of onlyflagged)'),
-            'next_since'    => new external_value(PARAM_INT, 'Pass back as `since` on the next call'),
-            'next_since_id' => new external_value(PARAM_INT, 'Pass back as `since_id` on the next call'),
+            'next_since'    => new external_value(PARAM_INT, 'Pass back as since on the next call'),
+            'next_since_id' => new external_value(PARAM_INT, 'Pass back as since_id on the next call'),
             'truncated'     => new external_value(PARAM_BOOL, 'True when more attempts remain beyond this page'),
             'attempts'      => new external_multiple_structure(
                 new external_single_structure([
-                    'attemptid'              => new external_value(PARAM_INT,   'Exam attempt row id'),
-                    'userid'                 => new external_value(PARAM_INT,   'Moodle user id'),
-                    'user_firstname'         => new external_value(PARAM_TEXT,  'First name'),
-                    'user_lastname'          => new external_value(PARAM_TEXT,  'Last name'),
-                    'user_email'             => new external_value(PARAM_TEXT,  'Email'),
-                    'user_idnumber'          => new external_value(PARAM_TEXT,  'User idnumber'),
-                    'courseid'               => new external_value(PARAM_INT,   'Course id'),
-                    'course_shortname'       => new external_value(PARAM_TEXT,  'Course shortname'),
-                    'course_fullname'        => new external_value(PARAM_TEXT,  'Course fullname'),
-                    'course_idnumber'        => new external_value(PARAM_TEXT,  'Course idnumber'),
-                    'exam_track'             => new external_value(PARAM_TEXT,  'program_final | direct_credit | certificate'),
-                    'attempt_number'         => new external_value(PARAM_INT,   'Attempt number within the track'),
-                    'attempts_allowed'       => new external_value(PARAM_INT,   'Attempts allowed (0 = unlimited)'),
+                    'attemptid'              => new external_value(PARAM_INT, 'Exam attempt row id'),
+                    'userid'                 => new external_value(PARAM_INT, 'Moodle user id'),
+                    'user_firstname'         => new external_value(PARAM_TEXT, 'First name'),
+                    'user_lastname'          => new external_value(PARAM_TEXT, 'Last name'),
+                    'user_email'             => new external_value(PARAM_TEXT, 'Email'),
+                    'user_idnumber'          => new external_value(PARAM_TEXT, 'User idnumber'),
+                    'courseid'               => new external_value(PARAM_INT, 'Course id'),
+                    'course_shortname'       => new external_value(PARAM_TEXT, 'Course shortname'),
+                    'course_fullname'        => new external_value(PARAM_TEXT, 'Course fullname'),
+                    'course_idnumber'        => new external_value(PARAM_TEXT, 'Course idnumber'),
+                    'exam_track'             => new external_value(PARAM_TEXT, 'program_final | direct_credit | certificate'),
+                    'attempt_number'         => new external_value(PARAM_INT, 'Attempt number within the track'),
+                    'attempts_allowed'       => new external_value(PARAM_INT, 'Attempts allowed (0 = unlimited)'),
                     'grade_decimal'          => new external_value(PARAM_FLOAT, 'Grade', VALUE_OPTIONAL, null, NULL_ALLOWED),
-                    'grade_passed'           => new external_value(PARAM_INT,   '1 passed, 0 failed, null no threshold', VALUE_OPTIONAL, null, NULL_ALLOWED),
-                    'resulted_in_completion' => new external_value(PARAM_INT,   '1 if this attempt completed the course'),
-                    'achievementid'          => new external_value(PARAM_INT,   'Achievement id if any', VALUE_OPTIONAL, null, NULL_ALLOWED),
-                    'timetaken'              => new external_value(PARAM_INT,   'When the attempt was submitted'),
-                    'duration'               => new external_value(PARAM_INT,   'Attempt duration in seconds', VALUE_OPTIONAL, null, NULL_ALLOWED),
+                    'grade_passed'           => new external_value(
+                        PARAM_INT,
+                        '1 passed, 0 failed, null no threshold',
+                        VALUE_OPTIONAL,
+                        null,
+                        NULL_ALLOWED
+                    ),
+                    'resulted_in_completion' => new external_value(PARAM_INT, '1 if this attempt completed the course'),
+                    'achievementid'          => new external_value(
+                        PARAM_INT,
+                        'Achievement id if any',
+                        VALUE_OPTIONAL,
+                        null,
+                        NULL_ALLOWED
+                    ),
+                    'timetaken'              => new external_value(PARAM_INT, 'When the attempt was submitted'),
+                    'duration'               => new external_value(
+                        PARAM_INT,
+                        'Attempt duration in seconds',
+                        VALUE_OPTIONAL,
+                        null,
+                        NULL_ALLOWED
+                    ),
                     'flags'                  => new external_multiple_structure(
                         new external_single_structure([
-                            'id'          => new external_value(PARAM_INT,  'Flag definition id'),
+                            'id'          => new external_value(PARAM_INT, 'Flag definition id'),
                             'name'        => new external_value(PARAM_TEXT, 'Flag name as configured'),
-                            'flag_type'   => new external_value(PARAM_TEXT, 'fast_completion | duration_exact | score_range | duplicate_account | new_account'),
+                            'flag_type'   => new external_value(
+                                PARAM_TEXT,
+                                'fast_completion | duration_exact | score_range | duplicate_account | new_account'
+                            ),
                             'severity'    => new external_value(PARAM_TEXT, 'Configured severity'),
                             'description' => new external_value(PARAM_TEXT, 'Admin description'),
                         ]),

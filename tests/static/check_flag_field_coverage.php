@@ -37,19 +37,20 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
 $root    = dirname(__DIR__, 2);
-$svcPath = $root . '/classes/local/flag_service.php';
-$extPath = $root . '/classes/external/get_flagged_attempts.php';
+$svcpath = $root . '/classes/local/flag_service.php';
+$extpath = $root . '/classes/external/get_flagged_attempts.php';
 
-foreach ([$svcPath, $extPath] as $p) {
+foreach ([$svcpath, $extpath] as $p) {
     if (!is_readable($p)) {
         fwrite(STDERR, "cannot read {$p}\n");
         exit(2);
     }
 }
 
-$svc = file_get_contents($svcPath);
-$ext = file_get_contents($extPath);
+$svc = file_get_contents($svcpath);
+$ext = file_get_contents($extpath);
 
 // Scope strictly to the evaluation path: matches() through to get_presets().
 // Sweeping the whole file yields false positives — enabled, timecreated and
@@ -98,8 +99,11 @@ echo "\nper flag type:\n";
 $broken = [];
 foreach ($deps as $type => $fields) {
     $lack = array_diff($fields, $provided);
-    printf("  %-20s %s\n", $type,
-        $lack ? '*** would never fire: needs ' . implode(', ', $lack) . ' ***' : 'evaluable');
+    printf(
+        "  %-20s %s\n",
+        $type,
+        $lack ? '*** would never fire: needs ' . implode(', ', $lack) . ' ***' : 'evaluable'
+    );
     if ($lack) {
         $broken[] = $type;
     }

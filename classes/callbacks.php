@@ -32,7 +32,6 @@ use local_completionhistory\hook\course_completions_purged;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class callbacks {
-
     /**
      * Decimal places `local_completionhistory_achievement.grade_decimal` actually stores.
      *
@@ -45,7 +44,7 @@ class callbacks {
     /**
      * Observer for \core\event\course_completed.
      *
-     * Captures an immutable achievement record when a user completes a course.
+     * Captures an achievement ledger row when a user completes a course.
      *
      * @param \core\event\course_completed $event
      */
@@ -132,14 +131,15 @@ class callbacks {
     /**
      * Observer for \core\event\course_updated.
      *
-     * Does NOT mutate existing achievement rows. Existing snapshot data
-     * is intentionally immutable. This observer is a no-op placeholder
-     * for potential future admin cache refresh.
+     * Does NOT touch existing achievement rows. The course snapshots record
+     * the course as it was at completion; a rename afterwards is not a
+     * correction to that record. This observer is a no-op placeholder for
+     * a potential future admin notification.
      *
      * @param \core\event\course_updated $event
      */
     public static function course_updated(\core\event\course_updated $event): void {
-        // Intentional no-op. Achievement rows are immutable snapshots.
+        // Intentional no-op. Course snapshots say what the course was called at completion.
         // Future: could trigger admin notification if course name changed
         // and there are existing achievement records referencing it.
     }
@@ -200,7 +200,8 @@ class callbacks {
 
         global $DB;
 
-        $attempt = $DB->get_record('quiz_attempts',
+        $attempt = $DB->get_record(
+            'quiz_attempts',
             ['id' => (int) $event->objectid],
             'id, quiz, userid, sumgrades, timestart, timefinish, state'
         );
@@ -274,8 +275,8 @@ class callbacks {
     /**
      * Observer for \tool_certificate\event\certificate_issued.
      *
-     * Attaches Moodle Workplace course certificates to the matching immutable
-     * achievement row, then republishes that row through the SIS outbox.
+     * Attaches Moodle Workplace course certificates to the matching achievement
+     * row (as a recorded revision), then republishes that row through the SIS outbox.
      *
      * @param \core\event\base $event
      */
@@ -381,7 +382,8 @@ class callbacks {
      * ledger contradict itself, and the SIS keys on `ledgeruuid`, so a correction has to travel under
      * the same identity. `source_event_hash` is deliberately untouched: the row's identity is still
      * the completion it came from, and rewriting it would let the backfill later insert a duplicate
-     * for that same completion.
+     * for that same completion. The previous grade is not lost: the revision goes through
+     * `ledger_service::revise_achievement`, which records old and new value in the correction history.
      *
      * @param \core\event\user_graded $event
      */
@@ -556,13 +558,14 @@ class callbacks {
             return 0;
         }
 
-        // Only the grade. Every other column stays exactly as the row currently holds it.
-        $DB->update_record('local_completionhistory_achievement', (object) [
-            'id' => $id,
+        // Only the grade, and through the ledger's correction history, so the figure the student was
+        // originally told stays recoverable next to the one that replaced it. Every other column stays
+        // exactly as the row currently holds it.
+        ledger_service::revise_achievement($id, [
             'grade_decimal' => $snapshot->finalgrade,
             'grade_passed' => $snapshot->passed,
             'grade_source' => 'gradebook',
-        ]);
+        ], ledger_service::REVISION_GRADE_CORRECTED, '\\core\\event\\user_graded');
 
         // Read back rather than reusing $current: the payload must describe what is now stored,
         // and build_achievement_payload reads the snapshot fields straight off whatever it is given.

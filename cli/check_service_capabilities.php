@@ -226,7 +226,6 @@ foreach ($services as $service) {
     // a version bump is simply absent from the database, so a comparison that
     // only walked the registered functions would never look at it and would
     // report PASS on the very deploy it exists to catch.
-    // ------------------------------------------------------------------
     $sourcefunctions = $source['services'][$service->shortname] ?? null;
     if ($sourcefunctions === null) {
         $warnings[] = "{$service->shortname}: db/services.php does not declare this service, so the "
@@ -264,7 +263,6 @@ foreach ($services as $service) {
     // authorised list when the service is restricted. Both, because a token for
     // an account missing from the authorised list fails too, and an authorised
     // account with no token cannot call anything.
-    // ------------------------------------------------------------------
     $accounts = [];
     $tokenusers = $DB->get_records('external_tokens', ['externalserviceid' => $service->id], '', 'DISTINCT userid');
     foreach ($tokenusers as $t) {
@@ -354,12 +352,20 @@ foreach ($services as $service) {
 
         printf("    %-40s %d of %d\n", 'functions it can call', $callable, count($registered));
         if ($unprovisioned) {
-            printf("    %-40s %d (%s)\n", 'not provisioned for', count($unprovisioned),
-                implode(', ', array_slice($unprovisioned, 0, 3)) . (count($unprovisioned) > 3 ? ', ...' : ''));
+            printf(
+                "    %-40s %d (%s)\n",
+                'not provisioned for',
+                count($unprovisioned),
+                implode(', ', array_slice($unprovisioned, 0, 3)) . (count($unprovisioned) > 3 ? ', ...' : '')
+            );
         }
         if ($withheld) {
-            printf("    %-40s %d (%s)\n", 'deliberately withheld', count($withheld),
-                implode('; ', array_slice($withheld, 0, 3)) . (count($withheld) > 3 ? '; ...' : ''));
+            printf(
+                "    %-40s %d (%s)\n",
+                'deliberately withheld',
+                count($withheld),
+                implode('; ', array_slice($withheld, 0, 3)) . (count($withheld) > 3 ? '; ...' : '')
+            );
         }
         if ($heldprotocols) {
             printf("    %-40s %s\n", 'transports available', implode(', ', $heldprotocols));

@@ -25,9 +25,12 @@ use stdClass;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\local\backfill_service
  */
-class backfill_service_test extends advanced_testcase {
-
+final class backfill_service_test extends advanced_testcase {
+    /**
+     * Enable the plugin with grade capture off and reset the site after each test.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
@@ -37,6 +40,10 @@ class backfill_service_test extends advanced_testcase {
 
     /**
      * Helper to insert a course_completions row directly.
+     *
+     * @param int $userid The user who completed.
+     * @param int $courseid The course completed.
+     * @param int $timecompleted Completion timestamp.
      */
     private function insert_completion(int $userid, int $courseid, int $timecompleted): void {
         global $DB;
@@ -50,6 +57,9 @@ class backfill_service_test extends advanced_testcase {
         $DB->insert_record('course_completions', $record);
     }
 
+    /**
+     * Completions with no ledger row are inserted.
+     */
     public function test_backfill_inserts_missing_records(): void {
         global $DB;
 
@@ -70,6 +80,9 @@ class backfill_service_test extends advanced_testcase {
         $this->assertEquals(2, $DB->count_records('local_completionhistory_achievement'));
     }
 
+    /**
+     * Running the backfill twice inserts nothing the second time.
+     */
     public function test_backfill_is_idempotent(): void {
         global $DB;
 
@@ -91,6 +104,9 @@ class backfill_service_test extends advanced_testcase {
         $this->assertEquals(1, $DB->count_records('local_completionhistory_achievement'));
     }
 
+    /**
+     * A dry run reports what it would insert without writing.
+     */
     public function test_dry_run_does_not_insert(): void {
         global $DB;
 
@@ -106,6 +122,9 @@ class backfill_service_test extends advanced_testcase {
         $this->assertEquals(0, $DB->count_records('local_completionhistory_achievement')); // But nothing actually inserted.
     }
 
+    /**
+     * A userid filter limits the backfill to that user's completions.
+     */
     public function test_backfill_respects_userid_filter(): void {
         $user1 = $this->getDataGenerator()->create_user();
         $user2 = $this->getDataGenerator()->create_user();

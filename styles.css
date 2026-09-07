@@ -1,0 +1,99 @@
+/*
+ * Plugin styles for local_completionhistory.
+ *
+ * Every rule that used to be an inline style attribute lives here, so themes can
+ * override presentation without touching PHP. Sections are appended by page.
+ */
+
+/* == Achievement ledger and attempt details ============================== */
+.lch-badge-xs {
+    font-size: 0.75em;
+}
+
+.lch-badge-sm {
+    font-size: 0.82em;
+}
+
+.lch-badge-md {
+    font-size: 0.85em;
+}
+
+.lch-btn-xs {
+    font-size: 0.75em;
+    padding: 1px 6px;
+}
+
+.lch-column-manager .lch-col-order-list {
+    gap: 6px;
+    min-height: 36px;
+    padding: 6px;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    background: #fafafa;
+}
+
+.lch-column-manager .lch-col-badge {
+    font-size: 0.85em;
+    padding: 5px 10px;
+    cursor: grab;
+    user-select: none;
+}
+
+.lch-column-manager .lch-col-badge.lch-dragging {
+    opacity: 0.4;
+}
+
+.lch-column-manager .lch-col-search {
+    max-width: 280px;
+}
+
+.lch-filter-form .fitem {
+    margin-bottom: 0.5rem;
+}
+
+.lch-attempt-history {
+    background: #f8f9fa;
+}
+
+.lch-attempt-history-table {
+    font-size: 0.85em;
+}
+
+.lch-attempt-details-row > td {
+    padding: 0;
+}
+
+/* == Exam attempt log ==================================================== */
+.lch-badge-flag {
+    font-size: 0.78em;
+}
+
+.lch-btn-link-sm {
+    font-size: 0.75em;
+    padding: 2px 8px;
+}
+
+.lch-attempt-log .generaltable tbody tr:hover {
+    background: #fffbea;
+}
+
+/* == Course exam configuration and system flags ========================== */
+.lch-track-heading {
+    display: block;
+    font-weight: 700;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.lch-actions form {
+    display: inline;
+}
+
+.lch-actions .btn {
+    margin-right: 0.25rem;
+}
+
+.lch-actions .btn:last-child {
+    margin-right: 0;
+}

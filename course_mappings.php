@@ -82,12 +82,13 @@ if ($action === 'add' || $action === 'edit') {
             $update->note = $data->note ?? null;
 
             // Re-snapshot course names.
+            $deletedname = get_string('coursename_deleted', 'local_completionhistory');
             $oldcourse = $DB->get_record('course', ['id' => $data->oldcourseid]);
             $newcourse = $DB->get_record('course', ['id' => $data->newcourseid]);
             $update->oldcourseidnumber_snapshot = $oldcourse ? $oldcourse->idnumber : null;
-            $update->oldcoursename_snapshot = $oldcourse ? $oldcourse->fullname : '[deleted]';
+            $update->oldcoursename_snapshot = $oldcourse ? $oldcourse->fullname : $deletedname;
             $update->newcourseidnumber_snapshot = $newcourse ? $newcourse->idnumber : null;
-            $update->newcoursename_snapshot = $newcourse ? $newcourse->fullname : '[deleted]';
+            $update->newcoursename_snapshot = $newcourse ? $newcourse->fullname : $deletedname;
 
             replacement_service::update_mapping($id, $update);
         } else {
@@ -113,7 +114,7 @@ if ($action === 'add' || $action === 'edit') {
     exit;
 }
 
-// Default: list view.
+// No action given, so show the list.
 echo $OUTPUT->header();
 
 // Add mapping button.

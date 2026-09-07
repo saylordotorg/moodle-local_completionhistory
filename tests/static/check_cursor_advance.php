@@ -48,6 +48,7 @@
 // Warnings are FAILURES here. An earlier version of this file referenced an undefined
 // variable, checked nothing at all, and still exited 0 — a check that reports PASS
 // while doing no work is worse than no check.
+// phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
 set_error_handler(static function (int $no, string $msg, string $file, int $line): bool {
     fwrite(STDERR, "the check itself errored at {$file}:{$line}: {$msg}\n");
     exit(2);
@@ -55,7 +56,7 @@ set_error_handler(static function (int $no, string $msg, string $file, int $line
 
 $root = dirname(__DIR__, 2);
 
-/** Every paging function, with the column its cursor is keyed on. */
+// Every paging function, with the column its cursor is keyed on.
 $targets = [
     'get_flagged_attempts' => [
         'file' => $root . '/classes/external/get_flagged_attempts.php',
@@ -112,7 +113,7 @@ $failed = 0;
 
 /* -- Part 1: the advance step, exercised ------------------------------- */
 
-/** Build a row list from [id, ts] pairs, keyed by id like $DB->get_records_sql(). */
+// Build a row list from [id, ts] pairs, keyed by id like $DB->get_records_sql().
 $rows = static function (array $pairs, string $field): array {
     $out = [];
     foreach ($pairs as [$id, $ts]) {
@@ -126,17 +127,22 @@ $rows = static function (array $pairs, string $field): array {
 
 foreach ($targets as $name => $t) {
     $code = file_get_contents($t['file']);
-    if (!preg_match(
-        '/public static function next_cursor\(array \$rows, int \$sincets, int \$sinceid\): array \{(.+?)\n    \}/s',
-        $code,
-        $m
-    )) {
+    if (
+        !preg_match(
+            '/public static function next_cursor\(array \$rows, int \$sincets, int \$sinceid\): array \{(.+?)\n    \}/s',
+            $code,
+            $m
+        )
+    ) {
         fwrite(STDERR, "{$name}: next_cursor() not found in the expected shape; "
             . "update this check rather than deleting it.\n");
         exit(2);
     }
     // Uniquely named so both functions can be evaluated in one process.
     $fn = "next_cursor_{$name}";
+    // The body being evaluated is this repository's own source, extracted above; it is the only way
+    // to exercise the real next_cursor() without a Moodle bootstrap (the class extends external_api).
+    // phpcs:ignore moodle.PHP.ForbiddenTokens.Found -- evaluates our own extracted source, see above.
     eval("function {$fn}(array \$rows, int \$sincets, int \$sinceid): array {" . $m[1] . "\n}");
 
     $cases = [
@@ -198,12 +204,10 @@ foreach ($targets as $name => $t) {
 // A correct advance is worthless if the SQL disagrees with it. Descending order with
 // a lower-bound cursor is unpageable however carefully the advance is written.
 echo "\nquery shape:\n";
-/**
- * Strip comments before matching, so prose ABOUT a fixed bug is not mistaken for the
- * bug itself. The first version of this check failed get_flagged_attempts because its
- * own docblock explains that the old predicate was `timetaken >= :since`. A check
- * that flags its own documentation is a check people switch off.
- */
+// Strip comments before matching, so prose ABOUT a fixed bug is not mistaken for the
+// bug itself. The first version of this check failed get_flagged_attempts because its
+// own docblock explains that the old predicate was `timetaken >= :since`. A check
+// that flags its own documentation is a check people switch off.
 $stripcomments = static function (string $php): string {
     $out = '';
     foreach (token_get_all($php) as $tok) {
@@ -253,6 +257,8 @@ if ($failed) {
     echo "\nFAIL: {$failed} problem(s)\n";
     exit(1);
 }
-printf("\nPASS: all %d paging functions ascend, use a keyset predicate, and advance correctly.\n",
-    count($targets));
+printf(
+    "\nPASS: all %d paging functions ascend, use a keyset predicate, and advance correctly.\n",
+    count($targets)
+);
 exit(0);

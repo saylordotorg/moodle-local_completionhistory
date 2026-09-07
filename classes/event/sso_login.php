@@ -34,21 +34,38 @@ namespace local_completionhistory\event;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class sso_login extends \core\event\base {
-
+    /**
+     * Initialise the event data: a read-level, non-educational event on the user table.
+     */
     protected function init() {
         $this->data['crud'] = 'r';
         $this->data['edulevel'] = self::LEVEL_OTHER;
         $this->data['objecttable'] = 'user';
     }
 
+    /**
+     * Return the localised event name.
+     *
+     * @return string
+     */
     public static function get_name() {
         return get_string('event_sso_login', 'local_completionhistory');
     }
 
+    /**
+     * Return the log description for this event.
+     *
+     * @return string
+     */
     public function get_description() {
         return "The user with id '{$this->userid}' was logged in by a single-use key issued by the SIS.";
     }
 
+    /**
+     * Return the profile page of the user who was logged in.
+     *
+     * @return \moodle_url
+     */
     public function get_url() {
         return new \moodle_url('/user/profile.php', ['id' => $this->userid]);
     }

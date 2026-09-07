@@ -83,7 +83,7 @@ Wire Moodle events and the custom purge hook to the service classes so the plugi
 **Observer behaviors:**
 - `course_completed` → captures achievement via ledger_service
 - `course_deleted` → logs audit, preserves achievements
-- `course_updated` → no-op (immutable snapshots)
+- `course_updated` → no-op (course snapshots record the course as it was at completion)
 - `user_deleted` → anonymizes if GDPR setting enabled, writes audit
 - `completions_purged` (hook) → writes audit, does NOT alter achievements
 

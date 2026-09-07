@@ -71,13 +71,17 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class create_login_key extends external_api {
-
     /** Script name the key is scoped to. Keys minted here work nowhere else. */
     public const SCRIPT = 'local_completionhistory/sso';
 
     /** Seconds a key remains valid. A redirect takes one; a leaked key should not survive. */
     public const TTL = 60;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'userid' => new external_value(PARAM_INT, 'Moodle user id to mint a key for'),
@@ -85,6 +89,13 @@ class create_login_key extends external_api {
         ]);
     }
 
+    /**
+     * Mint a single-use, IP-bound login key for an eligible learner account.
+     *
+     * @param int $userid Moodle user id to mint a key for.
+     * @param string $ip Browser IP address the key is restricted to.
+     * @return array The key, its lifetime in seconds, and a failure reason when the key is empty.
+     */
     public static function execute(int $userid, string $ip): array {
         global $CFG, $DB;
 
@@ -163,6 +174,11 @@ class create_login_key extends external_api {
         return ['key' => $key, 'expiresin' => self::TTL, 'warning' => ''];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'key'       => new external_value(PARAM_ALPHANUM, 'Single-use login key, or empty on failure'),

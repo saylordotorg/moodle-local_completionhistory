@@ -53,7 +53,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class update_user_profile extends external_api {
-
     /**
      * The only fields this function will ever write, with the PARAM type each is cleaned to.
      *
@@ -71,6 +70,11 @@ class update_user_profile extends external_api {
         'country'   => [PARAM_ALPHA, 2],
     ];
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'email'  => new external_value(PARAM_EMAIL, 'Account email — the identity key. NOT writable.'),
@@ -86,9 +90,11 @@ class update_user_profile extends external_api {
     }
 
     /**
+     * Apply whitelisted contact-field corrections to a learner's account.
+     *
      * @param string $email Identity key.
      * @param array $fields Whitelisted contact fields.
-     * @return array
+     * @return array Whether the account was writable, the fields actually changed, and any warning.
      */
     public static function execute(string $email, array $fields): array {
         global $CFG;
@@ -151,13 +157,18 @@ class update_user_profile extends external_api {
             return ['success' => true, 'updated' => '', 'warning' => ''];
         }
 
-        // user_update_user handles the event, the cache purge and the timemodified stamp.
+        // Delegated to user_update_user, which handles the event, the cache purge and the timemodified stamp.
         // Password is never touched here, hence false for the second argument.
         user_update_user($update, false, true);
 
         return ['success' => true, 'updated' => implode(',', $changed), 'warning' => ''];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'success' => new external_value(PARAM_BOOL, 'Whether the account was reachable and writable'),

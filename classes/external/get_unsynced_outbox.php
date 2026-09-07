@@ -34,10 +34,14 @@ use local_completionhistory\local\outbox_service;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_unsynced_outbox extends external_api {
-
     /** Hard ceiling on rows per call. */
     private const MAX_LIMIT = 1000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'limit'  => new external_value(PARAM_INT, 'Maximum rows to return', VALUE_DEFAULT, 500),
@@ -45,6 +49,13 @@ class get_unsynced_outbox extends external_api {
         ]);
     }
 
+    /**
+     * Return outbox rows in the given status, oldest first, for the SIS to drain.
+     *
+     * @param int $limit Maximum rows to return (capped at 1000).
+     * @param string $status Outbox status to fetch: pending, failed, sent or cancelled.
+     * @return array Outbox rows.
+     */
     public static function execute(int $limit = 500, string $status = 'pending'): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'limit'  => $limit,
@@ -85,6 +96,11 @@ class get_unsynced_outbox extends external_api {
         return $result;
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_multiple_structure
+     */
     public static function execute_returns(): external_multiple_structure {
         return new external_multiple_structure(
             new external_single_structure([

@@ -98,7 +98,8 @@ foreach ($groups as $g) {
     $maxn      = (int) $g->maxn;
 
     // Load existing attempt_numbers + template row (use the max one as template).
-    $rows = $DB->get_records('local_completionhistory_exam_attempt',
+    $rows = $DB->get_records(
+        'local_completionhistory_exam_attempt',
         ['userid' => $userid, 'courseid' => $courseid, 'exam_track' => $track],
         'attempt_number ASC'
     );

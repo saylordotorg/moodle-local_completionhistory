@@ -30,7 +30,6 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_user_achievements extends external_api {
-
     /** Hard ceiling on rows per call. */
     private const MAX_LIMIT = 500;
 
@@ -48,7 +47,12 @@ class get_user_achievements extends external_api {
     }
 
     /**
-     * Execute the function.
+     * Return a page of a user's achievement records.
+     *
+     * @param int $userid Moodle user id whose achievements to return.
+     * @param int $limit Maximum records to return (capped at 500).
+     * @param int $offset Pagination offset (capped at 100000).
+     * @return array Achievement records.
      */
     public static function execute(int $userid, int $limit = 100, int $offset = 0): array {
         global $DB, $USER;

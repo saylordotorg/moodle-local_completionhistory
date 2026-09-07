@@ -39,8 +39,13 @@
  *
  * Per the house standard, every check below was made to FAIL against a
  * deliberately broken copy before being trusted.
+ *
+ * @package    local_completionhistory
+ * @copyright  2026 Saylor Academy
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
 $root = dirname(__DIR__, 2);
 $external = file_get_contents($root . '/classes/external/get_user_certificates.php');
 $services = file_get_contents($root . '/db/services.php');
@@ -68,23 +73,23 @@ $checks = [
             "/'local\/completionhistory:viewcertificates'\s*=>\s*\[[^\]]*'captype'\s*=>\s*'read'/s",
             $access
         ),
-    'capability carries RISK_PERSONAL' =>
+        'capability carries RISK_PERSONAL' =>
         (bool) preg_match(
             "/'local\/completionhistory:viewcertificates'\s*=>\s*\[[^\]]*RISK_PERSONAL/s",
             $access
         ),
-    'email resolved by the ambiguity-refusing helper' =>
+        'email resolved by the ambiguity-refusing helper' =>
         strpos($external, 'get_unique_local_user_by_email') !== false,
-    'capability checked in the body' =>
+        'capability checked in the body' =>
         (bool) preg_match(
             "/require_capability\('local\/completionhistory:viewcertificates'/",
             $external
         ),
-    'enabled gate present' =>
+        'enabled gate present' =>
         strpos($external, 'security::require_enabled()') !== false,
-    'body is read-only' =>
+        'body is read-only' =>
         !preg_match('/\$DB->(insert|update|delete|set_field|execute)/', $external),
-    'absence is reported, not conflated with none' =>
+        'absence is reported, not conflated with none' =>
         (bool) preg_match("/'available'\s*=>\s*false/", $external),
 ];
 

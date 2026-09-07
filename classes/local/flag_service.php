@@ -32,48 +32,62 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class flag_service {
-
+    /** @var string Flag type: attempt finished within a threshold number of minutes. */
     const TYPE_FAST_COMPLETION   = 'fast_completion';
+    /** @var string Flag type: attempt duration equals a target, within a tolerance. */
     const TYPE_DURATION_EXACT    = 'duration_exact';
+    /** @var string Flag type: attempt grade falls inside an inclusive percentage range. */
     const TYPE_SCORE_RANGE       = 'score_range';
+    /** @var string Flag type: another account shares the learner's first and last name. */
     const TYPE_DUPLICATE_ACCOUNT = 'duplicate_account';
+    /** @var string Flag type: the account was created shortly before the exam. */
     const TYPE_NEW_ACCOUNT       = 'new_account';
 
+    /** @var string Severity: informational. */
     const SEVERITY_INFO     = 'info';
+    /** @var string Severity: warning. */
     const SEVERITY_WARNING  = 'warning';
+    /** @var string Severity: critical. */
     const SEVERITY_CRITICAL = 'critical';
 
-    /** Cached list of enabled flag defs for the current request. */
-    private static ?array $cached_defs = null;
-    /** Per-(firstname,lastname) duplicate lookup cache. */
+    /** @var stdClass[]|null Cached list of enabled flag defs for the current request. */
+    private static ?array $cacheddefs = null;
+    /** @var bool[] Per-(userid, firstname, lastname, domain option) duplicate lookup cache. */
     private static array $dupcache = [];
 
     /**
      * Human-readable labels for flag types.
+     *
+     * @return string[] Labels keyed by flag type constant.
      */
     public static function type_labels(): array {
         return [
-            self::TYPE_SCORE_RANGE       => get_string('flagtype_score_range',       'local_completionhistory'),
-            self::TYPE_FAST_COMPLETION   => get_string('flagtype_fast_completion',   'local_completionhistory'),
-            self::TYPE_DURATION_EXACT    => get_string('flagtype_duration_exact',    'local_completionhistory'),
+            self::TYPE_SCORE_RANGE       => get_string('flagtype_score_range', 'local_completionhistory'),
+            self::TYPE_FAST_COMPLETION   => get_string('flagtype_fast_completion', 'local_completionhistory'),
+            self::TYPE_DURATION_EXACT    => get_string('flagtype_duration_exact', 'local_completionhistory'),
             self::TYPE_DUPLICATE_ACCOUNT => get_string('flagtype_duplicate_account', 'local_completionhistory'),
-            self::TYPE_NEW_ACCOUNT       => get_string('flagtype_new_account',       'local_completionhistory'),
+            self::TYPE_NEW_ACCOUNT       => get_string('flagtype_new_account', 'local_completionhistory'),
         ];
     }
 
     /**
      * Human-readable labels for severities.
+     *
+     * @return string[] Labels keyed by severity constant.
      */
     public static function severity_labels(): array {
         return [
-            self::SEVERITY_INFO     => get_string('flagseverity_info',     'local_completionhistory'),
-            self::SEVERITY_WARNING  => get_string('flagseverity_warning',  'local_completionhistory'),
+            self::SEVERITY_INFO     => get_string('flagseverity_info', 'local_completionhistory'),
+            self::SEVERITY_WARNING  => get_string('flagseverity_warning', 'local_completionhistory'),
             self::SEVERITY_CRITICAL => get_string('flagseverity_critical', 'local_completionhistory'),
         ];
     }
 
     /**
      * Map severity to Bootstrap badge class.
+     *
+     * @param string $severity One of the SEVERITY_* constants.
+     * @return string Badge CSS class.
      */
     public static function severity_badge_class(string $severity): string {
         return match ($severity) {
@@ -90,19 +104,24 @@ class flag_service {
      */
     public static function get_enabled_defs(): array {
         global $DB;
-        if (self::$cached_defs === null) {
-            self::$cached_defs = $DB->get_records('local_completionhistory_flag_def',
-                ['enabled' => 1], 'severity DESC, name ASC');
+        if (self::$cacheddefs === null) {
+            self::$cacheddefs = $DB->get_records(
+                'local_completionhistory_flag_def',
+                ['enabled' => 1],
+                'severity DESC, name ASC'
+            );
         }
-        return self::$cached_defs;
+        return self::$cacheddefs;
     }
 
     /**
      * Clear caches. Call after write operations.
+     *
+     * @return void
      */
     public static function reset_cache(): void {
-        self::$cached_defs = null;
-        self::$dupcache    = [];
+        self::$cacheddefs = null;
+        self::$dupcache   = [];
     }
 
     /**
@@ -124,6 +143,10 @@ class flag_service {
 
     /**
      * Evaluate a single flag def against a row.
+     *
+     * @param stdClass $def Flag definition record.
+     * @param stdClass $row Exam attempt row.
+     * @return bool True when the flag applies to the attempt.
      */
     public static function matches(stdClass $def, stdClass $row): bool {
         $config = json_decode($def->configjson ?? '', true) ?: [];
@@ -139,7 +162,7 @@ class flag_service {
                 return $duration > 0 && $duration <= ($thresholdmins * 60);
 
             case self::TYPE_DURATION_EXACT:
-                $durmins   = (int) ($config['duration_minutes']  ?? 0);
+                $durmins   = (int) ($config['duration_minutes'] ?? 0);
                 $tolerance = (int) ($config['tolerance_seconds'] ?? 10);
                 if ($durmins <= 0) {
                     return false;
@@ -182,6 +205,10 @@ class flag_service {
      * Duplicate-account detector: look for another non-deleted user with
      * matching firstname + lastname. Optional config.same_email_domain
      * also requires matching @domain portion of the email.
+     *
+     * @param stdClass $row    Exam attempt row carrying the learner name and email.
+     * @param array    $config Decoded flag configuration.
+     * @return bool True when another matching account exists.
      */
     private static function check_duplicate_account(stdClass $row, array $config): bool {
         global $DB;
@@ -238,59 +265,60 @@ class flag_service {
      * Canonical preset flag set, matching the operational rubric in the admin
      * handbook. Keyed by `code`, which is the unique natural key in DB so
      * callers can load missing presets without clobbering admin edits.
+     *
+     * Names and descriptions are language strings (flagpreset_<code>_name / _desc)
+     * resolved at load time; once inserted they become ordinary admin-editable rows.
+     *
+     * @return stdClass[] Preset definitions keyed by code.
      */
     public static function get_presets(): array {
-        return [
-            'score_zero' => (object) [
-                'code' => 'score_zero', 'name' => 'Score = 0',
-                'flag_type' => self::TYPE_SCORE_RANGE,
+        $presets = [
+            'score_zero' => [
+                'flag_type'  => self::TYPE_SCORE_RANGE,
                 'configjson' => json_encode(['score_min' => 0, 'score_max' => 0]),
-                'severity' => self::SEVERITY_CRITICAL,
-                'description' => 'Exam score is 0. Possible technical issues or dropped session.',
+                'severity'   => self::SEVERITY_CRITICAL,
             ],
-            'score_low' => (object) [
-                'code' => 'score_low', 'name' => 'Score <= 20',
-                'flag_type' => self::TYPE_SCORE_RANGE,
+            'score_low' => [
+                'flag_type'  => self::TYPE_SCORE_RANGE,
                 'configjson' => json_encode(['score_min' => 1, 'score_max' => 20]),
-                'severity' => self::SEVERITY_WARNING,
-                'description' => 'Exam score is 1–20%. Possible technical issues or dropped session.',
+                'severity'   => self::SEVERITY_WARNING,
             ],
-            'score_high' => (object) [
-                'code' => 'score_high', 'name' => 'Score >= 90',
-                'flag_type' => self::TYPE_SCORE_RANGE,
+            'score_high' => [
+                'flag_type'  => self::TYPE_SCORE_RANGE,
                 'configjson' => json_encode(['score_min' => 90, 'score_max' => 100]),
-                'severity' => self::SEVERITY_WARNING,
-                'description' => 'Exam score is 90% or higher. Possible use of external resources.',
+                'severity'   => self::SEVERITY_WARNING,
             ],
-            'dur_at_most_20m' => (object) [
-                'code' => 'dur_at_most_20m', 'name' => 'Dur <= 20 min',
-                'flag_type' => self::TYPE_FAST_COMPLETION,
+            'dur_at_most_20m' => [
+                'flag_type'  => self::TYPE_FAST_COMPLETION,
                 'configjson' => json_encode(['threshold_minutes' => 20]),
-                'severity' => self::SEVERITY_WARNING,
-                'description' => 'Exam duration <= 20 minutes. Possible technical issues or dropped session.',
+                'severity'   => self::SEVERITY_WARNING,
             ],
-            'dur_exact_2h' => (object) [
-                'code' => 'dur_exact_2h', 'name' => 'Dur = 2 hr',
-                'flag_type' => self::TYPE_DURATION_EXACT,
+            'dur_exact_2h' => [
+                'flag_type'  => self::TYPE_DURATION_EXACT,
                 'configjson' => json_encode(['duration_minutes' => 120, 'tolerance_seconds' => 10]),
-                'severity' => self::SEVERITY_INFO,
-                'description' => 'Exam duration is exactly 2 hours. Auto-submission at end of time limit; possible dropped session.',
+                'severity'   => self::SEVERITY_INFO,
             ],
-            'potential_dupe' => (object) [
-                'code' => 'potential_dupe', 'name' => 'Potential dupe',
-                'flag_type' => self::TYPE_DUPLICATE_ACCOUNT,
+            'potential_dupe' => [
+                'flag_type'  => self::TYPE_DUPLICATE_ACCOUNT,
                 'configjson' => json_encode([]),
-                'severity' => self::SEVERITY_CRITICAL,
-                'description' => 'Account flagged as possible duplicate. Possible attempt to bypass waiting period.',
+                'severity'   => self::SEVERITY_CRITICAL,
             ],
-            'new_account' => (object) [
-                'code' => 'new_account', 'name' => 'New account',
-                'flag_type' => self::TYPE_NEW_ACCOUNT,
+            'new_account' => [
+                'flag_type'  => self::TYPE_NEW_ACCOUNT,
                 'configjson' => json_encode(['max_days_before' => 2]),
-                'severity' => self::SEVERITY_CRITICAL,
-                'description' => 'Account created less than 2 days before exam. Possible attempt to bypass waiting period with an alternate account.',
+                'severity'   => self::SEVERITY_CRITICAL,
             ],
         ];
+
+        $result = [];
+        foreach ($presets as $code => $fields) {
+            $preset              = (object) $fields;
+            $preset->code        = $code;
+            $preset->name        = get_string('flagpreset_' . $code . '_name', 'local_completionhistory');
+            $preset->description = get_string('flagpreset_' . $code . '_desc', 'local_completionhistory');
+            $result[$code]       = $preset;
+        }
+        return $result;
     }
 
     /**
@@ -325,7 +353,7 @@ class flag_service {
     /**
      * Save (insert or update) a flag def.
      *
-     * @param stdClass $flag
+     * @param stdClass $flag Flag definition record (id empty or 0 to insert).
      * @return int Flag def id.
      */
     public static function save(stdClass $flag): int {
@@ -348,6 +376,9 @@ class flag_service {
 
     /**
      * Delete a flag def.
+     *
+     * @param int $id Flag def id.
+     * @return void
      */
     public static function delete(int $id): void {
         global $DB;

@@ -26,11 +26,10 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class replacement_service {
-
     /**
      * Get the active replacement mapping for an old course.
      *
-     * @param int $oldcourseid
+     * @param int $oldcourseid Course id of the retired course.
      * @return stdClass|null The mapping record, or null if none active.
      */
     public static function get_replacement(int $oldcourseid): ?stdClass {
@@ -50,8 +49,8 @@ class replacement_service {
      * Only returns a recommendation if the user has NOT already completed
      * the replacement course in the achievement ledger.
      *
-     * @param int $userid
-     * @param int $oldcourseid
+     * @param int $userid Learner's user id.
+     * @param int $oldcourseid Course id of the retired course.
      * @return stdClass|null The mapping record with recommendation, or null.
      */
     public static function get_recommendation_for_user(int $userid, int $oldcourseid): ?stdClass {
@@ -108,10 +107,10 @@ class replacement_service {
     /**
      * Add a new course replacement mapping.
      *
-     * @param int $oldcourseid
-     * @param int $newcourseid
-     * @param string $migrationrule
-     * @param string|null $note
+     * @param int $oldcourseid Course id of the retired course.
+     * @param int $newcourseid Course id of its replacement.
+     * @param string $migrationrule How in-progress learners are handled (e.g. 'redirect_incomplete').
+     * @param string|null $note Optional free-text note about the mapping.
      * @return int The new mapping ID.
      */
     public static function add_mapping(
@@ -146,7 +145,7 @@ class replacement_service {
     /**
      * Update an existing course replacement mapping.
      *
-     * @param int $mappingid
+     * @param int $mappingid Id of the mapping to update.
      * @param stdClass $data Fields to update.
      * @return bool
      */
@@ -162,7 +161,7 @@ class replacement_service {
     /**
      * Deactivate a course replacement mapping.
      *
-     * @param int $mappingid
+     * @param int $mappingid Id of the mapping to deactivate.
      * @return bool
      */
     public static function deactivate_mapping(int $mappingid): bool {

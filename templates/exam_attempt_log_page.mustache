@@ -1,0 +1,65 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_completionhistory/exam_attempt_log_page
+
+    The Exam Attempt Log staff page: whole-dataset stats cards, a link back to the
+    ledger, the filter card and the results table.
+
+    Context variables required for this template:
+    * stats - array of {value, label, colour} cards; colour is a Bootstrap contextual name
+    * ledgerurl - URL of the Achievement Ledger page
+    * formhtml - the rendered filter form (pre-rendered HTML)
+    * tablehtml - the rendered attempts table (pre-rendered HTML)
+
+    Example context (json):
+    {
+        "stats": [
+            {"value": "1,204", "label": "Total Attempts", "colour": "secondary"},
+            {"value": "980", "label": "Passed", "colour": "success"}
+        ],
+        "ledgerurl": "https://example.com/local/completionhistory/achievement_ledger.php",
+        "formhtml": "<form class=\"mform\"></form>",
+        "tablehtml": "<table class=\"generaltable\"></table>"
+    }
+}}
+<div class="lch-attempt-log">
+    <div class="row mb-4">
+        {{#stats}}
+            <div class="col-md-2 col-sm-4 mb-2">
+                <div class="card border-{{colour}}">
+                    <div class="card-body text-center p-2">
+                        <div class="h3 mb-0 text-{{colour}} font-weight-bold">{{value}}</div>
+                        <div class="small text-muted">{{label}}</div>
+                    </div>
+                </div>
+            </div>
+        {{/stats}}
+    </div>
+    <a href="{{ledgerurl}}" class="btn btn-outline-secondary btn-sm mb-3">
+        &#8592; {{#str}}achievementledger, local_completionhistory{{/str}}
+    </a>
+    <div class="card mb-4">
+        <div class="card-header font-weight-bold">{{#str}}filter_heading, local_completionhistory{{/str}}</div>
+        <div class="card-body">
+            {{{formhtml}}}
+        </div>
+    </div>
+    <div class="lch-attempt-log-table" data-region="attempt-log-table">
+        {{{tablehtml}}}
+    </div>
+</div>

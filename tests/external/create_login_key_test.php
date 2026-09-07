@@ -24,6 +24,7 @@ use advanced_testcase;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\external\create_login_key
  */
 final class create_login_key_test extends advanced_testcase {
     /**

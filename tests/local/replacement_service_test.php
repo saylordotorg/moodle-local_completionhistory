@@ -24,14 +24,20 @@ use advanced_testcase;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\local\replacement_service
  */
-class replacement_service_test extends advanced_testcase {
-
+final class replacement_service_test extends advanced_testcase {
+    /**
+     * Reset the site after each test.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
     }
 
+    /**
+     * A mapping that is added can be read back active.
+     */
     public function test_add_and_get_mapping(): void {
         $oldcourse = $this->getDataGenerator()->create_course();
         $newcourse = $this->getDataGenerator()->create_course();
@@ -47,6 +53,9 @@ class replacement_service_test extends advanced_testcase {
         $this->assertEquals(1, $mapping->active);
     }
 
+    /**
+     * A deactivated mapping is no longer returned.
+     */
     public function test_deactivate_mapping(): void {
         $oldcourse = $this->getDataGenerator()->create_course();
         $newcourse = $this->getDataGenerator()->create_course();
@@ -58,6 +67,9 @@ class replacement_service_test extends advanced_testcase {
         $this->assertNull($mapping); // Inactive mapping not returned.
     }
 
+    /**
+     * No recommendation is made to a user who already completed the replacement.
+     */
     public function test_get_recommendation_skips_completed_user(): void {
         $user = $this->getDataGenerator()->create_user();
         $oldcourse = $this->getDataGenerator()->create_course();
@@ -82,6 +94,9 @@ class replacement_service_test extends advanced_testcase {
         $this->assertNull($rec);
     }
 
+    /**
+     * A replacement chain is followed through successive mappings.
+     */
     public function test_chain_follows_replacements(): void {
         $course1 = $this->getDataGenerator()->create_course();
         $course2 = $this->getDataGenerator()->create_course();
@@ -96,6 +111,9 @@ class replacement_service_test extends advanced_testcase {
         $this->assertEquals($course3->id, $chain[1]->newcourseid);
     }
 
+    /**
+     * A course with no mapping yields null.
+     */
     public function test_no_mapping_returns_null(): void {
         $mapping = replacement_service::get_replacement(99999);
         $this->assertNull($mapping);

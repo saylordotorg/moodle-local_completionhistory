@@ -1,0 +1,108 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_completionhistory/column_manager
+
+    Column visibility and ordering widget for the staff ledger pages.
+
+    Rendered inside the filter form. The local_completionhistory/column_manager
+    AMD module drives it through the data-region attributes:
+    * lch-column-manager  the widget root
+    * category-pills      optional category filter buttons (data-cat)
+    * column-search       optional search box for the checkbox grid
+    * column-checkboxes   one .lch-col-toggle checkbox per column (data-col, data-label)
+    * column-order        draggable .lch-col-badge badges of the visible columns (data-col)
+    * visiblecols         the hidden input carrying the ordered visible columns
+
+    Context variables required for this template:
+    * columns - array of {name, label, category, visible} for every known column
+    * visiblecolumns - array of {name, label} in display order
+    * visiblecolsvalue - comma-separated visible column names in display order
+    * hascategories - whether to show the category pills and search box
+    * categories - array of {key, label} in pill order
+    * fromsavedpref - whether the layout is the user's saved preference
+    * fromsitedefault - whether the layout is the site-wide default
+
+    Example context (json):
+    {
+        "columns": [
+            {"name": "user_firstname", "label": "First Name", "category": "user", "visible": true},
+            {"name": "grade_decimal", "label": "Grade", "category": "grade", "visible": false}
+        ],
+        "visiblecolumns": [
+            {"name": "user_firstname", "label": "First Name"}
+        ],
+        "visiblecolsvalue": "user_firstname",
+        "hascategories": true,
+        "categories": [
+            {"key": "user", "label": "User"},
+            {"key": "grade", "label": "Grade"}
+        ],
+        "fromsavedpref": true,
+        "fromsitedefault": false
+    }
+}}
+<div class="lch-column-manager mb-3" data-region="lch-column-manager">
+    <p class="small font-weight-bold mb-1">{{#str}}filter_columns, local_completionhistory{{/str}}</p>
+    <p class="small text-muted mb-2">{{#str}}filter_columns_help, local_completionhistory{{/str}}</p>
+    {{#fromsavedpref}}
+        <p class="small text-success mb-2">&#128190; {{#str}}layout_using_saved, local_completionhistory{{/str}}</p>
+    {{/fromsavedpref}}
+    {{#fromsitedefault}}
+        <p class="small text-info mb-2">&#127960; {{#str}}layout_using_default, local_completionhistory{{/str}}</p>
+    {{/fromsitedefault}}
+    {{#hascategories}}
+        <div class="d-flex flex-wrap mb-2" data-region="category-pills" role="group">
+            <button type="button" class="btn btn-sm btn-secondary mr-1 mb-1 lch-cat-pill active" data-cat="" aria-pressed="true">
+                {{#str}}filter_columns_all, local_completionhistory{{/str}}
+            </button>
+            {{#categories}}
+                <button type="button" class="btn btn-sm btn-outline-secondary mr-1 mb-1 lch-cat-pill" data-cat="{{key}}" aria-pressed="false">
+                    {{label}}
+                </button>
+            {{/categories}}
+        </div>
+        <input type="search"
+               class="form-control form-control-sm mb-2 lch-col-search"
+               data-region="column-search"
+               placeholder="{{#str}}filter_columns_search, local_completionhistory{{/str}}"
+               aria-label="{{#str}}filter_columns_search, local_completionhistory{{/str}}"
+               autocomplete="off">
+    {{/hascategories}}
+    <div class="d-flex flex-wrap mb-2" data-region="column-checkboxes">
+        {{#columns}}
+            <div class="form-check mr-4 mb-1" data-category="{{category}}">
+                <input type="checkbox"
+                       id="{{uniqid}}-colcb-{{name}}"
+                       value="1"
+                       class="form-check-input lch-col-toggle"
+                       data-col="{{name}}"
+                       data-label="{{label}}"
+                       {{#visible}}checked{{/visible}}>
+                <label class="form-check-label small" for="{{uniqid}}-colcb-{{name}}">{{label}}</label>
+            </div>
+        {{/columns}}
+    </div>
+    <div class="d-flex flex-wrap lch-col-order-list"
+         data-region="column-order"
+         aria-label="{{#str}}columns_reorder_hint, local_completionhistory{{/str}}">
+        {{#visiblecolumns}}
+            <span class="badge badge-light border lch-col-badge" draggable="true" data-col="{{name}}">&#8597; {{label}}</span>
+        {{/visiblecolumns}}
+    </div>
+    <input type="hidden" name="visiblecols" data-region="visiblecols" value="{{visiblecolsvalue}}">
+</div>

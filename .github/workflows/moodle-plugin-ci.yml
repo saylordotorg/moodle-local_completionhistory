@@ -1,4 +1,9 @@
-name: Moodle Plugin CI for 4.5
+name: Moodle Plugin CI
+
+# Every Moodle version the plugin claims to support (version.php: 4.5 through 5.2) is
+# exercised at the lowest and highest PHP version that Moodle release supports, on both
+# database families. A version that is only claimed and never run is a promise, not support
+# (Catalyst review, 2026-09).
 
 on:
   push:
@@ -14,7 +19,7 @@ concurrency:
 
 jobs:
   test:
-    name: PHP ${{ matrix.php }} / ${{ matrix.database }}
+    name: Moodle ${{ matrix.moodle.branch }} / PHP ${{ matrix.moodle.php }} / ${{ matrix.database }}
     runs-on: ubuntu-24.04
 
     services:
@@ -47,10 +52,25 @@ jobs:
 
     strategy:
       fail-fast: false
+      # Each Moodle release at its lowest and highest supported PHP, crossed with both
+      # databases. The branch/PHP pairs are one axis (an object per entry) rather than an
+      # `include` list: includes that carry only new keys are merged into every existing
+      # combination and overwrite each other, which silently left a single pair running.
       matrix:
-        php: ['8.1', '8.2', '8.3']
-        moodle-branch: ['MOODLE_405_STABLE']
         database: [pgsql, mariadb]
+        moodle:
+          # Moodle 4.5: PHP 8.1 – 8.3.
+          - { branch: MOODLE_405_STABLE, php: '8.1' }
+          - { branch: MOODLE_405_STABLE, php: '8.3' }
+          # Moodle 5.0: PHP 8.2 – 8.3.
+          - { branch: MOODLE_500_STABLE, php: '8.2' }
+          - { branch: MOODLE_500_STABLE, php: '8.3' }
+          # Moodle 5.1: PHP 8.2 – 8.4.
+          - { branch: MOODLE_501_STABLE, php: '8.2' }
+          - { branch: MOODLE_501_STABLE, php: '8.4' }
+          # Moodle 5.2: PHP 8.3 – 8.4.
+          - { branch: MOODLE_502_STABLE, php: '8.3' }
+          - { branch: MOODLE_502_STABLE, php: '8.4' }
 
     steps:
       - name: Check out repository code
@@ -59,10 +79,10 @@ jobs:
           path: plugin
           persist-credentials: false
 
-      - name: Setup PHP ${{ matrix.php }}
+      - name: Setup PHP ${{ matrix.moodle.php }}
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: ${{ matrix.moodle.php }}
           extensions: ${{ matrix.extensions }}
           ini-values: max_input_vars=5000, opcache.enable_cli=1
           coverage: none
@@ -79,7 +99,7 @@ jobs:
         run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
         env:
           DB: ${{ matrix.database }}
-          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+          MOODLE_BRANCH: ${{ matrix.moodle.branch }}
 
       - name: PHP lint
         if: ${{ !cancelled() }}
@@ -90,17 +110,24 @@ jobs:
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpmd
 
+      # Coding style and PHPDoc are merge gates: the tree is clean, and the
+      # Catalyst review requires it to stay that way.
       - name: Moodle Code Checker
-        # Keep the existing coding-style backlog visible while functional and
-        # compatibility checks remain the required merge gates.
-        continue-on-error: true
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpcs --max-warnings 0
 
       - name: Moodle PHPDoc Checker
-        continue-on-error: true
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpdoc --max-warnings 0
+
+      - name: Plugin static checks
+        if: ${{ !cancelled() }}
+        working-directory: plugin
+        run: |
+          for check in tests/static/*.php; do
+            echo "== $check"
+            php "$check"
+          done
 
       - name: Validate plugin
         if: ${{ !cancelled() }}
@@ -131,7 +158,7 @@ jobs:
         if: ${{ failure() && steps.behat.outcome == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
-          name: Behat faildump (${{ join(matrix.*, ', ') }})
+          name: Behat faildump (${{ matrix.moodle.branch }}, PHP ${{ matrix.moodle.php }}, ${{ matrix.database }})
           path: ${{ github.workspace }}/moodledata/behat_dump
           retention-days: 7
           if-no-files-found: ignore

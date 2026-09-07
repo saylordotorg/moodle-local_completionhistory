@@ -28,7 +28,6 @@ namespace local_completionhistory\local;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class program_context_resolver {
-
     /** @var bool|null Cached result of table existence check. */
     private static ?bool $tablesexist = null;
 
@@ -61,8 +60,8 @@ class program_context_resolver {
      *
      * Returns an array of objects with: programid, fullname, idnumber, allocationid.
      *
-     * @param int $userid
-     * @param int $courseid
+     * @param int $userid Learner's user id.
+     * @param int $courseid Course that was completed.
      * @return array Array of stdClass objects representing matched programs.
      */
     public static function resolve(int $userid, int $courseid): array {

@@ -26,12 +26,11 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class grade_snapshot_service {
-
     /**
      * Get the course total grade for a user.
      *
-     * @param int $userid
-     * @param int $courseid
+     * @param int $userid Learner's user id.
+     * @param int $courseid Course whose total grade to read.
      * @return stdClass|null Object with finalgrade, grademax, gradepass, passed; or null if unavailable.
      */
     public static function get_course_total(int $userid, int $courseid): ?stdClass {

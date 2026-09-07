@@ -29,7 +29,6 @@ use stdClass;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class backfill_service {
-
     /**
      * Scan historical completions and backfill missing achievement rows.
      *
