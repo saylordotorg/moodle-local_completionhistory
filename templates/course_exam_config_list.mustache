@@ -89,12 +89,13 @@
             <tbody>
                 {{#rows}}
                     <tr>
-                        <td>{{coursename}}</td>
+                        {{! Course and quiz names are format_string() output: already escaped and filtered. }}
+                        <td>{{{coursename}}}</td>
                         <td>{{shortname}}</td>
                         <td><span class="badge {{typebadgeclass}}">{{typelabel}}</span></td>
-                        <td>{{programquiz}}</td>
-                        <td>{{dcquiz}}</td>
-                        <td>{{certquiz}}</td>
+                        <td>{{{programquiz}}}</td>
+                        <td>{{{dcquiz}}}</td>
+                        <td>{{{certquiz}}}</td>
                         <td>{{attempts}}</td>
                         <td class="lch-actions">
                             <a href="{{editurl}}" class="btn btn-sm btn-outline-primary">{{#str}}edit, core{{/str}}</a>

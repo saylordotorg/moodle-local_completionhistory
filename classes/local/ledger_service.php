@@ -73,6 +73,14 @@ class ledger_service {
     public const REVISION_CERTIFICATE_CLEARED = 'certificate_cleared';
 
     /**
+     * Seconds to wait for another revision of the same achievement to finish.
+     *
+     * A holder does one read, one update and a few inserts; anything longer than this is a
+     * problem to surface, not to queue behind.
+     */
+    public const REVISION_LOCK_TIMEOUT = 10;
+
+    /**
      * Capture an achievement from a course completion record.
      *
      * @param stdClass    $completion      A course_completions record (userid, course, timecompleted).
@@ -268,6 +276,15 @@ class ledger_service {
      * a data condition, and throws. Unchanged values are ignored, so a caller can pass the full intended
      * state and a no-op leaves no trace. Runs in a delegated transaction and so nests inside a caller's.
      *
+     * ONE REVISION AT A TIME PER ACHIEVEMENT. The history is only reconstructible if each row's "old"
+     * value is what the row actually held when the "new" one was written. Two observers revising the
+     * same achievement at once — a regrade landing while a certificate is issued, or Moodle re-firing
+     * user_graded for every enrolled user on one gradebook save — could both read the same previous
+     * value and record 80→85 and 80→90 for a transition that was really 85→90. So the read and the
+     * write happen under a per-achievement lock from Moodle's lock API (portable across database
+     * families, unlike SELECT ... FOR UPDATE). A caller that cannot get the lock within the timeout is
+     * refused rather than allowed to write a history that lies.
+     *
      * @param int    $achievementid The row to revise.
      * @param array  $changes       Column name => new value.
      * @param string $reason        One of the REVISION_* constants.
@@ -275,6 +292,7 @@ class ledger_service {
      * @return int Number of columns actually changed (0 = nothing was written).
      * @throws \coding_exception For a column that is not revisable.
      * @throws \dml_exception When the achievement does not exist.
+     * @throws \moodle_exception When another revision of the same achievement holds the lock too long.
      */
     public static function revise_achievement(int $achievementid, array $changes, string $reason, string $source): int {
         global $DB;
@@ -284,6 +302,31 @@ class ledger_service {
                 throw new \coding_exception('Achievement column is not revisable: ' . $field);
             }
         }
+
+        $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_revision');
+        $lock = $lockfactory->get_lock('achievement_' . $achievementid, self::REVISION_LOCK_TIMEOUT);
+        if (!$lock) {
+            throw new \moodle_exception('revisionlockunavailable', 'local_completionhistory', '', $achievementid);
+        }
+
+        try {
+            return self::revise_achievement_locked($achievementid, $changes, $reason, $source);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * The body of revise_achievement(), run while the per-achievement lock is held.
+     *
+     * @param int    $achievementid The row to revise.
+     * @param array  $changes       Column name => new value, already validated as revisable.
+     * @param string $reason        One of the REVISION_* constants.
+     * @param string $source        What triggered it.
+     * @return int Number of columns actually changed.
+     */
+    private static function revise_achievement_locked(int $achievementid, array $changes, string $reason, string $source): int {
+        global $DB;
 
         $revisions = [];
         $transaction = $DB->start_delegated_transaction();

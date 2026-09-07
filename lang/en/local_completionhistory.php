@@ -393,6 +393,7 @@ $string['revision_reason_certificate_attached'] = 'Certificate issued';
 $string['revision_reason_certificate_cleared'] = 'Certificate revoked';
 $string['revision_reason_exam_context_set'] = 'Completing exam track identified';
 $string['revision_reason_grade_corrected'] = 'Grade corrected in the gradebook after completion';
+$string['revisionlockunavailable'] = 'Another correction to achievement {$a} is still being recorded. Please try again.';
 $string['savedefault'] = 'Save as site default';
 $string['savedefault_help'] = 'Save the current columns and order as the site-wide default for this page (visible to all users who have not saved their own layout).';
 $string['savelayout'] = 'Save layout';

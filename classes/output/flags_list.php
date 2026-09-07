@@ -16,9 +16,9 @@
 
 namespace local_completionhistory\output;
 
-use core\output\renderable;
-use core\output\renderer_base;
-use core\output\templatable;
+use renderable;
+use renderer_base;
+use templatable;
 use local_completionhistory\local\flag_service;
 use moodle_url;
 use stdClass;
