@@ -135,6 +135,7 @@ class get_user_certificates extends external_api {
                     t.name AS templatename
                FROM {tool_certificate_issues} i
                JOIN {tool_certificate_templates} t ON t.id = i.templateid
+                    {$coursejoin}
               WHERE i.userid = :userid
            ORDER BY i.timecreated DESC, i.id DESC",
             ['userid' => $user->id],
