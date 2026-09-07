@@ -1,6 +1,6 @@
 # Saylor SIS Integration (`local_completionhistory`)
 
-[![Moodle Plugin CI for 4.5](https://github.com/saylordotorg/moodle-local_saylorsis/actions/workflows/moodle-plugin-ci.yml/badge.svg)](https://github.com/saylordotorg/moodle-local_saylorsis/actions/workflows/moodle-plugin-ci.yml)
+[![Moodle Plugin CI](https://github.com/saylordotorg/moodle-local_completionhistory/actions/workflows/moodle-plugin-ci.yml/badge.svg)](https://github.com/saylordotorg/moodle-local_completionhistory/actions/workflows/moodle-plugin-ci.yml)
 
 The Moodle half of the link between this site and the Saylor SIS. It exposes a deliberately narrow
 server-to-server surface — nineteen web service functions covering account provisioning, enrolment
@@ -13,7 +13,8 @@ and a transactional outbox the SIS drains.
 
 The ledger came first and named the plugin; the integration is now the larger half, so the
 **displayed** name is "Saylor SIS Integration". The frankenstyle component deliberately did not
-follow it.
+follow it, and the repository is named for the component, following Moodle's
+`moodle-<frankenstyle>` convention so hosts and tooling can derive one from the other.
 
 In Moodle a component name is not a label. It is the key for nine database tables, twelve
 capabilities, nineteen web service functions, every `config_plugins` row, and the observer, hook and
