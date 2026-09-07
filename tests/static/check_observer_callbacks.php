@@ -41,6 +41,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
 $root      = dirname(__DIR__, 2);
 $eventspath = $root . '/db/events.php';
 
@@ -82,7 +83,7 @@ echo "observers registered in db/events.php:\n";
 foreach ($m as $obs) {
     [, $eventname, $callback] = $obs;
 
-    // '\local_completionhistory\callbacks::course_completed' -> class, method.
+    // Split '\local_completionhistory\callbacks::course_completed' into class and method.
     if (!str_contains($callback, '::')) {
         $failures[] = "{$eventname}: callback '{$callback}' is not a Class::method reference";
         continue;

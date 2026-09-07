@@ -60,8 +60,8 @@ class program_context_resolver {
      *
      * Returns an array of objects with: programid, fullname, idnumber, allocationid.
      *
-     * @param int $userid
-     * @param int $courseid
+     * @param int $userid Learner's user id.
+     * @param int $courseid Course that was completed.
      * @return array Array of stdClass objects representing matched programs.
      */
     public static function resolve(int $userid, int $courseid): array {

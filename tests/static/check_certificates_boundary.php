@@ -39,8 +39,13 @@
  *
  * Per the house standard, every check below was made to FAIL against a
  * deliberately broken copy before being trusted.
+ *
+ * @package    local_completionhistory
+ * @copyright  2026 Saylor Academy
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
 $root = dirname(__DIR__, 2);
 $external = file_get_contents($root . '/classes/external/get_user_certificates.php');
 $services = file_get_contents($root . '/db/services.php');

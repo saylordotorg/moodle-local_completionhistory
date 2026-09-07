@@ -38,6 +38,11 @@ class get_recent_achievements extends external_api {
     /** Hard ceiling on rows per call. */
     private const MAX_LIMIT = 1000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'since' => new external_value(PARAM_INT, 'Return achievements created after this timestamp'),
@@ -45,6 +50,13 @@ class get_recent_achievements extends external_api {
         ]);
     }
 
+    /**
+     * Return achievements created after a timestamp, oldest first, in the canonical payload shape.
+     *
+     * @param int $since Return achievements created after this Unix timestamp.
+     * @param int $limit Maximum records to return (capped at 1000).
+     * @return array Achievement payloads as built by outbox_service::build_achievement_payload().
+     */
     public static function execute(int $since, int $limit = 500): array {
         global $DB;
 
@@ -81,6 +93,11 @@ class get_recent_achievements extends external_api {
         return $result;
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_multiple_structure
+     */
     public static function execute_returns(): external_multiple_structure {
         return new external_multiple_structure(
             new external_single_structure([

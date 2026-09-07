@@ -29,6 +29,8 @@ require_once($CFG->libdir . '/formslib.php');
 class course_mapping_form extends \moodleform {
     /**
      * Form definition.
+     *
+     * @return void
      */
     protected function definition(): void {
         $mform = $this->_form;
@@ -100,6 +102,10 @@ class course_mapping_form extends \moodleform {
 
     /**
      * Validation.
+     *
+     * @param array $data  Submitted data.
+     * @param array $files Submitted files.
+     * @return array Errors keyed by element name.
      */
     public function validation($data, $files): array {
         $errors = parent::validation($data, $files);
@@ -108,7 +114,7 @@ class course_mapping_form extends \moodleform {
             !empty($data['oldcourseid']) && !empty($data['newcourseid'])
             && $data['oldcourseid'] == $data['newcourseid']
         ) {
-            $errors['newcourseid'] = 'Old and new course must be different.';
+            $errors['newcourseid'] = get_string('mapping_samecourse', 'local_completionhistory');
         }
 
         return $errors;

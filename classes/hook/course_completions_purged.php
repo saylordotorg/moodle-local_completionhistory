@@ -49,11 +49,11 @@ final class course_completions_purged {
     /**
      * Constructor.
      *
-     * @param int $userid
-     * @param string $reason
-     * @param array $purgedids
-     * @param int|null $courseid
-     * @param int|null $programid
+     * @param int $userid The user whose completions are being purged.
+     * @param string $reason Reason for the purge (e.g. 'program_reset', 'reallocation').
+     * @param array $purgedids IDs of the course_completions rows being purged.
+     * @param int|null $courseid The specific course id, or null for a program-wide purge.
+     * @param int|null $programid The program id triggering the purge, if applicable.
      */
     public function __construct(
         int $userid,

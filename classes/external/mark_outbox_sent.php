@@ -37,6 +37,11 @@ class mark_outbox_sent extends external_api {
     /** Maximum retained delivery-error length. */
     private const MAX_ERROR_LENGTH = 4000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'ids'    => new external_multiple_structure(
@@ -47,6 +52,14 @@ class mark_outbox_sent extends external_api {
         ]);
     }
 
+    /**
+     * Set the delivery status of the given outbox rows.
+     *
+     * @param array $ids Outbox row ids to update (at most 1000).
+     * @param string $status New status: sent, failed or cancelled.
+     * @param string $error Error message to store alongside a failed status.
+     * @return array The number of rows updated under the 'updated' key.
+     */
     public static function execute(array $ids, string $status = 'sent', string $error = ''): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'ids'    => $ids,
@@ -82,6 +95,11 @@ class mark_outbox_sent extends external_api {
         return ['updated' => $updated];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'updated' => new external_value(PARAM_INT, 'Number of outbox rows updated'),

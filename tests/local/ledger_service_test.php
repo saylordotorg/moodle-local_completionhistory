@@ -25,8 +25,12 @@ use stdClass;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\local\ledger_service
  */
-class ledger_service_test extends advanced_testcase {
+final class ledger_service_test extends advanced_testcase {
+    /**
+     * Enable the plugin with capture on and a fixed hash secret, and reset the site after each test.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();

@@ -35,6 +35,11 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class set_password extends external_api {
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'email'    => new external_value(PARAM_EMAIL, 'User email (identity key)'),
@@ -42,6 +47,13 @@ class set_password extends external_api {
         ]);
     }
 
+    /**
+     * Complete a newly provisioned learner's one-time password setup.
+     *
+     * @param string $email Email address identifying the manual-auth learner account.
+     * @param string $password New password, checked against the site password policy.
+     * @return array Whether the password was set and a failure reason when it was not.
+     */
     public static function execute(string $email, string $password): array {
         global $CFG;
         require_once($CFG->dirroot . '/user/lib.php');
@@ -101,6 +113,11 @@ class set_password extends external_api {
         return ['success' => true, 'warning' => ''];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'success' => new external_value(PARAM_BOOL, 'Whether the password was set'),

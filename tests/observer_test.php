@@ -27,8 +27,12 @@ use local_completionhistory\local\ledger_service;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\callbacks
  */
-class observer_test extends advanced_testcase {
+final class observer_test extends advanced_testcase {
+    /**
+     * Enable the plugin with autocapture and purge auditing on, and reset the site after each test.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();

@@ -36,7 +36,9 @@ use context_system;
  * @covers     \local_completionhistory\external\get_user_certificates
  */
 final class get_user_certificates_test extends advanced_testcase {
-    /** Grant the certificate-read capability to the current user via a fresh role. */
+    /**
+     * Grant the certificate-read capability to the current user via a fresh role.
+     */
     private function grant_capability(): void {
         global $DB;
         $roleid = create_role('Cert reader', 'certreader', '');
@@ -53,13 +55,18 @@ final class get_user_certificates_test extends advanced_testcase {
         );
     }
 
-    /** A logged-in caller holding exactly the read capability. */
+    /**
+     * A logged-in caller holding exactly the read capability.
+     */
     private function login_caller(): void {
         $caller = $this->getDataGenerator()->create_user(['username' => 'certcaller']);
         $this->setUser($caller);
         $this->grant_capability();
     }
 
+    /**
+     * A disabled plugin refuses the read before touching any data.
+     */
     public function test_disabled_plugin_refuses(): void {
         $this->resetAfterTest();
         set_config('enabled', 0, 'local_completionhistory');
@@ -69,6 +76,9 @@ final class get_user_certificates_test extends advanced_testcase {
         get_user_certificates::execute('someone@example.com');
     }
 
+    /**
+     * A caller without viewcertificates is refused.
+     */
     public function test_capability_is_required(): void {
         $this->resetAfterTest();
         set_config('enabled', 1, 'local_completionhistory');
@@ -79,6 +89,9 @@ final class get_user_certificates_test extends advanced_testcase {
         get_user_certificates::execute('someone@example.com');
     }
 
+    /**
+     * A site without a certificate manager reports unavailability rather than an empty list.
+     */
     public function test_site_without_certificate_manager_says_so(): void {
         global $DB;
         $this->resetAfterTest();
@@ -103,6 +116,9 @@ final class get_user_certificates_test extends advanced_testcase {
         $this->assertSame([], $result['certificates']);
     }
 
+    /**
+     * An email shared by two accounts is refused rather than resolved to either.
+     */
     public function test_ambiguous_email_is_refused_not_resolved(): void {
         global $CFG;
         $this->resetAfterTest();

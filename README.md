@@ -15,7 +15,7 @@ The ledger came first and named the plugin; the integration is now the larger ha
 **displayed** name is "Saylor SIS Integration". The frankenstyle component deliberately did not
 follow it.
 
-In Moodle a component name is not a label. It is the key for eight database tables, twelve
+In Moodle a component name is not a label. It is the key for nine database tables, twelve
 capabilities, nineteen web service functions, every `config_plugins` row, and the observer, hook and
 task registrations — and there is no supported way to change it. A renamed component is a *new*
 plugin: Moodle runs `db/install.xml`, creates empty tables, and offers to uninstall the old plugin,
@@ -34,8 +34,8 @@ silently.
 
 ## Requirements
 
-- Moodle 4.5 through 5.2
-- PHP 8.1+
+- Moodle 4.5 through 5.2 — every one of these is exercised in CI, at the lowest and highest PHP version that Moodle release supports, on PostgreSQL and MariaDB (see `.github/workflows/moodle-plugin-ci.yml`)
+- PHP 8.1+ (8.2+ for Moodle 5.0 and 5.1, 8.3+ for Moodle 5.2, as Moodle itself requires)
 - Optional for the core ledger: `enrol_programs` and Moodle Workplace certificate tooling
 - No longer required: `enrol_programs`. Since 0.7.0 provisioning creates the account only, and programme membership is a fact the SIS owns
 
@@ -128,6 +128,8 @@ php local/completionhistory/cli/check_service_capabilities.php
 php local/completionhistory/tests/static/check_service_capability_declarations.php
 ```
 
+Every script in `tests/static/` runs against the source tree alone and is part of CI. `check_phpdoc_params.php` fails on any function whose docblock does not document exactly its parameters — the check Moodle's PHPDoc tool would make, without needing an installed Moodle.
+
 The live check reads the capabilities the upgrade **registered**, not the ones on disk, and reports any disagreement between the two in either direction — a function declared but not registered, one still served after being removed, or a changed capability list. Editing `db/services.php` without bumping `version.php` re-registers nothing and leaves the site enforcing a definition no file describes any more. It also flags a disabled service, an enabled service no account can call, a suspended service account, a token whose account is missing from a restricted service's authorised list, and an account with no usable `webservice/*:use` transport.
 
 **A narrow service account is not a broken one.** The security model above grants each capability only when the operation is required, so coverage is judged one function at a time:
@@ -154,6 +156,7 @@ Neither check grants anything. An account can hold a capability through any of s
 |---|---|
 | `local_completionhistory_achievement` | Durable achievement and identity/course snapshots |
 | `local_completionhistory_ach_program` | Program snapshots associated with an achievement |
+| `local_completionhistory_ach_revision` | Correction history: the previous and new value of every revised grade, exam-context or certificate column |
 | `local_completionhistory_exam_attempt` | Per-attempt academic/proctoring history |
 | `local_completionhistory_course_exam_config` | Admin exam-track configuration |
 | `local_completionhistory_course_map` | Retired-to-replacement course mappings |
@@ -162,6 +165,8 @@ Neither check grants anything. An account can hold a capability through any of s
 | `local_completionhistory_outbox` | Denormalized SIS synchronization messages |
 
 Achievement capture is transactional with program snapshots and the optional outbox row. A deterministic keyed event digest makes observer and backfill processing idempotent. Academic snapshots intentionally do not use foreign keys to live user, course, or program records because they must survive source-record retirement.
+
+**The ledger is append-only in its identity, not in every column.** A row is captured once per completion and is never deleted when source data changes, and it keeps its `ledgeruuid`, user, course and completion time for life. But Moodle can learn something new about a completion afterwards — a teacher regrades the exam, a certificate is issued or revoked, a backfill identifies the completing attempt — and a ledger that refused to reflect that would simply be wrong forever. So the grade, exam-context and certificate columns may be revised, and every revision is recorded in `local_completionhistory_ach_revision` with the previous value, the new value, the reason and the trigger (`ledger_service::revise_achievement()`). The figure originally captured is always recoverable from that history, and it is included in a learner's privacy export. Anonymization on erasure is the one change deliberately kept out of the history, since a history of the erased identity would defeat the erasure; it also blanks the certificate values in existing revision rows.
 
 ## Other capabilities
 

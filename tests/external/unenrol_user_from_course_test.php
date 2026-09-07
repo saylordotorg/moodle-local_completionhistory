@@ -43,6 +43,7 @@ use advanced_testcase;
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @covers \local_completionhistory\external\unenrol_user_from_course
  */
 final class unenrol_user_from_course_test extends advanced_testcase {
     /**

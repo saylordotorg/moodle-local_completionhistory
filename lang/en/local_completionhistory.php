@@ -27,7 +27,7 @@
  *
  * THE DISPLAYED NAME ONLY. The frankenstyle component stays `local_completionhistory`, and this
  * string is deliberately the one thing that moves: the component name is the primary key for
- * eight tables, twelve capabilities, nineteen web service functions and every config_plugins row,
+ * nine tables, twelve capabilities, nineteen web service functions and every config_plugins row,
  * and Moodle has no supported way to change it — a new component installs empty tables and leaves
  * the ledger orphaned.
  *
@@ -110,7 +110,7 @@ $string['examattemptlog']   = 'Exam Attempt Log';
 $string['purgeaudit']       = 'Purge Audit Log';
 $string['manageflags']      = 'Manage System Flags';
 
-// ── Table column headers ─────────────────────────────────────────────────────
+// Table column headers.
 $string['col_user']                  = 'User';
 $string['col_firstname']             = 'First Name';
 $string['col_lastname']              = 'Last Name';
@@ -150,7 +150,7 @@ $string['col_attempt_result']       = 'Result';
 $string['col_attempt_date']         = 'Date';
 $string['col_achievement_link']     = 'Achievement';
 
-// ── Ledger filter UI ─────────────────────────────────────────────────────────
+// Ledger filter UI.
 $string['filter_heading']          = 'Filters';
 $string['filter_passed']           = 'Pass status';
 $string['filter_passed_any']       = 'Any';
@@ -200,18 +200,18 @@ $string['filter_user_search']      = 'User search';
 $string['filter_exhausted_only']   = 'Only show rows where the track is exhausted';
 $string['filter_completing_only']  = 'Only show the attempt that completed the course';
 
-// ── Course types ─────────────────────────────────────────────────────────────
+// Course types.
 $string['course_type_standard']  = 'Standard (no exam tracking)';
 $string['course_type_program']   = 'Program course — one final exam';
 $string['course_type_open_dual'] = 'Open course — Direct Credit + Certificate tracks';
 $string['course_type_open_cert'] = 'Open course — Certificate track only';
 
-// ── Exam tracks ──────────────────────────────────────────────────────────────
+// Exam tracks.
 $string['track_program_final'] = 'Program Final';
 $string['track_direct_credit'] = 'Direct Credit';
 $string['track_certificate']   = 'Certificate';
 
-// ── Course exam config admin UI ──────────────────────────────────────────────
+// Course exam config admin UI.
 $string['examconfig_add']              = 'Add Course Exam Config';
 $string['examconfig_edit']             = 'Edit Course Exam Config';
 $string['examconfig_none']             = 'No courses have been configured yet. Click "Add" to get started.';
@@ -227,7 +227,7 @@ $string['examconfig_confirmdelete']    = 'Delete this exam configuration? This d
 $string['examconfigsaved']             = 'Course exam configuration saved.';
 $string['examconfigdeleted']           = 'Course exam configuration deleted.';
 
-// ── Attempt history (expand panel) ──────────────────────────────────────────
+// Attempt history (expand panel).
 $string['attempts_panel_title']     = 'Exam Attempt History';
 $string['attempts_none']            = 'No attempt records found for this course.';
 $string['attempt_track']            = 'Track';
@@ -238,11 +238,11 @@ $string['attempt_date']             = 'Date';
 $string['attempt_completing']       = 'Completing attempt';
 $string['track_exhausted']          = 'Track exhausted';
 
-// ── Migration rules ──────────────────────────────────────────────────────────
+// Migration rules.
 $string['migrationrule_redirect_incomplete'] = 'Redirect incomplete learners';
 $string['migrationrule_recommend']           = 'Recommend only';
 
-// ── Actions ──────────────────────────────────────────────────────────────────
+// Actions.
 $string['addmapping']           = 'Add course mapping';
 $string['editmapping']          = 'Edit course mapping';
 $string['deletemapping']        = 'Delete course mapping';
@@ -250,11 +250,11 @@ $string['confirmdeletemapping'] = 'Are you sure you want to delete this course r
 $string['mappingsaved']         = 'Course replacement mapping saved.';
 $string['mappingdeleted']       = 'Course replacement mapping deleted.';
 
-// ── Replacement recommendations ──────────────────────────────────────────────
+// Replacement recommendations.
 $string['replacedby']             = 'Replaced by: {$a}';
 $string['replacementavailable']   = 'A replacement course is available';
 
-// ── Status messages ──────────────────────────────────────────────────────────
+// Status messages.
 $string['noachievements']  = 'No achievement records found.';
 $string['nomappings']      = 'No course replacement mappings found.';
 $string['plugindisabled']  = 'The Saylor SIS Integration plugin is currently disabled.';
@@ -262,15 +262,15 @@ $string['gradepassed']     = 'Passed';
 $string['gradefailed']     = 'Not passed';
 $string['gradeunknown']    = 'N/A';
 
-// ── CLI ──────────────────────────────────────────────────────────────────────
+// CLI.
 $string['cli_backfill_started']  = 'Starting achievement backfill...';
 $string['cli_backfill_dryrun']   = 'DRY RUN - no records will be inserted.';
 $string['cli_backfill_complete'] = 'Backfill complete. Scanned: {$a->scanned}, Inserted: {$a->inserted}, Skipped: {$a->skipped}, Errors: {$a->errors}';
 $string['cli_audit_started']     = 'Starting achievement audit...';
 $string['cli_audit_complete']    = 'Audit complete.';
 
-// ── Privacy ──────────────────────────────────────────────────────────────────
-$string['privacy:metadata:achievement']                          = 'Records of course completions captured as immutable achievement history.';
+// Privacy.
+$string['privacy:metadata:achievement']                          = 'Records of course completions captured as durable achievement history.';
 $string['privacy:metadata:achievement:ledgeruuid']               = 'A stable pseudonymous identifier for the achievement.';
 $string['privacy:metadata:achievement:userid']                   = 'The user who completed the course.';
 $string['privacy:metadata:achievement:useridnumber_snapshot']    = 'The user idnumber at the time of completion.';
@@ -343,12 +343,12 @@ $string['privacy:metadata:preference:ledger_cols']               = 'The user\'s 
 $string['privacy:metadata:preference:attempts_cols']             = 'The user\'s saved exam-attempt column layout.';
 $string['privacy:export:exam_attempts']                          = 'Exam attempts';
 $string['privacy:export:outbox']                                 = 'SIS synchronization queue';
-// ── Tasks ────────────────────────────────────────────────────────────────────
+// Tasks.
 $string['task_reconcile_ledger']        = 'Reconcile achievement ledger';
 $string['task_process_outbox']          = 'Process SIS sync outbox';
 $string['task_reconcile_anonymization'] = 'Reconcile anonymization for deleted users';
 
-// ── System flags ─────────────────────────────────────────────────────────────
+// System flags.
 $string['addflag']                    = 'Add flag';
 $string['editflag']                   = 'Edit flag';
 $string['flags_none']                 = 'No system flags defined yet. Use the Add flag button to create one.';
@@ -399,8 +399,94 @@ $string['flagsloadpresets_help']      = 'Inserts the standard rubric of seven sy
 $string['flagsloadpresets_confirm']   = 'Insert any missing preset flags? Existing flags you have edited will be left alone.';
 $string['flagspresetsloaded']         = 'Preset flags loaded: {$a} inserted.';
 
-// ── Errors ───────────────────────────────────────────────────────────────────
+// Errors.
 $string['error_nocourse']       = 'Course not found.';
 $string['error_nouser']         = 'User not found.';
 $string['error_duplicatehash']  = 'Achievement already recorded (duplicate event hash).';
 $string['error_plugindisabled'] = 'Saylor SIS Integration plugin is disabled.';
+
+// Achievement ledger page and attempt details (Catalyst review).
+$string['anonymized']              = 'anonymized';
+$string['nodata']                  = '-';
+$string['emptyvalue']              = '—';
+$string['days_today']              = 'Today';
+$string['days_sameday']            = 'Same day';
+$string['days_one']                = '1 day';
+$string['days_count']              = '{$a} days';
+$string['days_ago_one']            = '1 day ago';
+$string['days_ago']                = '{$a} days ago';
+$string['attempts_unlimited']      = '∞';
+$string['attempts_summary']        = '{$a->used} / {$a->allowed}';
+$string['attempt_details']         = 'Details';
+$string['attempt_details_loading'] = 'Loading attempt history…';
+$string['attempt_details_error']   = 'The attempt history could not be loaded.';
+$string['result_passed']           = 'Passed';
+$string['result_failed']           = 'Failed';
+$string['result_failed_exhausted'] = 'Failed — track exhausted';
+$string['placeholder_userid']      = 'User ID';
+$string['placeholder_coursename']  = 'Course name';
+$string['placeholder_source']      = 'Source component';
+$string['placeholder_date']        = 'YYYY-MM-DD';
+$string['filter_reset']            = 'Reset filters';
+$string['columns_reorder_hint']    = 'Visible columns in display order. Drag a badge to move it.';
+
+// Exam attempt log page (Catalyst review).
+$string['placeholder_usersearch'] = 'Name or User ID#';
+$string['stats_total']            = 'Total Attempts';
+$string['stats_passed']           = 'Passed';
+$string['stats_failed']           = 'Failed';
+$string['stats_exhausted']        = 'Track Exhausted';
+$string['stats_completing']       = 'Completing Attempt';
+$string['attempt_of']             = '{$a->number} of {$a->allowed}';
+$string['attempt_final']          = 'Final';
+$string['ago_today']              = 'today';
+$string['duration_hms']           = '{$a->h}h {$a->m}m {$a->s}s';
+$string['duration_ms']            = '{$a->m}m {$a->s}s';
+$string['duration_s']             = '{$a->s}s';
+$string['ledger_link']            = 'Ledger';
+
+// Course exam configuration and system flags pages (Catalyst review).
+$string['examconfig_edit_heading']     = 'Edit Course Exam Config: {$a}';
+$string['examconfig_course_missing']   = 'Course #{$a}';
+$string['examconfig_quiz_missing']     = 'Quiz #{$a}';
+$string['examconfig_notmapped_short']  = '—';
+$string['examconfig_unlimited']        = '∞';
+$string['examconfig_attempts_summary'] = '{$a->program} / {$a->dc} / {$a->cert}';
+$string['examconfig_attempts_range']   = 'Attempts allowed must be between {$a->min} and {$a->max}.';
+$string['col_examconfig_type']         = 'Type';
+$string['col_program_final_quiz']      = 'Program Final Quiz';
+$string['col_dc_quiz']                 = 'DC Quiz';
+$string['col_cert_quiz']               = 'Cert Quiz';
+$string['col_attempts_summary']        = 'Attempts (P/DC/Cert)';
+$string['flag_config_pair']            = '{$a->key}={$a->value}';
+$string['flagpreset_score_zero_name']       = 'Score = 0';
+$string['flagpreset_score_zero_desc']       = 'Exam score is 0. Possible technical issues or dropped session.';
+$string['flagpreset_score_low_name']        = 'Score <= 20';
+$string['flagpreset_score_low_desc']        = 'Exam score is 1–20%. Possible technical issues or dropped session.';
+$string['flagpreset_score_high_name']       = 'Score >= 90';
+$string['flagpreset_score_high_desc']       = 'Exam score is 90% or higher. Possible use of external resources.';
+$string['flagpreset_dur_at_most_20m_name']  = 'Dur <= 20 min';
+$string['flagpreset_dur_at_most_20m_desc']  = 'Exam duration <= 20 minutes. Possible technical issues or dropped session.';
+$string['flagpreset_dur_exact_2h_name']     = 'Dur = 2 hr';
+$string['flagpreset_dur_exact_2h_desc']     = 'Exam duration is exactly 2 hours. Auto-submission at end of time limit; possible dropped session.';
+$string['flagpreset_potential_dupe_name']   = 'Potential dupe';
+$string['flagpreset_potential_dupe_desc']   = 'Account flagged as possible duplicate. Possible attempt to bypass waiting period.';
+$string['flagpreset_new_account_name']      = 'New account';
+$string['flagpreset_new_account_desc']      = 'Account created less than 2 days before exam. Possible attempt to bypass waiting period with an alternate account.';
+$string['mapping_samecourse']          = 'Old and new course must be different.';
+$string['coursename_deleted']          = '[deleted]';
+
+// Ledger correction history and replacement lookup (Catalyst review).
+$string['replacementlookupnotallowed'] = 'You can only look up the replacement for a course you are, or were, enrolled in.';
+$string['privacy:metadata:ach_revision'] = 'Correction history for achievement records: the previous and new value of each revised grade, exam-context or certificate column.';
+$string['privacy:metadata:ach_revision:achievementid'] = 'The user\'s achievement whose value was revised.';
+$string['privacy:metadata:ach_revision:fieldname'] = 'Which column of the achievement was revised.';
+$string['privacy:metadata:ach_revision:oldvalue'] = 'The value before the revision.';
+$string['privacy:metadata:ach_revision:newvalue'] = 'The value after the revision.';
+$string['privacy:metadata:ach_revision:reason'] = 'Why the value was revised (grade corrected, exam context identified, certificate issued or revoked).';
+$string['privacy:metadata:ach_revision:source'] = 'The event or process that triggered the revision.';
+$string['privacy:metadata:ach_revision:timecreated'] = 'When the revision was recorded.';
+$string['revision_reason_grade_corrected'] = 'Grade corrected in the gradebook after completion';
+$string['revision_reason_exam_context_set'] = 'Completing exam track identified';
+$string['revision_reason_certificate_attached'] = 'Certificate issued';
+$string['revision_reason_certificate_cleared'] = 'Certificate revoked';

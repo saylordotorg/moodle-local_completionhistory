@@ -216,23 +216,35 @@ class artifact_service {
     }
 
     /**
-     * Persist artifact fields and enqueue the updated achievement for SIS sync.
+     * Persist artifact fields as a recorded revision and enqueue the achievement for SIS sync.
      *
-     * @param \stdClass $achievement
-     * @param string|null $url
-     * @param string|null $storage
+     * The change goes through the ledger's correction history, so a revoked certificate's link is
+     * recoverable from the revision row rather than simply gone. The outbox payload is built from the
+     * row as it is stored AFTER the revision, never from the copy this method was handed, for the same
+     * reason apply_grade_correction re-reads: the row may have been anonymized in between.
+     *
+     * @param \stdClass   $achievement The achievement row to revise.
+     * @param string|null $url         The certificate URL, or null to clear it.
+     * @param string|null $storage     The storage marker, or null to clear it.
      */
     private static function persist_artifact(\stdClass $achievement, ?string $url, ?string $storage): void {
         global $DB;
 
-        $updated = clone $achievement;
-        $updated->artifacturl = $url;
-        $updated->artifactstorage = $storage;
+        $reason = $url === null
+            ? ledger_service::REVISION_CERTIFICATE_CLEARED
+            : ledger_service::REVISION_CERTIFICATE_ATTACHED;
+        $source = $url === null
+            ? '\\tool_certificate\\event\\certificate_revoked'
+            : '\\tool_certificate\\event\\certificate_issued';
 
         $transaction = $DB->start_delegated_transaction();
         try {
-            $DB->update_record('local_completionhistory_achievement', $updated);
-            outbox_service::enqueue_achievement($updated);
+            ledger_service::revise_achievement((int) $achievement->id, [
+                'artifacturl' => $url,
+                'artifactstorage' => $storage,
+            ], $reason, $source);
+            $stored = $DB->get_record('local_completionhistory_achievement', ['id' => $achievement->id], '*', MUST_EXIST);
+            outbox_service::enqueue_achievement($stored);
             $transaction->allow_commit();
         } catch (\Exception $e) {
             $transaction->rollback($e);

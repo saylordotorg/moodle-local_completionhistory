@@ -226,7 +226,6 @@ foreach ($services as $service) {
     // a version bump is simply absent from the database, so a comparison that
     // only walked the registered functions would never look at it and would
     // report PASS on the very deploy it exists to catch.
-    // ------------------------------------------------------------------
     $sourcefunctions = $source['services'][$service->shortname] ?? null;
     if ($sourcefunctions === null) {
         $warnings[] = "{$service->shortname}: db/services.php does not declare this service, so the "
@@ -264,7 +263,6 @@ foreach ($services as $service) {
     // authorised list when the service is restricted. Both, because a token for
     // an account missing from the authorised list fails too, and an authorised
     // account with no token cannot call anything.
-    // ------------------------------------------------------------------
     $accounts = [];
     $tokenusers = $DB->get_records('external_tokens', ['externalserviceid' => $service->id], '', 'DISTINCT userid');
     foreach ($tokenusers as $t) {

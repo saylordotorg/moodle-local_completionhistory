@@ -38,6 +38,11 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class provision_applicant extends external_api {
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'email'     => new external_value(PARAM_EMAIL, 'Applicant email (identity key)'),
@@ -46,6 +51,14 @@ class provision_applicant extends external_api {
         ]);
     }
 
+    /**
+     * Find or create the applicant's Moodle account by email.
+     *
+     * @param string $email Applicant email address, the identity key.
+     * @param string $firstname First name used when the account is created.
+     * @param string $lastname Last name used when the account is created.
+     * @return array The user id and username, whether it was created, the initial password, and any warning.
+     */
     public static function execute(string $email, string $firstname, string $lastname): array {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/user/lib.php');
@@ -139,6 +152,11 @@ class provision_applicant extends external_api {
         }
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'userid'    => new external_value(PARAM_INT, 'Moodle user id'),

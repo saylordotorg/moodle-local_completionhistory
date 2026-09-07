@@ -1,4 +1,9 @@
-name: Moodle Plugin CI for 4.5
+name: Moodle Plugin CI
+
+# Every Moodle version the plugin claims to support (version.php: 4.5 through 5.2) is
+# exercised at the lowest and highest PHP version that Moodle release supports, on both
+# database families. A version that is only claimed and never run is a promise, not support
+# (Catalyst review, 2026-09).
 
 on:
   push:
@@ -14,7 +19,7 @@ concurrency:
 
 jobs:
   test:
-    name: PHP ${{ matrix.php }} / ${{ matrix.database }}
+    name: Moodle ${{ matrix.moodle-branch }} / PHP ${{ matrix.php }} / ${{ matrix.database }}
     runs-on: ubuntu-24.04
 
     services:
@@ -48,9 +53,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.1', '8.2', '8.3']
-        moodle-branch: ['MOODLE_405_STABLE']
         database: [pgsql, mariadb]
+        include:
+          # Moodle 4.5: PHP 8.1 – 8.3.
+          - moodle-branch: MOODLE_405_STABLE
+            php: '8.1'
+          - moodle-branch: MOODLE_405_STABLE
+            php: '8.3'
+          # Moodle 5.0: PHP 8.2 – 8.3.
+          - moodle-branch: MOODLE_500_STABLE
+            php: '8.2'
+          - moodle-branch: MOODLE_500_STABLE
+            php: '8.3'
+          # Moodle 5.1: PHP 8.2 – 8.4.
+          - moodle-branch: MOODLE_501_STABLE
+            php: '8.2'
+          - moodle-branch: MOODLE_501_STABLE
+            php: '8.4'
+          # Moodle 5.2: PHP 8.3 – 8.4.
+          - moodle-branch: MOODLE_502_STABLE
+            php: '8.3'
+          - moodle-branch: MOODLE_502_STABLE
+            php: '8.4'
 
     steps:
       - name: Check out repository code
@@ -90,17 +114,24 @@ jobs:
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpmd
 
+      # Coding style and PHPDoc are merge gates: the tree is clean, and the
+      # Catalyst review requires it to stay that way.
       - name: Moodle Code Checker
-        # Keep the existing coding-style backlog visible while functional and
-        # compatibility checks remain the required merge gates.
-        continue-on-error: true
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpcs --max-warnings 0
 
       - name: Moodle PHPDoc Checker
-        continue-on-error: true
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpdoc --max-warnings 0
+
+      - name: Plugin static checks
+        if: ${{ !cancelled() }}
+        working-directory: plugin
+        run: |
+          for check in tests/static/*.php; do
+            echo "== $check"
+            php "$check"
+          done
 
       - name: Validate plugin
         if: ${{ !cancelled() }}

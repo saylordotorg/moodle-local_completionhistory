@@ -141,7 +141,7 @@ cli_writeln(sprintf(
 ));
 cli_writeln(sprintf('sequences touched: %d', $result['sequences']));
 if ($commit) {
-    // record_attempt can only APPEND, so an attempt older than one the observer already
+    // Because record_attempt can only APPEND, an attempt older than one the observer already
     // recorded would otherwise sit after it. Renumbering is what makes attempt_number mean
     // "the Nth exam this learner sat" instead of "the Nth row we wrote".
     cli_writeln(sprintf('renumbered: %d row(s) moved into chronological order', $result['renumbered']));

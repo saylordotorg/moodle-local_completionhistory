@@ -36,9 +36,16 @@ use local_completionhistory\local\ledger_service;
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class provider implements \core_privacy\local\metadata\provider, \core_privacy\local\request\core_userlist_provider, \core_privacy\local\request\plugin\provider, \core_privacy\local\request\user_preference_provider {
+class provider implements
+    \core_privacy\local\metadata\provider,
+    \core_privacy\local\request\core_userlist_provider,
+    \core_privacy\local\request\plugin\provider,
+    \core_privacy\local\request\user_preference_provider {
     /**
      * Describe the types of data stored by this plugin.
+     *
+     * @param collection $collection The collection to add the plugin's metadata to.
+     * @return collection
      */
     public static function get_metadata(collection $collection): collection {
         $collection->add_database_table('local_completionhistory_achievement', [
@@ -75,6 +82,16 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
             'programname_snapshot' => 'privacy:metadata:ach_program:programname_snapshot',
             'timecreated' => 'privacy:metadata:ach_program:timecreated',
         ], 'privacy:metadata:ach_program');
+
+        $collection->add_database_table('local_completionhistory_ach_revision', [
+            'achievementid' => 'privacy:metadata:ach_revision:achievementid',
+            'fieldname' => 'privacy:metadata:ach_revision:fieldname',
+            'oldvalue' => 'privacy:metadata:ach_revision:oldvalue',
+            'newvalue' => 'privacy:metadata:ach_revision:newvalue',
+            'reason' => 'privacy:metadata:ach_revision:reason',
+            'source' => 'privacy:metadata:ach_revision:source',
+            'timecreated' => 'privacy:metadata:ach_revision:timecreated',
+        ], 'privacy:metadata:ach_revision');
 
         $collection->add_database_table('local_completionhistory_purge_audit', [
             'userid' => 'privacy:metadata:purge_audit:userid',
@@ -134,6 +151,9 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
 
     /**
      * Get the list of contexts that contain user data.
+     *
+     * @param int $userid The user to search for.
+     * @return contextlist
      */
     public static function get_contexts_for_userid(int $userid): contextlist {
         $contextlist = new contextlist();
@@ -169,6 +189,8 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
 
     /**
      * Get the list of users within a specific context.
+     *
+     * @param userlist $userlist The userlist to add users to, carrying the context.
      */
     public static function get_users_in_context(userlist $userlist): void {
         $context = $userlist->get_context();
@@ -186,6 +208,8 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
 
     /**
      * Export all user data for the specified approved contexts.
+     *
+     * @param approved_contextlist $contextlist The approved contexts and user to export for.
      */
     public static function export_user_data(approved_contextlist $contextlist): void {
         global $DB;
@@ -201,6 +225,8 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
             // Get associated programs.
             $programs = $DB->get_records('local_completionhistory_ach_program', ['achievementid' => $achievement->id]);
             $achievement->programs = array_values($programs);
+            // The correction history: every grade, exam-context and certificate revision, old and new value.
+            $achievement->revisions = ledger_service::get_revisions((int) $achievement->id);
 
             writer::with_context($systemcontext)->export_data(
                 [get_string('pluginname', 'local_completionhistory'), $achievement->ledgeruuid],
@@ -251,7 +277,11 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
         $audits = $DB->get_records('local_completionhistory_purge_audit', ['userid' => $userid], 'timecreated DESC');
         foreach ($audits as $audit) {
             writer::with_context($systemcontext)->export_data(
-                [get_string('pluginname', 'local_completionhistory'), get_string('purgeaudit', 'local_completionhistory'), $audit->id],
+                [
+                    get_string('pluginname', 'local_completionhistory'),
+                    get_string('purgeaudit', 'local_completionhistory'),
+                    $audit->id,
+                ],
                 $audit
             );
         }
@@ -262,6 +292,8 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
      *
      * Achievement records are anonymized, not deleted, because they are
      * institutional academic records.
+     *
+     * @param \context $context The context to delete data in.
      */
     public static function delete_data_for_all_users_in_context(\context $context): void {
         global $DB;
@@ -290,6 +322,8 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
      * Delete all data for the specified user in the specified context.
      *
      * Achievement records are anonymized, not deleted.
+     *
+     * @param approved_contextlist $contextlist The approved contexts and user to delete for.
      */
     public static function delete_data_for_user(approved_contextlist $contextlist): void {
         global $DB;
@@ -308,6 +342,8 @@ class provider implements \core_privacy\local\metadata\provider, \core_privacy\l
 
     /**
      * Delete data for multiple users within a single context.
+     *
+     * @param approved_userlist $userlist The approved users and context to delete for.
      */
     public static function delete_data_for_users(approved_userlist $userlist): void {
         global $DB;

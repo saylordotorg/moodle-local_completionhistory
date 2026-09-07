@@ -32,6 +32,12 @@ use core_external\external_value;
 class get_purge_audit extends external_api {
     /** Hard ceiling on rows per call. */
     private const MAX_LIMIT = 500;
+
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'since' => new external_value(PARAM_INT, 'Return records created after this timestamp', VALUE_DEFAULT, 0),
@@ -39,6 +45,13 @@ class get_purge_audit extends external_api {
         ]);
     }
 
+    /**
+     * Return purge audit records created after a timestamp, newest first.
+     *
+     * @param int $since Return records created after this Unix timestamp.
+     * @param int $limit Maximum records to return (capped at 500).
+     * @return array Audit records.
+     */
     public static function execute(int $since = 0, int $limit = 100): array {
         global $DB;
 
@@ -78,6 +91,11 @@ class get_purge_audit extends external_api {
         return $result;
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_multiple_structure
+     */
     public static function execute_returns(): external_multiple_structure {
         return new external_multiple_structure(
             new external_single_structure([

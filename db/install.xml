@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/completionhistory/db" VERSION="20260817" COMMENT="XMLDB file for local_completionhistory"
+<XMLDB PATH="local/completionhistory/db" VERSION="20260907" COMMENT="XMLDB file for local_completionhistory"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
-    <TABLE NAME="local_completionhistory_achievement" COMMENT="Immutable achievement ledger. Rows are append-only and never mutated or deleted when source data changes.">
+    <TABLE NAME="local_completionhistory_achievement" COMMENT="Achievement ledger. A row is captured once per completion and never deleted when source data changes; its grade, exam-context and certificate columns may be revised, and every revision is recorded in local_completionhistory_ach_revision.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="ledgeruuid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="UUID v4 for external reference"/>
@@ -63,6 +63,26 @@
       <INDEXES>
         <INDEX NAME="achievementid_ix" UNIQUE="false" FIELDS="achievementid"/>
         <INDEX NAME="programid_ix" UNIQUE="false" FIELDS="programid"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_completionhistory_ach_revision" COMMENT="Correction history for the achievement ledger. One row per column changed by a revision, holding the previous and new value, so the figure originally captured is always recoverable.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="achievementid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="FK to local_completionhistory_achievement"/>
+        <FIELD NAME="fieldname" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false" COMMENT="Achievement column that was revised"/>
+        <FIELD NAME="oldvalue" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Value before the revision, as text. NULL when it was NULL or has since been anonymized."/>
+        <FIELD NAME="newvalue" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Value after the revision, as text. NULL when it was NULL or has since been anonymized."/>
+        <FIELD NAME="reason" TYPE="char" LENGTH="50" NOTNULL="true" SEQUENCE="false" COMMENT="grade_corrected, exam_context_set, certificate_attached, certificate_cleared"/>
+        <FIELD NAME="source" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Event class name or CLI/service identifier that triggered the revision"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="When the revision was written"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="achievementid_fk" TYPE="foreign" FIELDS="achievementid" REFTABLE="local_completionhistory_achievement" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="timecreated_ix" UNIQUE="false" FIELDS="timecreated"/>
       </INDEXES>
     </TABLE>
 

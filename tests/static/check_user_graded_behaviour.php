@@ -46,28 +46,105 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// phpcs:disable PSR1.Classes.ClassDeclaration.MultipleClasses, Generic.Classes.DuplicateClassName.Found -- standalone harness pre-defines fake collaborators; see header.
+// phpcs:disable moodle.Files.MoodleInternal.MoodleInternalGlobalState -- standalone check, no Moodle bootstrap (see header).
+
 // ---------------------------------------------------------------------------
 // Collaborators, pre-defined so the real callbacks.php resolves to these rather
 // than reaching for an autoloader that is not present.
-// ---------------------------------------------------------------------------
 namespace local_completionhistory\local {
 
+    /**
+     * Fake grade_snapshot_service: returns whatever total the case under test has set.
+     *
+     * @package    local_completionhistory
+     * @copyright  2026 Saylor Academy
+     * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+     */
     class grade_snapshot_service {
         /** @var mixed What get_course_total should return for the case being run. */
         public static $total = null;
+
+        /**
+         * Return the preset course total, ignoring who and which course is asked about.
+         *
+         * @param int $userid The user (ignored).
+         * @param int $courseid The course (ignored).
+         * @return mixed The preset total.
+         */
         public static function get_course_total(int $userid, int $courseid) {
             return self::$total;
         }
     }
 
+    /**
+     * Fake outbox_service: records what the observer enqueues and returns a preset id.
+     *
+     * @package    local_completionhistory
+     * @copyright  2026 Saylor Academy
+     * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+     */
     class outbox_service {
         /** @var array Records handed to enqueue_achievement. */
         public static $enqueued = [];
         /** @var int Next id to return; 0 emulates `enableoutbox` being off. */
         public static $nextid = 1;
+
+        /**
+         * Record the achievement handed over and return the preset outbox id.
+         *
+         * @param \stdClass $achievement The record the observer wants published.
+         * @return int The preset id; 0 means the outbox is off.
+         */
         public static function enqueue_achievement(\stdClass $achievement): int {
             self::$enqueued[] = clone $achievement;
             return self::$nextid;
+        }
+    }
+
+    /**
+     * Fake ledger_service: the correction-history entry point the observer writes through.
+     *
+     * Applies the change to the fake $DB exactly as the real one does — an update_record carrying the
+     * id plus the changed columns — so the "only the grade is written" assertions below still see the
+     * write; and records what it was asked to record, so a case can assert the previous value is kept.
+     *
+     * @package    local_completionhistory
+     * @copyright  2026 Saylor Academy
+     * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+     */
+    class ledger_service {
+        /** @var string Mirrors the real constant the observer passes. */
+        public const REVISION_GRADE_CORRECTED = 'grade_corrected';
+
+        /** @var array Every revision requested: achievementid, changes, old values, reason, source. */
+        public static $revisions = [];
+
+        /**
+         * Apply the changed columns to the row and record the revision.
+         *
+         * @param int $achievementid The row to revise.
+         * @param array $changes Column => new value.
+         * @param string $reason Why.
+         * @param string $source What triggered it.
+         * @return int Number of columns changed.
+         */
+        public static function revise_achievement(int $achievementid, array $changes, string $reason, string $source): int {
+            global $DB;
+            $current = $DB->rows[$achievementid] ?? null;
+            $old = [];
+            foreach (array_keys($changes) as $field) {
+                $old[$field] = $current->$field ?? null;
+            }
+            self::$revisions[] = [
+                'achievementid' => $achievementid,
+                'changes' => $changes,
+                'old' => $old,
+                'reason' => $reason,
+                'source' => $source,
+            ];
+            $DB->update_record('local_completionhistory_achievement', (object) (['id' => $achievementid] + $changes));
+            return count($changes);
         }
     }
 }
@@ -75,9 +152,19 @@ namespace local_completionhistory\local {
 // The event class itself, so the observer's own type declaration is exercised rather than bypassed.
 namespace core\event {
 
+    /**
+     * Fake user_graded event carrying only the properties the observer reads.
+     *
+     * @package    local_completionhistory
+     * @copyright  2026 Saylor Academy
+     * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+     */
     class user_graded {
+        /** @var int|null The graded user. */
         public $relateduserid;
+        /** @var int|null The course the grade belongs to. */
         public $courseid;
+        /** @var array Event payload; the observer reads other['itemid']. */
         public $other = [];
     }
 }
@@ -89,30 +176,62 @@ namespace {
 
     $root = dirname(__DIR__, 2);
 
-    /** Plugin settings for the case being run. */
-    $CFGSTUB = ['enabled' => 1, 'capturegrades' => 1];
+    // Plugin settings for the case being run.
+    $cfgstub = ['enabled' => 1, 'capturegrades' => 1];
 
+    /**
+     * Fake get_config: answers from the per-case settings stub.
+     *
+     * @param string $plugin The component (ignored; only this plugin's settings are stubbed).
+     * @param string $name The setting name.
+     * @return mixed The stubbed value, or false when unset.
+     */
     function get_config($plugin, $name) {
-        global $CFGSTUB;
-        return $CFGSTUB[$name] ?? false;
+        global $cfgstub;
+        return $cfgstub[$name] ?? false;
     }
 
-    /** Captured so a case can assert the observer complained rather than going quiet. */
-    $DEBUGGING = [];
+    // Captured so a case can assert the observer complained rather than going quiet.
+    $debugging = [];
 
+    /**
+     * Fake debugging(): captures the message instead of printing it.
+     *
+     * @param string $message The debugging message.
+     * @param int|null $level The debug level (ignored).
+     * @return bool Always true, as the real function returns when it emits.
+     */
     function debugging($message, $level = null) {
-        global $DEBUGGING;
-        $DEBUGGING[] = $message;
+        global $debugging;
+        $debugging[] = $message;
         return true;
     }
 
-    /** Records what the transaction was told to do, so a rollback cannot pass as a commit. */
+    /**
+     * Records what the transaction was told to do, so a rollback cannot pass as a commit.
+     *
+     * @package    local_completionhistory
+     * @copyright  2026 Saylor Academy
+     * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+     */
     class fake_transaction {
+        /** @var bool Whether allow_commit() was called. */
         public $committed = false;
+        /** @var bool Whether rollback() was called. */
         public $rolledback = false;
+
+        /**
+         * Mark the transaction committed.
+         */
         public function allow_commit() {
             $this->committed = true;
         }
+
+        /**
+         * Mark the transaction rolled back and rethrow, as the real one does.
+         *
+         * @param \Throwable $e The exception that caused the rollback.
+         */
         public function rollback($e) {
             $this->rolledback = true;
             throw $e;
@@ -124,16 +243,33 @@ namespace {
      * expressible. Strict about tables — an unexpected one is recorded rather than silently
      * returning false, because a false sends the observer down an early return and would let a
      * broken one look like a correctly-skipping one.
+     *
+     * @package    local_completionhistory
+     * @copyright  2026 Saylor Academy
+     * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
      */
     class fake_db {
-        public $gradeitems = [];      // id => row
-        public $rows = [];            // achievement id => full row
-        public $updates = [];         // objects passed to update_record
+        /** @var array Grade item rows, id => row. */
+        public $gradeitems = [];
+        /** @var array Achievement rows, achievement id => full row. */
+        public $rows = [];
+        /** @var array Objects passed to update_record, in order. */
+        public $updates = [];
+        /** @var fake_transaction|null The transaction handed out, if one was opened. */
         public $transaction;
+        /** @var array Names of unexpected table reads and writes. */
         public $unexpected = [];
         /** @var callable|null Runs when the transaction opens: a competing commit. */
-        public $on_transaction = null;
+        public $ontransaction = null;
 
+        /**
+         * Fake get_record over the two tables the observer reads.
+         *
+         * @param string $table The table name.
+         * @param array $conditions Only 'id' is honoured.
+         * @param string $fields Ignored; whole rows are returned.
+         * @return \stdClass|false A clone of the row, or false.
+         */
         public function get_record($table, array $conditions, $fields = '*') {
             if ($table === 'grade_items') {
                 $row = $this->gradeitems[(int) $conditions['id']] ?? false;
@@ -147,6 +283,18 @@ namespace {
             return false;
         }
 
+        /**
+         * Fake get_records_select over the achievement table, honouring sort, paging and field narrowing.
+         *
+         * @param string $table The table name.
+         * @param string $select Ignored; the filter is taken from $params.
+         * @param array $params Must carry 'userid' and 'courseid'.
+         * @param string $sort Only 'completiontime DESC' is honoured.
+         * @param string $fields Comma-separated columns to keep, or '*'.
+         * @param int $offset Rows to skip when $limit is set.
+         * @param int $limit Maximum rows; 0 for all.
+         * @return array Rows keyed by id.
+         */
         public function get_records_select(
             $table,
             $select,
@@ -181,7 +329,7 @@ namespace {
                 $copy = clone $r;
                 if ($fields !== '*') {
                     $keep = array_map('trim', explode(',', $fields));
-                    foreach (get_object_vars($copy) as $k => $_) {
+                    foreach (get_object_vars($copy) as $k => $unused) {
                         if (!in_array($k, $keep, true)) {
                             unset($copy->$k);
                         }
@@ -192,7 +340,13 @@ namespace {
             return $out;
         }
 
-        /** Applies only the properties present, exactly as a real UPDATE of those columns would. */
+        /**
+         * Applies only the properties present, exactly as a real UPDATE of those columns would.
+         *
+         * @param string $table The table name.
+         * @param \stdClass $row The columns to write; must carry id.
+         * @return bool True when the table is the achievement table.
+         */
         public function update_record($table, $row) {
             if ($table !== 'local_completionhistory_achievement') {
                 $this->unexpected[] = "update_record({$table})";
@@ -208,19 +362,25 @@ namespace {
             return true;
         }
 
+        /**
+         * Open a fake transaction, first running any competing change the case has registered.
+         *
+         * @return fake_transaction The transaction handed to the observer.
+         */
         public function start_delegated_transaction() {
-            if ($this->on_transaction) {
-                ($this->on_transaction)($this);
+            if ($this->ontransaction) {
+                ($this->ontransaction)($this);
             }
             $this->transaction = new fake_transaction();
             return $this->transaction;
         }
     }
 
-    require $root . '/classes/callbacks.php';
+    require($root . '/classes/callbacks.php');
 
     use local_completionhistory\callbacks;
     use local_completionhistory\local\grade_snapshot_service;
+    use local_completionhistory\local\ledger_service;
     use local_completionhistory\local\outbox_service;
 
     $failures = [];
@@ -231,6 +391,9 @@ namespace {
      *
      * Numeric columns hold the PADDED DECIMAL STRINGS a real read returns, not floats — the
      * distinction that hid a P1. grade_decimal is number(10,5).
+     *
+     * @param array $over Column values overriding the defaults.
+     * @return \stdClass The row.
      */
     function achievement_row(array $over = []): \stdClass {
         $r = (object) [
@@ -266,18 +429,30 @@ namespace {
         return $r;
     }
 
-    /** The gradebook total, shaped as grade_snapshot_service returns it (floats). */
+    /**
+     * The gradebook total, shaped as grade_snapshot_service returns it (floats).
+     *
+     * @param float $grade The final grade out of 100.
+     * @param int|null $passed The pass flag, or null when the course has no pass grade.
+     * @return \stdClass The total.
+     */
     function total(float $grade = 88.5, ?int $passed = 1): \stdClass {
         return (object) ['finalgrade' => $grade, 'grademax' => 100.0, 'gradepass' => 70.0,
                          'passed' => $passed];
     }
 
-    /** Run one case against the real observer. Returns the fake $DB. */
+    /**
+     * Run one case against the real observer.
+     *
+     * @param array $opts Case options: config, gradeitems, achievements, on_transaction, total,
+     *                    outboxid, userid, courseid, other. Each falls back to a passing default.
+     * @return \fake_db The fake $DB after the observer has run, for assertions.
+     */
     function run_case(array $opts): \fake_db {
-        global $DB, $CFGSTUB, $DEBUGGING;
+        global $DB, $cfgstub, $debugging;
 
-        $CFGSTUB = $opts['config'] ?? ['enabled' => 1, 'capturegrades' => 1];
-        $DEBUGGING = [];
+        $cfgstub = $opts['config'] ?? ['enabled' => 1, 'capturegrades' => 1];
+        $debugging = [];
 
         $DB = new \fake_db();
         $DB->gradeitems = $opts['gradeitems'] ?? [
@@ -286,11 +461,12 @@ namespace {
         foreach ($opts['achievements'] ?? [achievement_row()] as $r) {
             $DB->rows[(int) $r->id] = $r;
         }
-        $DB->on_transaction = $opts['on_transaction'] ?? null;
+        $DB->ontransaction = $opts['on_transaction'] ?? null;
 
         grade_snapshot_service::$total = array_key_exists('total', $opts) ? $opts['total'] : total();
         outbox_service::$enqueued = [];
         outbox_service::$nextid = $opts['outboxid'] ?? 1;
+        ledger_service::$revisions = [];
 
         $e = new \core\event\user_graded();
         $e->relateduserid = $opts['userid'] ?? 42;
@@ -301,6 +477,13 @@ namespace {
         return $DB;
     }
 
+    /**
+     * Record and print one assertion.
+     *
+     * @param string $name What is being asserted.
+     * @param bool $ok Whether it held.
+     * @param string $detail Extra context printed on failure.
+     */
     function check(string $name, bool $ok, string $detail = '') {
         global $failures, $passes;
         if ($ok) {
@@ -337,6 +520,21 @@ namespace {
     );
     check('the transaction commits', ($db->transaction->committed ?? false) === true);
     check('the row is revised, not duplicated — one row still', count($db->rows) === 1);
+
+    echo "\n  the correction goes through the ledger's history (Catalyst review)\n";
+    $revision = ledger_service::$revisions[0] ?? null;
+    check('exactly one revision is recorded', count(ledger_service::$revisions) === 1);
+    check(
+        'it is recorded as a grade correction triggered by user_graded',
+        ($revision['reason'] ?? null) === ledger_service::REVISION_GRADE_CORRECTED
+            && ($revision['source'] ?? null) === '\\core\\event\\user_graded',
+        var_export($revision['reason'] ?? null, true) . ' / ' . var_export($revision['source'] ?? null, true)
+    );
+    check(
+        'the previous grade is what the history is handed, so it stays recoverable',
+        ($revision['old']['grade_decimal'] ?? null) === '72.00000',
+        'old grade ' . var_export($revision['old']['grade_decimal'] ?? null, true)
+    );
 
     echo "\n  the UPDATE touches only the grade (PR #8 review)\n";
     // The guard against a full-row write: whatever else is true, update_record must not be handed
@@ -444,7 +642,7 @@ namespace {
     check('pass flag flipping alone is a change', count($db->updates) === 1);
 
     echo "\n  a competing commit between the decision and the write (PR #8 review)\n";
-    // anonymize_users() sets userid = 0 and NULLs the identity snapshots. A full-row update_record
+    // The anonymize_users() call sets userid = 0 and NULLs the identity snapshots. A full-row update_record
     // built from the pre-transaction read would restore all of it AND publish it.
     $db = run_case(['on_transaction' => function (\fake_db $db) {
         $r = $db->rows[500];
@@ -505,16 +703,16 @@ namespace {
     );
     check(
         'and it says so out loud rather than dropping the correction silently',
-        count($GLOBALS['DEBUGGING']) === 1,
-        count($GLOBALS['DEBUGGING']) . ' messages'
+        count($GLOBALS['debugging']) === 1,
+        count($GLOBALS['debugging']) . ' messages'
     );
     check(
         'the warning names the setting to change',
-        str_contains($GLOBALS['DEBUGGING'][0] ?? '', 'enableoutbox'),
-        $GLOBALS['DEBUGGING'][0] ?? '(none)'
+        str_contains($GLOBALS['debugging'][0] ?? '', 'enableoutbox'),
+        $GLOBALS['debugging'][0] ?? '(none)'
     );
     $db = run_case([]);
-    check('and stays quiet when the outbox worked', $GLOBALS['DEBUGGING'] === []);
+    check('and stays quiet when the outbox worked', $GLOBALS['debugging'] === []);
 
     echo "\n  only the course total\n";
     $db = run_case(['gradeitems' => [

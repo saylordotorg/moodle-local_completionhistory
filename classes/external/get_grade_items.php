@@ -91,10 +91,10 @@ class get_grade_items extends external_api {
      * percentage of zero is not zero percent, it is undefined, and returning 0 would put
      * an invented failure on an academic record.
      *
-     * @param float|null $finalgrade
-     * @param float|null $grademax
-     * @param float|null $grademin
-     * @return float|null
+     * @param float|null $finalgrade The grade to normalise.
+     * @param float|null $grademax The item's maximum grade.
+     * @param float|null $grademin The item's minimum grade (0 when null).
+     * @return float|null Percentage rounded to 5 places, or null when undefined.
      */
     public static function percentage_of(?float $finalgrade, ?float $grademax, ?float $grademin): ?float {
         if ($finalgrade === null || $grademax === null) {
@@ -111,6 +111,11 @@ class get_grade_items extends external_api {
         return round(((((float) $finalgrade - $min) / $span) * 100.0), 5);
     }
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'since' => new external_value(
@@ -121,7 +126,7 @@ class get_grade_items extends external_api {
             ),
             'since_id' => new external_value(
                 PARAM_INT,
-                'Tie-break within `since`: include grades at that timestamp only if id is greater. '
+                'Tie-break within since: include grades at that timestamp only if id is greater. '
                 . 'Load-bearing here, because a large share of rows share changed_at = 0.',
                 VALUE_DEFAULT,
                 0
@@ -161,6 +166,8 @@ class get_grade_items extends external_api {
     }
 
     /**
+     * Return a page of per-grade-item grades after a keyset cursor on (changed_at, id).
+     *
      * @param int   $since         Exclusive lower bound on changed_at.
      * @param int   $sinceid       Tie-break id within $since.
      * @param int   $limit         Maximum rows.
@@ -257,7 +264,7 @@ class get_grade_items extends external_api {
                  WHERE " . implode(' AND ', $where) . "
               ORDER BY {$changed} ASC, gg.id ASC";
 
-        // get_recordSET, not get_records_sql: the latter keys its array by the first
+        // A recordSET, not get_records_sql: the latter keys its array by the first
         // selected column, and although gg.id is unique here, a later edit to the select
         // list would silently collapse rows. This project has been bitten by that four
         // times; the recordset form cannot be broken that way.
@@ -283,7 +290,7 @@ class get_grade_items extends external_api {
             }
 
             $out[] = [
-                // grade_grades.id: the idempotency key. One SIS row per grade, however
+                // Keyed on grade_grades.id, the idempotency key. One SIS row per grade, however
                 // often the sweep runs, and a regrade updates in place.
                 'gradeid'          => (int) $r->id,
                 'itemid'           => (int) $r->itemid,
@@ -332,6 +339,11 @@ class get_grade_items extends external_api {
         ];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'grades' => new external_multiple_structure(new external_single_structure([
@@ -348,8 +360,20 @@ class get_grade_items extends external_api {
                 'itemname'         => new external_value(PARAM_RAW, 'Item name; empty for course and category totals'),
                 'grademax'         => new external_value(PARAM_FLOAT, 'Item maximum', VALUE_REQUIRED, null, NULL_ALLOWED),
                 'grademin'         => new external_value(PARAM_FLOAT, 'Item minimum', VALUE_REQUIRED, null, NULL_ALLOWED),
-                'gradepass'        => new external_value(PARAM_FLOAT, 'Pass threshold; 0 or null means none set', VALUE_REQUIRED, null, NULL_ALLOWED),
-                'rawgrade'         => new external_value(PARAM_FLOAT, 'Raw grade before adjustment', VALUE_REQUIRED, null, NULL_ALLOWED),
+                'gradepass'        => new external_value(
+                    PARAM_FLOAT,
+                    'Pass threshold; 0 or null means none set',
+                    VALUE_REQUIRED,
+                    null,
+                    NULL_ALLOWED
+                ),
+                'rawgrade'         => new external_value(
+                    PARAM_FLOAT,
+                    'Raw grade before adjustment',
+                    VALUE_REQUIRED,
+                    null,
+                    NULL_ALLOWED
+                ),
                 'finalgrade'       => new external_value(PARAM_FLOAT, 'Authoritative grade', VALUE_REQUIRED, null, NULL_ALLOWED),
                 'percentage'       => new external_value(
                     PARAM_FLOAT,
@@ -378,8 +402,8 @@ class get_grade_items extends external_api {
                 ),
             ])),
             'count'         => new external_value(PARAM_INT, 'Rows returned'),
-            'next_since'    => new external_value(PARAM_INT, 'Pass as `since` on the next call'),
-            'next_since_id' => new external_value(PARAM_INT, 'Pass as `since_id` on the next call'),
+            'next_since'    => new external_value(PARAM_INT, 'Pass as since on the next call'),
+            'next_since_id' => new external_value(PARAM_INT, 'Pass as since_id on the next call'),
             'truncated'     => new external_value(PARAM_BOOL, 'The page filled; call again for more'),
         ]);
     }

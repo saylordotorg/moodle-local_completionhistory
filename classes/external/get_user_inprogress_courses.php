@@ -37,12 +37,23 @@ class get_user_inprogress_courses extends external_api {
     /** Defensive ceiling for pathological enrolment sets. */
     private const MAX_COURSES = 1000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'userid' => new external_value(PARAM_INT, 'Moodle user id'),
         ]);
     }
 
+    /**
+     * Return the courses a user is actively enrolled in, has accessed, and has not completed.
+     *
+     * @param int $userid Moodle user id.
+     * @return array The in-progress courses under the 'courses' key.
+     */
     public static function execute(int $userid): array {
         global $DB, $CFG;
 
@@ -99,6 +110,11 @@ class get_user_inprogress_courses extends external_api {
         return ['courses' => $courses];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'courses' => new external_multiple_structure(new external_single_structure([

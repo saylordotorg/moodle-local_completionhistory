@@ -1,0 +1,151 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_completionhistory/flags_list
+
+    The system flags list: an add link, a load-presets form, and one row per
+    flag with edit, enable/disable and delete controls.
+
+    Every state change is a POST form protected by sesskey. The load-presets
+    and delete buttons carry the core/utility declarative confirmation
+    attributes, so core shows a modal before the form is submitted.
+
+    Context variables required for this template:
+    * addurl - URL of the add form.
+    * listurl - URL the action forms post to.
+    * sesskey - Current session key.
+    * hasflags - Whether there are any rows.
+    * rows - Array of flags, each with id, name, code, typelabel, sevlabel, sevclass,
+      configsummary, hasconfig, enabled, editurl, togglelabel and toggleclass.
+    * presetsconfirm - Object with title, content and yes: JSON-encoded string
+      identifier arrays for the load-presets confirmation modal.
+    * deleteconfirm - Object with title, content and yes: JSON-encoded string
+      identifier arrays for the delete confirmation modal.
+
+    Example context (json):
+    {
+        "addurl": "/local/completionhistory/edit_flag.php",
+        "listurl": "/local/completionhistory/manage_flags.php",
+        "sesskey": "abc123",
+        "hasflags": true,
+        "rows": [
+            {
+                "id": 4,
+                "name": "Score = 0",
+                "code": "score_zero",
+                "typelabel": "Score in range",
+                "sevlabel": "Critical",
+                "sevclass": "badge-danger",
+                "configsummary": "score_min=0, score_max=0",
+                "hasconfig": true,
+                "enabled": true,
+                "editurl": "/local/completionhistory/edit_flag.php?id=4",
+                "togglelabel": "Disable",
+                "toggleclass": "btn-outline-warning"
+            }
+        ],
+        "presetsconfirm": {
+            "title": "[\"flagsloadpresets\",\"local_completionhistory\"]",
+            "content": "[\"flagsloadpresets_confirm\",\"local_completionhistory\"]",
+            "yes": "[\"flagsloadpresets\",\"local_completionhistory\"]"
+        },
+        "deleteconfirm": {
+            "title": "[\"delete\",\"core\"]",
+            "content": "[\"flagdelete_confirm\",\"local_completionhistory\"]",
+            "yes": "[\"delete\",\"core\"]"
+        }
+    }
+}}
+<div class="lch-flags-list">
+    <div class="mb-3">
+        <a href="{{addurl}}" class="btn btn-primary btn-sm mr-2">
+            {{#pix}}t/add, core{{/pix}} {{#str}}addflag, local_completionhistory{{/str}}
+        </a>
+        <form method="post" action="{{listurl}}" class="d-inline">
+            <input type="hidden" name="action" value="loadpresets">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm"
+                    title="{{#str}}flagsloadpresets_help, local_completionhistory{{/str}}"
+                    data-confirmation="modal"
+                    data-confirmation-title-str="{{presetsconfirm.title}}"
+                    data-confirmation-content-str="{{presetsconfirm.content}}"
+                    data-confirmation-yes-button-str="{{presetsconfirm.yes}}">
+                {{#pix}}t/download, core{{/pix}} {{#str}}flagsloadpresets, local_completionhistory{{/str}}
+            </button>
+        </form>
+    </div>
+
+    {{^hasflags}}
+        <div class="alert alert-info">{{#str}}flags_none, local_completionhistory{{/str}}</div>
+    {{/hasflags}}
+
+    {{#hasflags}}
+        <table class="generaltable">
+            <thead>
+                <tr>
+                    <th scope="col">{{#str}}flag_name, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}flag_code, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}flag_type, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}flag_severity, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}flag_config, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}flag_enabled, local_completionhistory{{/str}}</th>
+                    <th scope="col">{{#str}}actions, core{{/str}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#rows}}
+                    <tr>
+                        <td>{{name}}</td>
+                        <td><code>{{code}}</code></td>
+                        <td>{{typelabel}}</td>
+                        <td><span class="badge {{sevclass}}">{{sevlabel}}</span></td>
+                        <td>
+                            {{#hasconfig}}<small class="text-muted">{{configsummary}}</small>{{/hasconfig}}
+                            {{^hasconfig}}-{{/hasconfig}}
+                        </td>
+                        <td>
+                            {{#enabled}}<span class="badge badge-success">{{#str}}yes, core{{/str}}</span>{{/enabled}}
+                            {{^enabled}}<span class="badge badge-secondary">{{#str}}no, core{{/str}}</span>{{/enabled}}
+                        </td>
+                        <td class="lch-actions">
+                            <a href="{{editurl}}" class="btn btn-outline-secondary btn-sm">{{#str}}edit, core{{/str}}</a>
+                            <form method="post" action="{{listurl}}" class="d-inline">
+                                <input type="hidden" name="action" value="toggle">
+                                <input type="hidden" name="id" value="{{id}}">
+                                <input type="hidden" name="sesskey" value="{{sesskey}}">
+                                <button type="submit" class="btn {{toggleclass}} btn-sm">{{togglelabel}}</button>
+                            </form>
+                            <form method="post" action="{{listurl}}" class="d-inline">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" value="{{id}}">
+                                <input type="hidden" name="sesskey" value="{{sesskey}}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm"
+                                        data-confirmation="modal"
+                                        data-confirmation-type="delete"
+                                        data-confirmation-title-str="{{deleteconfirm.title}}"
+                                        data-confirmation-content-str="{{deleteconfirm.content}}"
+                                        data-confirmation-yes-button-str="{{deleteconfirm.yes}}">
+                                    {{#str}}delete, core{{/str}}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {{/rows}}
+            </tbody>
+        </table>
+    {{/hasflags}}
+</div>

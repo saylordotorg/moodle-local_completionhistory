@@ -37,10 +37,20 @@ class list_programs extends external_api {
     /** Maximum total program-to-course links returned in one snapshot. */
     private const MAX_COURSE_LINKS = 10000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([]);
     }
 
+    /**
+     * Return every enrol_programs program with its member courses.
+     *
+     * @return array The programs under the 'programs' key; empty when enrol_programs is absent.
+     */
     public static function execute(): array {
         global $DB;
 
@@ -113,6 +123,11 @@ class list_programs extends external_api {
         return ['programs' => $out];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'programs' => new external_multiple_structure(new external_single_structure([

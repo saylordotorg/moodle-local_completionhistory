@@ -138,10 +138,10 @@ class exam_backfill_service {
     /**
      * Already recorded? See the class docblock on why this tuple and not an attempt id.
      *
-     * @param int    $userid
-     * @param int    $courseid
-     * @param string $track
-     * @param int    $timetaken
+     * @param int    $userid    Learner's user id.
+     * @param int    $courseid  Course the exam belongs to.
+     * @param string $track     Exam track the attempt was made on.
+     * @param int    $timetaken Submission timestamp of the attempt.
      * @return bool
      */
     public static function already_recorded(int $userid, int $courseid, string $track, int $timetaken): bool {
@@ -158,7 +158,7 @@ class exam_backfill_service {
     /**
      * Normalise an attempt's grade to 0-100, exactly as the observer does.
      *
-     * @param stdClass $row
+     * @param stdClass $row Attempt row carrying sumgrades and quizsumgrades.
      * @return float|null Null when the attempt has no grade or the quiz has no total.
      */
     public static function grade_of(stdClass $row): ?float {
@@ -174,8 +174,8 @@ class exam_backfill_service {
      * Returns null when there is no grade or no threshold — "no pass mark" is a third
      * state, and collapsing it to a fail would invent a failure on an academic record.
      *
-     * @param stdClass   $row
-     * @param float|null $grade
+     * @param stdClass   $row   Attempt row carrying the quiz id and quizgrade.
+     * @param float|null $grade Normalised 0-100 grade, as returned by grade_of().
      * @return bool|null
      */
     public static function passed_of(stdClass $row, ?float $grade): ?bool {
@@ -200,7 +200,7 @@ class exam_backfill_service {
     /**
      * Duration in seconds, or null when the timestamps cannot support one.
      *
-     * @param stdClass $row
+     * @param stdClass $row Attempt row carrying timestart and timefinish.
      * @return int|null
      */
     public static function duration_of(stdClass $row): ?int {
@@ -223,10 +223,10 @@ class exam_backfill_service {
      * Rows already holding the right number are left alone, so the return value is the
      * number of rows this actually had to move.
      *
-     * @param int    $userid
-     * @param int    $courseid
-     * @param string $track
-     * @param bool   $dryrun Count what would change without writing.
+     * @param int    $userid   Learner's user id.
+     * @param int    $courseid Course the exam belongs to.
+     * @param string $track    Exam track whose sequence to renumber.
+     * @param bool   $dryrun   Count what would change without writing.
      * @return int Rows whose attempt_number was (or would be) corrected.
      */
     public static function renumber_group(int $userid, int $courseid, string $track, bool $dryrun = false): int {

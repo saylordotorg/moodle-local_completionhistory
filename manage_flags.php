@@ -17,6 +17,9 @@
 /**
  * Manage System Flags — list view with CRUD actions.
  *
+ * The list itself is {@see \local_completionhistory\output\flags_list}; this
+ * page handles the sesskey-protected POST actions and redirects.
+ *
  * @package    local_completionhistory
  * @copyright  2026 Saylor Academy
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -26,6 +29,7 @@ require_once(__DIR__ . '/../../config.php');
 require_login();
 
 use local_completionhistory\local\flag_service;
+use local_completionhistory\output\flags_list;
 
 $systemcontext = context_system::instance();
 require_capability('local/completionhistory:manage', $systemcontext);
@@ -40,7 +44,7 @@ $PAGE->set_title(get_string('manageflags', 'local_completionhistory'));
 $PAGE->set_heading(get_string('manageflags', 'local_completionhistory'));
 $PAGE->set_pagelayout('admin');
 
-// ── Handle toggle enable/disable and delete ─────────────────────────────────
+// Actions: load presets, toggle enabled, delete. All are sesskey-protected POSTs.
 $action = optional_param('action', '', PARAM_ALPHA);
 $flagid = optional_param('id', 0, PARAM_INT);
 
@@ -63,7 +67,6 @@ if ($action && $flagid) {
         throw new moodle_exception('invalidrequest');
     }
     require_sesskey();
-    global $DB;
     $flag = $DB->get_record('local_completionhistory_flag_def', ['id' => $flagid], '*', MUST_EXIST);
 
     if ($action === 'toggle') {
@@ -88,143 +91,8 @@ if ($action && $flagid) {
     }
 }
 
-echo $OUTPUT->header();
-
-$editurl    = new moodle_url('/local/completionhistory/edit_flag.php');
-$presetsurl = new moodle_url($PAGE->url);
-
-echo html_writer::tag(
-    'a',
-    '&#43; ' . get_string('addflag', 'local_completionhistory'),
-    ['href' => $editurl->out(false), 'class' => 'btn btn-primary btn-sm mr-2 mb-3']
-);
-
-echo html_writer::start_tag('form', [
-    'method' => 'post',
-    'action' => $presetsurl->out(false),
-    'class' => 'd-inline',
-]);
-echo html_writer::empty_tag('input', [
-    'type' => 'hidden', 'name' => 'action', 'value' => 'loadpresets',
-]);
-echo html_writer::empty_tag('input', [
-    'type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey(),
-]);
-echo html_writer::tag(
-    'button',
-    '&#8681; ' . get_string('flagsloadpresets', 'local_completionhistory'),
-    [
-        'type'    => 'submit',
-        'class'   => 'btn btn-outline-secondary btn-sm mb-3',
-        'title'   => get_string('flagsloadpresets_help', 'local_completionhistory'),
-        'onclick' => 'return confirm(' . json_encode(get_string('flagsloadpresets_confirm', 'local_completionhistory')) . ');',
-    ]
-);
-echo html_writer::end_tag('form');
-
-global $DB;
 $flags = $DB->get_records('local_completionhistory_flag_def', null, 'severity DESC, name ASC');
 
-if (empty($flags)) {
-    echo html_writer::tag(
-        'p',
-        get_string('flags_none', 'local_completionhistory'),
-        ['class' => 'alert alert-info']
-    );
-    echo $OUTPUT->footer();
-    return;
-}
-
-$typelabels = flag_service::type_labels();
-$sevlabels  = flag_service::severity_labels();
-
-$table = new html_table();
-$table->head = [
-    get_string('flag_name', 'local_completionhistory'),
-    get_string('flag_code', 'local_completionhistory'),
-    get_string('flag_type', 'local_completionhistory'),
-    get_string('flag_severity', 'local_completionhistory'),
-    get_string('flag_config', 'local_completionhistory'),
-    get_string('flag_enabled', 'local_completionhistory'),
-    get_string('actions'),
-];
-$table->attributes = ['class' => 'generaltable'];
-
-foreach ($flags as $f) {
-    $typelabel = $typelabels[$f->flag_type] ?? $f->flag_type;
-    $sevlabel  = $sevlabels[$f->severity] ?? $f->severity;
-    $sevcls    = flag_service::severity_badge_class($f->severity);
-
-    $configsummary = '';
-    $config = json_decode($f->configjson ?? '', true) ?: [];
-    if (!empty($config)) {
-        $pairs = [];
-        foreach ($config as $k => $v) {
-            $pairs[] = s($k) . '=' . s(is_bool($v) ? ($v ? 'yes' : 'no') : (string) $v);
-        }
-        $configsummary = implode(', ', $pairs);
-    }
-
-    $editlink = html_writer::link(
-        new moodle_url('/local/completionhistory/edit_flag.php', ['id' => $f->id]),
-        get_string('edit'),
-        ['class' => 'btn btn-outline-secondary btn-sm mr-1']
-    );
-    $actionurl = new moodle_url('/local/completionhistory/manage_flags.php');
-    $togglelabel = $f->enabled
-        ? get_string('flagdisable', 'local_completionhistory')
-        : get_string('flagenable', 'local_completionhistory');
-    $togglelink = html_writer::start_tag('form', [
-        'method' => 'post', 'action' => $actionurl->out(false), 'class' => 'd-inline',
-    ]);
-    $togglelink .= html_writer::empty_tag('input', [
-        'type' => 'hidden', 'name' => 'action', 'value' => 'toggle',
-    ]);
-    $togglelink .= html_writer::empty_tag('input', [
-        'type' => 'hidden', 'name' => 'id', 'value' => (int) $f->id,
-    ]);
-    $togglelink .= html_writer::empty_tag('input', [
-        'type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey(),
-    ]);
-    $togglelink .= html_writer::tag('button', $togglelabel, [
-        'type' => 'submit',
-        'class' => 'btn btn-outline-' . ($f->enabled ? 'warning' : 'success') . ' btn-sm mr-1',
-    ]);
-    $togglelink .= html_writer::end_tag('form');
-
-    $deletelink = html_writer::start_tag('form', [
-        'method' => 'post', 'action' => $actionurl->out(false), 'class' => 'd-inline',
-    ]);
-    $deletelink .= html_writer::empty_tag('input', [
-        'type' => 'hidden', 'name' => 'action', 'value' => 'delete',
-    ]);
-    $deletelink .= html_writer::empty_tag('input', [
-        'type' => 'hidden', 'name' => 'id', 'value' => (int) $f->id,
-    ]);
-    $deletelink .= html_writer::empty_tag('input', [
-        'type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey(),
-    ]);
-    $deletelink .= html_writer::tag('button', get_string('delete'), [
-        'type' => 'submit',
-        'class'   => 'btn btn-outline-danger btn-sm',
-        'onclick' => 'return confirm(' . json_encode(get_string('flagdelete_confirm', 'local_completionhistory')) . ');',
-    ]);
-    $deletelink .= html_writer::end_tag('form');
-
-    $enabledbadge = $f->enabled
-        ? html_writer::tag('span', get_string('yes'), ['class' => 'badge badge-success'])
-        : html_writer::tag('span', get_string('no'), ['class' => 'badge badge-secondary']);
-
-    $table->data[] = [
-        s($f->name),
-        html_writer::tag('code', s($f->code)),
-        s($typelabel),
-        html_writer::tag('span', s($sevlabel), ['class' => "badge {$sevcls}"]),
-        $configsummary ? html_writer::tag('small', $configsummary, ['class' => 'text-muted']) : '-',
-        $enabledbadge,
-        $editlink . $togglelink . $deletelink,
-    ];
-}
-
-echo html_writer::table($table);
+echo $OUTPUT->header();
+echo $OUTPUT->render(new flags_list(array_values($flags)));
 echo $OUTPUT->footer();

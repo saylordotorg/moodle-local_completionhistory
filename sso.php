@@ -45,6 +45,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// phpcs:ignore moodle.Files.RequireLogin.Missing -- runs logged-out by design: the single-use key IS the credential (see header).
 require_once(__DIR__ . '/../../config.php');
 
 use local_completionhistory\external\create_login_key;
@@ -68,6 +69,9 @@ $destination = new moodle_url($wantsurl !== '' ? $wantsurl : '/my/');
  * BEHAT_SITE_RUNNING is defined, so on a real site the obvious
  * `/login/index.php?wantsurl=...` is silently ignored and the student lands on the
  * dashboard after signing in. The redirect looked right, and lost the course.
+ *
+ * @param moodle_url $destination Where the student was trying to go; restored after login.
+ * @param string $reason Why the key was rejected, for the developer debugging line.
  */
 function local_completionhistory_sso_send_to_login(moodle_url $destination, string $reason): void {
     global $SESSION;
@@ -81,23 +85,21 @@ function local_completionhistory_sso_send_to_login(moodle_url $destination, stri
     );
 }
 
-/**
- * CLAIM THE KEY UNDER A LOCK, so "single use" survives two simultaneous requests.
- *
- * validate_user_key() then delete_user_key() is a read followed by a write, and nothing
- * joins them. Two requests presenting the same key from the same permitted address can
- * both pass validation before either deletes, and both then get a session — which defeats
- * the guarantee in exactly the replay scenario it exists to stop. A stolen key is most
- * likely to be replayed immediately, so the race is the attack, not a curiosity.
- *
- * Moodle's lock API rather than SELECT ... FOR UPDATE: it is portable across database
- * families, whereas the SQL is not. The lock is named for the key VALUE, so it serialises
- * only the requests actually contending for the same key.
- *
- * The wait is short. A holder of this lock does a lookup and a delete, nothing more, and a
- * caller that cannot get in within a couple of seconds is better told to log in than left
- * waiting on a key that has 60 seconds to live.
- */
+// CLAIM THE KEY UNDER A LOCK, so "single use" survives two simultaneous requests.
+//
+// validate_user_key() then delete_user_key() is a read followed by a write, and nothing
+// joins them. Two requests presenting the same key from the same permitted address can
+// both pass validation before either deletes, and both then get a session — which defeats
+// the guarantee in exactly the replay scenario it exists to stop. A stolen key is most
+// likely to be replayed immediately, so the race is the attack, not a curiosity.
+//
+// Moodle's lock API rather than SELECT ... FOR UPDATE: it is portable across database
+// families, whereas the SQL is not. The lock is named for the key VALUE, so it serialises
+// only the requests actually contending for the same key.
+//
+// The wait is short. A holder of this lock does a lookup and a delete, nothing more, and a
+// caller that cannot get in within a couple of seconds is better told to log in than left
+// waiting on a key that has 60 seconds to live.
 $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_sso');
 $lock = $lockfactory->get_lock('key_' . hash('sha256', $keyvalue), 2);
 if (!$lock) {

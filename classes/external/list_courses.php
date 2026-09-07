@@ -58,6 +58,11 @@ class list_courses extends external_api {
     /** Maximum rows returned by this snapshot-style catalog endpoint. */
     private const MAX_CATALOG_ROWS = 5000;
 
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'includehidden' => new external_value(
@@ -70,8 +75,10 @@ class list_courses extends external_api {
     }
 
     /**
+     * Return the course catalog and its category tree.
+     *
      * @param bool $includehidden Include invisible courses.
-     * @return array
+     * @return array Courses, categories and their counts.
      */
     public static function execute(bool $includehidden = true): array {
         global $DB;
@@ -152,6 +159,11 @@ class list_courses extends external_api {
         ];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'courses' => new external_multiple_structure(

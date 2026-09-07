@@ -77,6 +77,11 @@ use core_external\external_value;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class unenrol_user_from_course extends external_api {
+    /**
+     * Describe the parameters accepted by execute().
+     *
+     * @return external_function_parameters
+     */
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'email'          => new external_value(PARAM_EMAIL, 'User email (identity key)'),
@@ -84,6 +89,13 @@ class unenrol_user_from_course extends external_api {
         ]);
     }
 
+    /**
+     * Suspend a learner's manual enrolments in a course and report whether access remains open.
+     *
+     * @param string $email Email address identifying the learner.
+     * @param string $courseidnumber Course idnumber, falling back to a shortname match.
+     * @return array Outcome flags, the course id and a warning when the course is still accessible.
+     */
     public static function execute(string $email, string $courseidnumber): array {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/lib/enrollib.php');
@@ -187,6 +199,11 @@ class unenrol_user_from_course extends external_api {
         ];
     }
 
+    /**
+     * Describe the structure execute() returns.
+     *
+     * @return external_single_structure
+     */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'ok'       => new external_value(PARAM_BOOL, 'Request completed'),
