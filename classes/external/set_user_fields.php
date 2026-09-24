@@ -138,11 +138,11 @@ class set_user_fields extends external_api {
             self::apply($params['fields'], $user, $custom, $formfields, $lockvalue, $results, $standardupdate,
                 $standardchanged, $customchanged, $seen);
 
-            if ($standardchanged) {
-                // user_update_user fires user_updated, purges caches and stamps timemodified.
+            if ($standardchanged || $customchanged) {
+                // user_update_user fires user_updated, purges caches and stamps timemodified — for a
+                // custom-only change too (PR #15 review): consumers that sync on the core
+                // modification time would otherwise never see it.
                 user_update_user($standardupdate, false, true);
-            } else if ($customchanged) {
-                \core\event\user_updated::create_from_userid((int) $user->id)->trigger();
             }
         } finally {
             foreach ($locks as $lock) {
@@ -261,10 +261,13 @@ class set_user_fields extends external_api {
                         $report('refused', 'another request is writing this value right now; try again');
                         continue;
                     }
+                    // The FULL value (PR #15 review): sql_compare_text defaults to 32 characters on
+                    // some drivers, which would call two long values with one prefix a collision.
+                    $width = max(2048, (int) $field->param2, \core_text::strlen($wouldstore));
                     $taken = $DB->record_exists_select(
                         'user_info_data',
-                        'fieldid = :fieldid AND userid <> :userid AND ' . $DB->sql_compare_text('data') . ' = '
-                            . $DB->sql_compare_text(':data'),
+                        'fieldid = :fieldid AND userid <> :userid AND ' . $DB->sql_compare_text('data', $width) . ' = '
+                            . $DB->sql_compare_text(':data', $width),
                         ['fieldid' => (int) $field->id, 'userid' => (int) $user->id, 'data' => $wouldstore]
                     );
                     if ($taken) {

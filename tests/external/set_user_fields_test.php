@@ -212,6 +212,53 @@ final class set_user_fields_test extends advanced_testcase {
     }
 
     /**
+     * A change to custom fields alone still stamps the user's modification time.
+     */
+    public function test_custom_only_change_stamps_timemodified(): void {
+        global $DB;
+
+        $this->getDataGenerator()->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'program', 'name' => 'Program']);
+        $user = $this->getDataGenerator()->create_user(['email' => 'stamp@example.com']);
+        $DB->set_field('user', 'timemodified', 1000, ['id' => $user->id]);
+
+        set_user_fields::execute('stamp@example.com', [['name' => 'profile_field_program', 'value' => 'MBA']]);
+        $this->assertGreaterThan(1000, (int) $DB->get_field('user', 'timemodified', ['id' => $user->id]));
+    }
+
+    /**
+     * A Unix timestamp is not an accepted date form: its calendar year depends on the timezone.
+     */
+    public function test_timestamp_dates_are_refused(): void {
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'datetime', 'shortname' => 'enrolled', 'name' => 'Enrolled', 'param1' => 2000, 'param2' => 2050,
+        ]);
+        $this->getDataGenerator()->create_user(['email' => 'ts@example.com']);
+
+        $row = $this->by_name(set_user_fields::execute('ts@example.com', [
+            ['name' => 'profile_field_enrolled', 'value' => '2556142200'],
+        ]))['profile_field_enrolled'];
+        $this->assertSame('refused', $row['status']);
+    }
+
+    /**
+     * Two long forceunique values that share a 32-character prefix are different values.
+     */
+    public function test_forceunique_compares_the_whole_value(): void {
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'text', 'shortname' => 'longref', 'name' => 'Long reference', 'forceunique' => 1,
+        ]);
+        $this->getDataGenerator()->create_user(['email' => 'long1@example.com']);
+        $this->getDataGenerator()->create_user(['email' => 'long2@example.com']);
+        $prefix = str_repeat('x', 40);
+
+        set_user_fields::execute('long1@example.com', [['name' => 'profile_field_longref', 'value' => $prefix . 'A']]);
+        $row = $this->by_name(set_user_fields::execute('long2@example.com', [
+            ['name' => 'profile_field_longref', 'value' => $prefix . 'B'],
+        ]))['profile_field_longref'];
+        $this->assertSame('changed', $row['status'], $row['message']);
+    }
+
+    /**
      * A forceunique custom field never ends up with the same value on two accounts.
      */
     public function test_forceunique_custom_field_is_not_duplicated(): void {

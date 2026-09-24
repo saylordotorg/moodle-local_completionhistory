@@ -144,11 +144,10 @@ final class profile_field_catalogue {
                 $bit = in_array($lower, $truthy, true) ? '1' : '0';
                 return [$bit, ''];
             case 'datetime':
-                // The SIS sends ISO dates (YYYY-MM-DD) or a Unix timestamp.
-                if (ctype_digit($value)) {
-                    $ts = (int) $value;
-                    $year = (int) gmdate('Y', $ts);
-                } else if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+                // ISO dates (YYYY-MM-DD) only. A Unix-timestamp form used to be accepted too, but its
+                // calendar year depends on the site timezone (PR #15 review) and the SIS never sends
+                // one, so it is refused rather than validated in the wrong zone.
+                if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
                     // Refused rather than normalised (PR #15 review): PHP turns 2026-02-30 into
                     // 2026-03-02, which would store a date the SIS never sent.
                     if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
