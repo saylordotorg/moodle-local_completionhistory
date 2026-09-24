@@ -135,13 +135,23 @@ class set_user_fields extends external_api {
         };
 
         try {
-            self::apply($params['fields'], $user, $custom, $formfields, $lockvalue, $results, $standardupdate,
-                $standardchanged, $customchanged, $seen);
+            self::apply(
+                $params['fields'],
+                $user,
+                $custom,
+                $formfields,
+                $lockvalue,
+                $results,
+                $standardupdate,
+                $standardchanged,
+                $customchanged,
+                $seen
+            );
 
             if ($standardchanged || $customchanged) {
-                // user_update_user fires user_updated, purges caches and stamps timemodified — for a
-                // custom-only change too (PR #15 review): consumers that sync on the core
-                // modification time would otherwise never see it.
+                // The core user_update_user() fires user_updated, purges caches and stamps
+                // timemodified, for a custom-only change too (PR #15 review): consumers that sync on
+                // the core modification time would otherwise never see it.
                 user_update_user($standardupdate, false, true);
             }
         } finally {
@@ -210,11 +220,13 @@ class set_user_fields extends external_api {
                         $report('refused', 'another request is assigning this ID number right now; try again');
                         continue;
                     }
-                    if ($DB->record_exists_select(
-                        'user',
-                        'idnumber = :idnumber AND deleted = 0 AND id <> :userid',
-                        ['idnumber' => $value, 'userid' => (int) $user->id]
-                    )) {
+                    if (
+                        $DB->record_exists_select(
+                            'user',
+                            'idnumber = :idnumber AND deleted = 0 AND id <> :userid',
+                            ['idnumber' => $value, 'userid' => (int) $user->id]
+                        )
+                    ) {
                         $report('refused', 'another account already holds this ID number');
                         continue;
                     }
@@ -268,7 +280,7 @@ class set_user_fields extends external_api {
                     continue;
                 }
                 // Moodle enforces forceunique only in the profile form's validation, which this
-                // endpoint bypasses, so the invariant is checked here under a per-value lock.
+                // endpoint bypasses, so the invariant is checked here under a per-field lock.
                 if (!empty($field->forceunique)) {
                     if (!$lockvalue('unique_' . (int) $field->id)) {
                         $report('refused', 'another request is writing this value right now; try again');
@@ -291,7 +303,8 @@ class set_user_fields extends external_api {
                 if ($field->datatype === 'datetime') {
                     // The same record edit_save_data writes, minus the caller-timezone preprocessing.
                     $record = (object) ['userid' => (int) $user->id, 'fieldid' => (int) $field->id, 'data' => $wouldstore];
-                    if ($dataid = $DB->get_field('user_info_data', 'id', ['userid' => $record->userid, 'fieldid' => $record->fieldid])) {
+                    $existing = ['userid' => $record->userid, 'fieldid' => $record->fieldid];
+                    if ($dataid = $DB->get_field('user_info_data', 'id', $existing)) {
                         $record->id = $dataid;
                         $DB->update_record('user_info_data', $record);
                     } else {

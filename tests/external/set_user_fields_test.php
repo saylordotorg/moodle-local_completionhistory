@@ -236,7 +236,9 @@ final class set_user_fields_test extends advanced_testcase {
      * Markup-only text is empty once cleaned, so it never clears a stored value.
      */
     public function test_markup_only_text_is_not_written(): void {
-        $this->getDataGenerator()->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'program', 'name' => 'Program']);
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'text', 'shortname' => 'program', 'name' => 'Program',
+        ]);
         $user = $this->getDataGenerator()->create_user(['email' => 'markup@example.com']);
         set_user_fields::execute('markup@example.com', [['name' => 'profile_field_program', 'value' => 'MBA']]);
 
@@ -272,7 +274,9 @@ final class set_user_fields_test extends advanced_testcase {
     public function test_custom_only_change_stamps_timemodified(): void {
         global $DB;
 
-        $this->getDataGenerator()->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'program', 'name' => 'Program']);
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'text', 'shortname' => 'program', 'name' => 'Program',
+        ]);
         $user = $this->getDataGenerator()->create_user(['email' => 'stamp@example.com']);
         $DB->set_field('user', 'timemodified', 1000, ['id' => $user->id]);
 
