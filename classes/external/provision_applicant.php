@@ -112,7 +112,6 @@ class provision_applicant extends external_api {
                     $usernamewarning = 'Username ' . $base . ' was taken by another account; created as ' . $username . '.';
                 }
 
-                $password = bin2hex(random_bytes(16)) . 'Aa1!';
                 $new = new \stdClass();
                 $new->username = $username;
                 $new->firstname = $params['firstname'] !== ''
@@ -125,6 +124,8 @@ class provision_applicant extends external_api {
                 $new->auth = 'manual';
                 $new->confirmed = 1;
                 $new->mnethostid = $CFG->mnet_localhost_id;
+                // Built to satisfy the site's WHOLE policy, plugins included (see initial_password).
+                $password = \local_completionhistory\local\initial_password::generate($new);
                 $new->password = $password;
                 $userid = user_create_user($new, true, true);
                 set_user_preference('auth_forcepasswordchange', 1, $userid);

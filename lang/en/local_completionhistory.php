@@ -264,6 +264,7 @@ $string['flagtype_score_range'] = 'Score in range';
 $string['gradefailed'] = 'Not passed';
 $string['gradepassed'] = 'Passed';
 $string['gradeunknown'] = 'N/A';
+$string['initialpasswordrefused'] = 'The site password policy refused every generated initial password: {$a}';
 $string['inprogresscoursestoolarge'] = 'This learner has too many in-progress courses for one response.';
 $string['layout_using_default'] = 'Using the site-wide default column layout.';
 $string['layout_using_saved'] = 'Using your saved column layout.';
