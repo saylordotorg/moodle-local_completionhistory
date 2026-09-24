@@ -50,6 +50,16 @@ final class set_user_fields_test extends advanced_testcase {
     }
 
     /**
+     * A stored datetime as the calendar date Moodle displays, in the timezone core used to store it.
+     *
+     * @param int|string $ts The stored timestamp.
+     * @return string YYYY-MM-DD
+     */
+    private function day(int|string $ts): string {
+        return (new \DateTime('@' . (int) $ts))->setTimezone(\core_date::get_user_timezone_object())->format('Y-m-d');
+    }
+
+    /**
      * The SIS is authoritative: an existing ID number is overwritten, and nothing unmapped changes.
      */
     public function test_id_number_is_overwritten(): void {
@@ -135,7 +145,7 @@ final class set_user_fields_test extends advanced_testcase {
         $this->assertSame('Bachelor of Arts in Business Administration', $stored->program);
         $this->assertSame('Graduate', $stored->level);
         $this->assertSame('1', (string) $stored->matriculated);
-        $this->assertSame('2026-09-24', gmdate('Y-m-d', (int) $stored->enrolled));
+        $this->assertSame('2026-09-24', $this->day($stored->enrolled));
 
         $bad = set_user_fields::execute('custom@example.com', [
             ['name' => 'profile_field_level', 'value' => 'Doctoral'],
@@ -172,7 +182,7 @@ final class set_user_fields_test extends advanced_testcase {
         set_user_fields::execute('dates@example.com', [['name' => 'profile_field_enrolled', 'value' => '2026-09-24']]);
         $next = set_user_fields::execute('dates@example.com', [['name' => 'profile_field_enrolled', 'value' => '2026-09-25']]);
         $this->assertSame('changed', $this->by_name($next)['profile_field_enrolled']['status'], 'an adjacent day is a change');
-        $this->assertSame('2026-09-25', gmdate('Y-m-d', (int) profile_user_record($user->id, false)->enrolled));
+        $this->assertSame('2026-09-25', $this->day(profile_user_record($user->id, false)->enrolled));
 
         foreach (['2026-02-30' => 'not a real calendar date', '2099-01-01' => 'year range'] as $value => $why) {
             $row = $this->by_name(set_user_fields::execute('dates@example.com', [
@@ -181,7 +191,24 @@ final class set_user_fields_test extends advanced_testcase {
             $this->assertSame('refused', $row['status'], "{$value} must be refused");
             $this->assertStringContainsString($why, $row['message']);
         }
-        $this->assertSame('2026-09-25', gmdate('Y-m-d', (int) profile_user_record($user->id, false)->enrolled));
+        $this->assertSame('2026-09-25', $this->day(profile_user_record($user->id, false)->enrolled));
+    }
+
+    /**
+     * An ISO date is stored as that calendar day even where noon UTC is already tomorrow.
+     */
+    public function test_iso_date_survives_a_far_east_timezone(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+
+        $this->setTimezone('Pacific/Kiritimati'); // UTC+14.
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'datetime', 'shortname' => 'started', 'name' => 'Started', 'param1' => 2000, 'param2' => 2050,
+        ]);
+        $user = $this->getDataGenerator()->create_user(['email' => 'east@example.com']);
+
+        set_user_fields::execute('east@example.com', [['name' => 'profile_field_started', 'value' => '2026-09-24']]);
+        $this->assertSame('2026-09-24', $this->day(profile_user_record($user->id, false)->started));
     }
 
     /**

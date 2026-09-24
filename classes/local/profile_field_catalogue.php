@@ -154,7 +154,10 @@ final class profile_field_catalogue {
                     if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
                         return [null, 'not a real calendar date'];
                     }
-                    $ts = (int) (new \DateTimeImmutable($value . ' 12:00:00', new \DateTimeZone('UTC')))->getTimestamp();
+                    // Handed to core AS A DATE STRING (PR #15 review): its preprocessing builds the
+                    // timestamp in the site's own timezone, the one the date is displayed in. A
+                    // noon-UTC timestamp is already tomorrow in UTC+12 and later.
+                    $ts = $value;
                     $year = (int) $m[1];
                 } else {
                     return [null, 'a date must be YYYY-MM-DD'];

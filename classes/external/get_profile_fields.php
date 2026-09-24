@@ -93,7 +93,10 @@ class get_profile_fields extends external_api {
                     'name'      => new external_value(PARAM_ALPHANUMEXT, 'Field name to map to'),
                     'label'     => new external_value(PARAM_TEXT, 'Human name'),
                     'kind'      => new external_value(PARAM_ALPHA, 'standard | custom'),
-                    'datatype'  => new external_value(PARAM_ALPHA, 'text, country, textarea, menu, checkbox, datetime, social…'),
+                    // PARAM_PLUGIN, not PARAM_ALPHA (PR #15 review): a third-party profilefield
+                    // plugin may be named with digits or underscores, and one such field would
+                    // otherwise fail the whole list instead of showing as unsupported.
+                    'datatype'  => new external_value(PARAM_PLUGIN, 'text, country, textarea, menu, checkbox, datetime, social…'),
                     'maxlength' => new external_value(PARAM_INT, 'Maximum length, 0 when not applicable'),
                     'options'   => new external_multiple_structure(new external_value(PARAM_RAW, 'Menu option')),
                     'supported' => new external_value(PARAM_BOOL, 'Whether set_user_fields can write this field'),

@@ -117,12 +117,16 @@ class set_user_fields extends external_api {
          * Locks held from each uniqueness check until the write it guards (PR #15 review). Moodle
          * does not constrain user.idnumber, nor a forceunique custom field, at the database, so two
          * concurrent syncs could each pass the "nobody else holds this" check and both write it.
-         * One lock per VALUE, so unrelated learners never wait on each other.
+         *
+         * ONE LOCK PER FIELD, not per value: the database compares values under its collation
+         * (case- and often accent-insensitive on MySQL), so a lock keyed on the raw value would let
+         * SU-123 and su-123 through at once. Serialising the field costs little — syncs are rare
+         * and the SIS sends one learner at a time.
          */
         $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_fields');
         $locks = [];
         $lockvalue = static function (string $key) use ($lockfactory, &$locks): bool {
-            $lock = $lockfactory->get_lock($key, 5);
+            $lock = $lockfactory->get_lock($key, 10);
             if (!$lock) {
                 return false;
             }
@@ -202,7 +206,7 @@ class set_user_fields extends external_api {
                     continue;
                 }
                 if ($name === 'idnumber') {
-                    if (!$lockvalue('idnumber_' . hash('sha256', $value))) {
+                    if (!$lockvalue('idnumber')) {
                         $report('refused', 'another request is assigning this ID number right now; try again');
                         continue;
                     }
@@ -253,7 +257,7 @@ class set_user_fields extends external_api {
                 // Moodle enforces forceunique only in the profile form's validation, which this
                 // endpoint bypasses, so the invariant is checked here under a per-value lock.
                 if (!empty($field->forceunique)) {
-                    if (!$lockvalue('unique_' . (int) $field->id . '_' . hash('sha256', $wouldstore))) {
+                    if (!$lockvalue('unique_' . (int) $field->id)) {
                         $report('refused', 'another request is writing this value right now; try again');
                         continue;
                     }
