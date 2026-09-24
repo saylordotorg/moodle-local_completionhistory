@@ -113,8 +113,71 @@ class set_user_fields extends external_api {
         $standardchanged = [];
         $customchanged = false;
         $seen = [];
+        /*
+         * Locks held from each uniqueness check until the write it guards (PR #15 review). Moodle
+         * does not constrain user.idnumber, nor a forceunique custom field, at the database, so two
+         * concurrent syncs could each pass the "nobody else holds this" check and both write it.
+         * One lock per VALUE, so unrelated learners never wait on each other.
+         */
+        $lockfactory = \core\lock\lock_config::get_lock_factory('local_completionhistory_fields');
+        $locks = [];
+        $lockvalue = static function (string $key) use ($lockfactory, &$locks): bool {
+            $lock = $lockfactory->get_lock($key, 5);
+            if (!$lock) {
+                return false;
+            }
+            $locks[] = $lock;
+            return true;
+        };
 
-        foreach ($params['fields'] as $item) {
+        try {
+            self::apply($params['fields'], $user, $custom, $formfields, $lockvalue, $results, $standardupdate,
+                $standardchanged, $customchanged, $seen);
+
+            if ($standardchanged) {
+                // user_update_user fires user_updated, purges caches and stamps timemodified.
+                user_update_user($standardupdate, false, true);
+            } else if ($customchanged) {
+                \core\event\user_updated::create_from_userid((int) $user->id)->trigger();
+            }
+        } finally {
+            foreach ($locks as $lock) {
+                $lock->release();
+            }
+        }
+
+        return ['success' => true, 'userid' => (int) $user->id, 'warning' => '', 'results' => $results];
+    }
+
+    /**
+     * Check each field and stage or save it, appending one result per field.
+     *
+     * @param array $fields The fields as sent.
+     * @param \stdClass $user The learner.
+     * @param array $custom Custom field definitions keyed by mapping name.
+     * @param array $formfields The learner's profile field objects keyed by mapping name.
+     * @param callable $lockvalue Takes a lock key; false when the lock could not be had.
+     * @param array $results Results, appended to.
+     * @param \stdClass $standardupdate Standard-field changes, staged for one user_update_user.
+     * @param array $standardchanged Names of staged standard fields.
+     * @param bool $customchanged Set when a custom field was saved.
+     * @param array $seen Names already handled in this call.
+     */
+    private static function apply(
+        array $fields,
+        \stdClass $user,
+        array $custom,
+        array $formfields,
+        callable $lockvalue,
+        array &$results,
+        \stdClass $standardupdate,
+        array &$standardchanged,
+        bool &$customchanged,
+        array &$seen
+    ): void {
+        global $DB;
+
+        foreach ($fields as $item) {
             $name = $item['name'];
             $raw = (string) $item['value'];
             $report = static function (string $status, string $message = '') use (&$results, $name): void {
@@ -138,13 +201,19 @@ class set_user_fields extends external_api {
                     $report('refused', $why);
                     continue;
                 }
-                if ($name === 'idnumber' && $DB->record_exists_select(
-                    'user',
-                    'idnumber = :idnumber AND deleted = 0 AND id <> :userid',
-                    ['idnumber' => $value, 'userid' => (int) $user->id]
-                )) {
-                    $report('refused', 'another account already holds this ID number');
-                    continue;
+                if ($name === 'idnumber') {
+                    if (!$lockvalue('idnumber_' . hash('sha256', $value))) {
+                        $report('refused', 'another request is assigning this ID number right now; try again');
+                        continue;
+                    }
+                    if ($DB->record_exists_select(
+                        'user',
+                        'idnumber = :idnumber AND deleted = 0 AND id <> :userid',
+                        ['idnumber' => $value, 'userid' => (int) $user->id]
+                    )) {
+                        $report('refused', 'another account already holds this ID number');
+                        continue;
+                    }
                 }
                 if ((string) ($user->$name ?? '') === $value) {
                     $report('unchanged');
@@ -162,20 +231,42 @@ class set_user_fields extends external_api {
                     $report('refused', "custom fields of type {$field->datatype} are not supported");
                     continue;
                 }
-                [$prepared, $why, $comparable] = profile_field_catalogue::custom_value($field, $raw);
+                [$prepared, $why] = profile_field_catalogue::custom_value($field, $raw);
                 if ($prepared === null) {
                     $report('refused', $why);
                     continue;
                 }
                 $formfield = $formfields[$name];
-                $current = (string) ($formfield->data ?? '');
-                $same = $field->datatype === 'datetime'
-                    // A stored date is re-derived through the calendar, so compare to within a day.
-                    ? ($current !== '' && abs((int) $current - (int) $comparable) < 36 * 3600)
-                    : $current === $comparable;
-                if ($same) {
+                /*
+                 * Compare with EXACTLY what core would store (PR #15 review), by running the field
+                 * type's own preprocessing: a datetime is re-derived through the calendar, a
+                 * textarea unwraps its array. The old tolerance-based comparison let an adjacent
+                 * date read as unchanged and silently skip the save. Read from user_info_data, not
+                 * the field object, so a value that only matches the field's DEFAULT still saves.
+                 */
+                $wouldstore = (string) $formfield->edit_save_data_preprocess($prepared, new \stdClass());
+                $stored = $DB->get_field('user_info_data', 'data', ['userid' => (int) $user->id, 'fieldid' => (int) $field->id]);
+                if ($stored !== false && (string) $stored === $wouldstore) {
                     $report('unchanged');
                     continue;
+                }
+                // Moodle enforces forceunique only in the profile form's validation, which this
+                // endpoint bypasses, so the invariant is checked here under a per-value lock.
+                if (!empty($field->forceunique)) {
+                    if (!$lockvalue('unique_' . (int) $field->id . '_' . hash('sha256', $wouldstore))) {
+                        $report('refused', 'another request is writing this value right now; try again');
+                        continue;
+                    }
+                    $taken = $DB->record_exists_select(
+                        'user_info_data',
+                        'fieldid = :fieldid AND userid <> :userid AND ' . $DB->sql_compare_text('data') . ' = '
+                            . $DB->sql_compare_text(':data'),
+                        ['fieldid' => (int) $field->id, 'userid' => (int) $user->id, 'data' => $wouldstore]
+                    );
+                    if ($taken) {
+                        $report('refused', 'this field must be unique and another account already holds this value');
+                        continue;
+                    }
                 }
                 $formfield->edit_save_data((object) ['id' => (int) $user->id, $formfield->inputname => $prepared]);
                 $customchanged = true;
@@ -185,15 +276,6 @@ class set_user_fields extends external_api {
 
             $report('refused', 'not a field this integration may write, or no such custom profile field exists');
         }
-
-        if ($standardchanged) {
-            // user_update_user fires user_updated, purges caches and stamps timemodified.
-            user_update_user($standardupdate, false, true);
-        } else if ($customchanged) {
-            \core\event\user_updated::create_from_userid((int) $user->id)->trigger();
-        }
-
-        return ['success' => true, 'userid' => (int) $user->id, 'warning' => '', 'results' => $results];
     }
 
     /**

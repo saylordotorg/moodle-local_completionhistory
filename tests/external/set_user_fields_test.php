@@ -158,6 +158,58 @@ final class set_user_fields_test extends advanced_testcase {
     }
 
     /**
+     * A date moved by one day is saved, not reported unchanged; invalid and out-of-range dates are refused.
+     */
+    public function test_dates_are_exact_and_validated(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'datetime', 'shortname' => 'enrolled', 'name' => 'Enrolled', 'param1' => 2000, 'param2' => 2050,
+        ]);
+        $user = $this->getDataGenerator()->create_user(['email' => 'dates@example.com']);
+
+        set_user_fields::execute('dates@example.com', [['name' => 'profile_field_enrolled', 'value' => '2026-09-24']]);
+        $next = set_user_fields::execute('dates@example.com', [['name' => 'profile_field_enrolled', 'value' => '2026-09-25']]);
+        $this->assertSame('changed', $this->by_name($next)['profile_field_enrolled']['status'], 'an adjacent day is a change');
+        $this->assertSame('2026-09-25', gmdate('Y-m-d', (int) profile_user_record($user->id, false)->enrolled));
+
+        foreach (['2026-02-30' => 'not a real calendar date', '2099-01-01' => 'year range'] as $value => $why) {
+            $row = $this->by_name(set_user_fields::execute('dates@example.com', [
+                ['name' => 'profile_field_enrolled', 'value' => $value],
+            ]))['profile_field_enrolled'];
+            $this->assertSame('refused', $row['status'], "{$value} must be refused");
+            $this->assertStringContainsString($why, $row['message']);
+        }
+        $this->assertSame('2026-09-25', gmdate('Y-m-d', (int) profile_user_record($user->id, false)->enrolled));
+    }
+
+    /**
+     * A forceunique custom field never ends up with the same value on two accounts.
+     */
+    public function test_forceunique_custom_field_is_not_duplicated(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'text', 'shortname' => 'sisref', 'name' => 'SIS reference', 'forceunique' => 1,
+        ]);
+        $first = $this->getDataGenerator()->create_user(['email' => 'first@example.com']);
+        $second = $this->getDataGenerator()->create_user(['email' => 'second@example.com']);
+
+        $ok = set_user_fields::execute('first@example.com', [['name' => 'profile_field_sisref', 'value' => 'SU-2026-01050']]);
+        $this->assertSame('changed', $this->by_name($ok)['profile_field_sisref']['status']);
+
+        $dup = $this->by_name(set_user_fields::execute('second@example.com', [
+            ['name' => 'profile_field_sisref', 'value' => 'SU-2026-01050'],
+        ]))['profile_field_sisref'];
+        $this->assertSame('refused', $dup['status']);
+        $this->assertStringContainsString('must be unique', $dup['message']);
+        $this->assertSame('', (string) (profile_user_record($second->id, false)->sisref ?? ''));
+        $this->assertSame('SU-2026-01050', profile_user_record($first->id, false)->sisref);
+    }
+
+    /**
      * Identity and access fields are not writable, whatever the SIS sends.
      */
     public function test_identity_fields_are_refused(): void {

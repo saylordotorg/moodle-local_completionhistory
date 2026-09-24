@@ -113,8 +113,7 @@ final class profile_field_catalogue {
      *
      * @param \stdClass $field The user_info_field row.
      * @param string $raw The value the SIS sent.
-     * @return array{0: mixed, 1: string, 2: string} The value for edit_save_data (null when refused),
-     *     the reason, and the value as it will read back from user_info_data for comparison.
+     * @return array{0: mixed, 1: string} The value for edit_save_data (null when refused) and the reason.
      */
     public static function custom_value(\stdClass $field, string $raw): array {
         $value = trim($raw);
@@ -123,39 +122,52 @@ final class profile_field_catalogue {
             case 'social':
                 $max = (int) ($field->param2 ?: 2048);
                 if (\core_text::strlen($value) > $max) {
-                    return [null, "longer than the field's {$max}-character limit", ''];
+                    return [null, "longer than the field's {$max}-character limit"];
                 }
                 $clean = clean_param($value, PARAM_TEXT);
-                return [$clean, '', $clean];
+                return [$clean, ''];
             case 'textarea':
                 $clean = clean_param($value, PARAM_TEXT);
-                return [['text' => $clean, 'format' => FORMAT_PLAIN], '', $clean];
+                return [['text' => $clean, 'format' => FORMAT_PLAIN], ''];
             case 'menu':
                 if (!in_array($value, self::menu_options($field), true)) {
-                    return [null, 'not one of the menu options defined in Moodle', ''];
+                    return [null, 'not one of the menu options defined in Moodle'];
                 }
-                return [$value, '', $value];
+                return [$value, ''];
             case 'checkbox':
                 $truthy = ['1', 'true', 'yes'];
                 $falsy = ['0', 'false', 'no'];
                 $lower = \core_text::strtolower($value);
                 if (!in_array($lower, array_merge($truthy, $falsy), true)) {
-                    return [null, 'a checkbox takes true or false', ''];
+                    return [null, 'a checkbox takes true or false'];
                 }
                 $bit = in_array($lower, $truthy, true) ? '1' : '0';
-                return [$bit, '', $bit];
+                return [$bit, ''];
             case 'datetime':
                 // The SIS sends ISO dates (YYYY-MM-DD) or a Unix timestamp.
                 if (ctype_digit($value)) {
                     $ts = (int) $value;
-                } else if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                    $year = (int) gmdate('Y', $ts);
+                } else if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+                    // Refused rather than normalised (PR #15 review): PHP turns 2026-02-30 into
+                    // 2026-03-02, which would store a date the SIS never sent.
+                    if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+                        return [null, 'not a real calendar date'];
+                    }
                     $ts = (int) (new \DateTimeImmutable($value . ' 12:00:00', new \DateTimeZone('UTC')))->getTimestamp();
+                    $year = (int) $m[1];
                 } else {
-                    return [null, 'a date must be YYYY-MM-DD', ''];
+                    return [null, 'a date must be YYYY-MM-DD'];
                 }
-                return [$ts, '', (string) $ts];
+                // Core would silently clamp an out-of-range year to the field's bounds.
+                $min = (int) $field->param1;
+                $max = (int) $field->param2;
+                if (($min && $year < $min) || ($max && $year > $max)) {
+                    return [null, "outside the field's {$min}–{$max} year range"];
+                }
+                return [$ts, ''];
             default:
-                return [null, "custom fields of type {$field->datatype} are not supported", ''];
+                return [null, "custom fields of type {$field->datatype} are not supported"];
         }
     }
 }
