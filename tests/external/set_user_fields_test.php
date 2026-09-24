@@ -248,6 +248,25 @@ final class set_user_fields_test extends advanced_testcase {
     }
 
     /**
+     * A date field set to unique is shown unsupported and never written.
+     */
+    public function test_unique_date_field_is_unsupported(): void {
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'datetime', 'shortname' => 'udate', 'name' => 'Unique date', 'param1' => 2000, 'param2' => 2050,
+            'forceunique' => 1,
+        ]);
+        $this->getDataGenerator()->create_user(['email' => 'udate@example.com']);
+
+        $fields = array_column(get_profile_fields::execute()['fields'], null, 'name');
+        $this->assertFalse($fields['profile_field_udate']['supported']);
+
+        $row = $this->by_name(set_user_fields::execute('udate@example.com', [
+            ['name' => 'profile_field_udate', 'value' => '2026-09-24'],
+        ]))['profile_field_udate'];
+        $this->assertSame('refused', $row['status']);
+    }
+
+    /**
      * A change to custom fields alone still stamps the user's modification time.
      */
     public function test_custom_only_change_stamps_timemodified(): void {

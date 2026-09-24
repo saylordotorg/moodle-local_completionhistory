@@ -75,7 +75,7 @@ class get_profile_fields extends external_api {
                 'datatype' => (string) $field->datatype,
                 'maxlength' => in_array($field->datatype, ['text', 'social'], true) ? (int) ($field->param2 ?: 2048) : 0,
                 'options' => $field->datatype === 'menu' ? profile_field_catalogue::menu_options($field) : [],
-                'supported' => in_array($field->datatype, profile_field_catalogue::CUSTOM_TYPES, true),
+                'supported' => profile_field_catalogue::is_supported($field),
             ];
         }
         return ['fields' => $out];

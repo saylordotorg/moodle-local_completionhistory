@@ -73,6 +73,24 @@ final class profile_field_catalogue {
     }
 
     /**
+     * Whether the writer can write this custom field at all.
+     *
+     * A forceunique DATE field is refused (PR #15 review). Dates are stored as each learner's own
+     * local midnight, so one calendar date is a different timestamp for learners in different
+     * timezones, and the uniqueness check cannot see the duplicate. A unique date has no real use
+     * for a student record, so it is marked unsupported rather than given a second comparison.
+     *
+     * @param \stdClass $field The user_info_field row.
+     * @return bool
+     */
+    public static function is_supported(\stdClass $field): bool {
+        if (!in_array($field->datatype, self::CUSTOM_TYPES, true)) {
+            return false;
+        }
+        return !($field->datatype === 'datetime' && !empty($field->forceunique));
+    }
+
+    /**
      * The options of a menu field, one per line of param1, as Moodle stores them.
      *
      * @param \stdClass $field The user_info_field row.

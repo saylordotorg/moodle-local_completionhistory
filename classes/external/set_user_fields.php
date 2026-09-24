@@ -231,8 +231,10 @@ class set_user_fields extends external_api {
 
             if (isset($custom[$name], $formfields[$name])) {
                 $field = $custom[$name];
-                if (!in_array($field->datatype, profile_field_catalogue::CUSTOM_TYPES, true)) {
-                    $report('refused', "custom fields of type {$field->datatype} are not supported");
+                if (!profile_field_catalogue::is_supported($field)) {
+                    $report('refused', $field->datatype === 'datetime'
+                        ? 'a date field set to unique cannot be written by the integration'
+                        : "custom fields of type {$field->datatype} are not supported");
                     continue;
                 }
                 [$prepared, $why] = profile_field_catalogue::custom_value($field, $raw);
