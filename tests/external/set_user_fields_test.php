@@ -53,10 +53,11 @@ final class set_user_fields_test extends advanced_testcase {
      * A stored datetime as the calendar date Moodle displays, in the timezone core used to store it.
      *
      * @param int|string $ts The stored timestamp.
+     * @param \stdClass|null $user Whose timezone to read it in; the current user when null.
      * @return string YYYY-MM-DD
      */
-    private function day(int|string $ts): string {
-        return (new \DateTime('@' . (int) $ts))->setTimezone(\core_date::get_user_timezone_object())->format('Y-m-d');
+    private function day(int|string $ts, ?\stdClass $user = null): string {
+        return (new \DateTime('@' . (int) $ts))->setTimezone(\core_date::get_user_timezone_object($user))->format('Y-m-d');
     }
 
     /**
@@ -209,6 +210,41 @@ final class set_user_fields_test extends advanced_testcase {
 
         set_user_fields::execute('east@example.com', [['name' => 'profile_field_started', 'value' => '2026-09-24']]);
         $this->assertSame('2026-09-24', $this->day(profile_user_record($user->id, false)->started));
+    }
+
+    /**
+     * A date shows as the day the SIS sent in the LEARNER's own timezone, whatever the caller's is.
+     */
+    public function test_date_is_the_learners_calendar_day(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+
+        $this->setTimezone('UTC');
+        $this->getDataGenerator()->create_custom_profile_field([
+            'datatype' => 'datetime', 'shortname' => 'started', 'name' => 'Started', 'param1' => 2000, 'param2' => 2050,
+        ]);
+        $learner = $this->getDataGenerator()->create_user(['email' => 'la@example.com', 'timezone' => 'America/Los_Angeles']);
+
+        set_user_fields::execute('la@example.com', [['name' => 'profile_field_started', 'value' => '2026-09-24']]);
+        $this->assertSame('2026-09-24', $this->day(profile_user_record($learner->id, false)->started, $learner));
+
+        $again = set_user_fields::execute('la@example.com', [['name' => 'profile_field_started', 'value' => '2026-09-24']]);
+        $this->assertSame('unchanged', $this->by_name($again)['profile_field_started']['status']);
+    }
+
+    /**
+     * Markup-only text is empty once cleaned, so it never clears a stored value.
+     */
+    public function test_markup_only_text_is_not_written(): void {
+        $this->getDataGenerator()->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'program', 'name' => 'Program']);
+        $user = $this->getDataGenerator()->create_user(['email' => 'markup@example.com']);
+        set_user_fields::execute('markup@example.com', [['name' => 'profile_field_program', 'value' => 'MBA']]);
+
+        $row = $this->by_name(set_user_fields::execute('markup@example.com', [
+            ['name' => 'profile_field_program', 'value' => '<b></b>'],
+        ]))['profile_field_program'];
+        $this->assertSame('refused', $row['status']);
+        $this->assertSame('MBA', profile_user_record($user->id, false)->program);
     }
 
     /**

@@ -124,10 +124,18 @@ final class profile_field_catalogue {
                 if (\core_text::strlen($value) > $max) {
                     return [null, "longer than the field's {$max}-character limit"];
                 }
-                $clean = clean_param($value, PARAM_TEXT);
+                $clean = trim(clean_param($value, PARAM_TEXT));
+                // Checked again AFTER cleaning (PR #15 review): markup-only input such as <b></b> is
+                // empty once stripped, and writing it would clear what Moodle holds.
+                if ($clean === '') {
+                    return [null, 'nothing is left once markup is removed, so Moodle was left alone'];
+                }
                 return [$clean, ''];
             case 'textarea':
-                $clean = clean_param($value, PARAM_TEXT);
+                $clean = trim(clean_param($value, PARAM_TEXT));
+                if ($clean === '') {
+                    return [null, 'nothing is left once markup is removed, so Moodle was left alone'];
+                }
                 return [['text' => $clean, 'format' => FORMAT_PLAIN], ''];
             case 'menu':
                 if (!in_array($value, self::menu_options($field), true)) {
@@ -153,9 +161,8 @@ final class profile_field_catalogue {
                     if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
                         return [null, 'not a real calendar date'];
                     }
-                    // Handed to core AS A DATE STRING (PR #15 review): its preprocessing builds the
-                    // timestamp in the site's own timezone, the one the date is displayed in. A
-                    // noon-UTC timestamp is already tomorrow in UTC+12 and later.
+                    // Returned as the date itself; set_user_fields turns it into midnight in the
+                    // LEARNER's timezone (PR #15 review), the zone their profile shows it in.
                     $ts = $value;
                     $year = (int) $m[1];
                 } else {

@@ -248,7 +248,18 @@ class set_user_fields extends external_api {
                  * date read as unchanged and silently skip the save. Read from user_info_data, not
                  * the field object, so a value that only matches the field's DEFAULT still saves.
                  */
-                $wouldstore = (string) $formfield->edit_save_data_preprocess($prepared, new \stdClass());
+                if ($field->datatype === 'datetime') {
+                    /*
+                     * Midnight in the TARGET LEARNER's timezone (PR #15 review), not the integration
+                     * account's: core's preprocessing uses the caller's zone, so a UTC service account
+                     * writing 2026-09-24 for a Los Angeles learner showed them September 23. Year bounds
+                     * were already checked against the field when the value was parsed.
+                     */
+                    [$y, $mo, $d] = array_map('intval', explode('-', (string) $prepared));
+                    $wouldstore = (string) make_timestamp($y, $mo, $d, 0, 0, 0, \core_date::get_user_timezone($user));
+                } else {
+                    $wouldstore = (string) $formfield->edit_save_data_preprocess($prepared, new \stdClass());
+                }
                 $stored = $DB->get_field('user_info_data', 'data', ['userid' => (int) $user->id, 'fieldid' => (int) $field->id]);
                 if ($stored !== false && (string) $stored === $wouldstore) {
                     $report('unchanged');
@@ -275,7 +286,18 @@ class set_user_fields extends external_api {
                         continue;
                     }
                 }
-                $formfield->edit_save_data((object) ['id' => (int) $user->id, $formfield->inputname => $prepared]);
+                if ($field->datatype === 'datetime') {
+                    // The same record edit_save_data writes, minus the caller-timezone preprocessing.
+                    $record = (object) ['userid' => (int) $user->id, 'fieldid' => (int) $field->id, 'data' => $wouldstore];
+                    if ($dataid = $DB->get_field('user_info_data', 'id', ['userid' => $record->userid, 'fieldid' => $record->fieldid])) {
+                        $record->id = $dataid;
+                        $DB->update_record('user_info_data', $record);
+                    } else {
+                        $DB->insert_record('user_info_data', $record);
+                    }
+                } else {
+                    $formfield->edit_save_data((object) ['id' => (int) $user->id, $formfield->inputname => $prepared]);
+                }
                 $customchanged = true;
                 $report('changed');
                 continue;
