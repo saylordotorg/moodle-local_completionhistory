@@ -86,6 +86,22 @@ $functions = [
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:provisionusers',
     ],
+    'local_completionhistory_get_profile_fields' => [
+        'classname'    => 'local_completionhistory\external\get_profile_fields',
+        'description'  => 'List the standard and custom user profile fields the SIS field mapping may write. '
+            . 'Field definitions only, never user data.',
+        'type'         => 'read',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
+    ],
+    'local_completionhistory_set_user_fields' => [
+        'classname'    => 'local_completionhistory\external\set_user_fields',
+        'description'  => 'Write SIS-mapped fields (ID number, standard and custom profile fields) to a learner '
+            . 'account, one outcome per field. The SIS is authoritative; empty values are never written.',
+        'type'         => 'write',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:updateprofiles',
+    ],
     'local_completionhistory_set_password' => [
         'classname'    => 'local_completionhistory\external\set_password',
         'description'  => 'Complete one-time initial password setup for an eligible manual-auth learner.',
@@ -230,6 +246,8 @@ $services = [
             'local_completionhistory_unenrol_user_from_course',
             'local_completionhistory_create_login_key',
             'local_completionhistory_update_user_profile',
+            'local_completionhistory_get_profile_fields',
+            'local_completionhistory_set_user_fields',
         ],
         'restrictedusers' => 1,
         'enabled'         => 0,
