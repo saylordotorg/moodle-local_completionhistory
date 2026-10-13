@@ -81,4 +81,94 @@ final class security_test extends advanced_testcase {
         $this->assertTrue(security::is_privileged_user($manager));
         $this->assertFalse(security::is_learner_account($manager));
     }
+
+    /**
+     * A student archetype does not make a role with course-level staff powers a learner role.
+     */
+    public function test_student_archetype_with_staff_capability_is_refused(): void {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 'student');
+        $studentrole = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
+        assign_capability('moodle/grade:edit', CAP_ALLOW, $studentrole, \context_course::instance($course->id)->id);
+
+        $this->assertFalse(has_capability('moodle/grade:edit', \context_system::instance(), $user));
+        $this->assertTrue(security::is_privileged_user($user));
+        $this->assertFalse(security::is_learner_account($user));
+    }
+
+    /**
+     * A role defined with staff powers becomes privileged wherever that role is assigned.
+     */
+    public function test_staff_role_definition_is_checked_at_assignment_context(): void {
+        $course = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+        $role = create_role('Student grader', 'studentgrader', '', 'student');
+        assign_capability('moodle/grade:edit', CAP_ALLOW, $role, \context_system::instance()->id);
+        role_assign($role, $user->id, \context_course::instance($course->id)->id);
+
+        $this->assertFalse(has_capability('moodle/grade:edit', \context_system::instance(), $user));
+        $this->assertFalse(security::is_learner_account($user));
+    }
+
+    /**
+     * Staff powers granted below the role assignment, at activity level, are also refused.
+     */
+    public function test_module_override_is_refused_without_rejecting_unrelated_learners(): void {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $othercourse = $this->getDataGenerator()->create_course();
+        $quiz = $this->getDataGenerator()->create_module('quiz', ['course' => $course->id]);
+        $staff = $this->getDataGenerator()->create_user();
+        $learner = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($staff->id, $course->id, 'student');
+        $this->getDataGenerator()->enrol_user($learner->id, $othercourse->id, 'student');
+        $studentrole = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
+        assign_capability('mod/quiz:grade', CAP_ALLOW, $studentrole, \context_module::instance($quiz->cmid)->id);
+
+        $this->assertFalse(security::is_learner_account($staff));
+        $this->assertTrue(security::is_learner_account($learner));
+    }
+
+    /**
+     * The certificate-only integration capability is privileged without the base integrate grant.
+     */
+    public function test_certificate_reader_is_not_a_learner(): void {
+        $user = $this->getDataGenerator()->create_user();
+        $role = create_role('Certificate reader', 'certificatereader', '', 'user');
+        assign_capability('local/completionhistory:viewcertificates', CAP_ALLOW, $role, \context_system::instance()->id);
+        role_assign($role, $user->id, \context_system::instance()->id);
+
+        $this->assertTrue(security::is_privileged_user($user));
+        $this->assertFalse(security::is_learner_account($user));
+    }
+
+    /**
+     * Optional proctoring staff permissions are protected without requiring generic teaching powers.
+     */
+    public function test_proctoring_staff_permission_is_not_a_learner(): void {
+        global $DB;
+
+        $capability = 'quizaccess/proctoring:manageadminsettings';
+        if (!$DB->record_exists('capabilities', ['name' => $capability])) {
+            // Model the optional plugin's declaration without requiring that plugin in CI.
+            $DB->insert_record('capabilities', (object) [
+                'name' => $capability,
+                'captype' => 'write',
+                'contextlevel' => CONTEXT_SYSTEM,
+                'component' => 'quizaccess_proctoring',
+                'riskbitmask' => RISK_CONFIG,
+            ]);
+            \cache::make('core', 'capabilities')->delete('core_capabilities');
+        }
+        $user = $this->getDataGenerator()->create_user();
+        $role = create_role('Proctoring staff', 'proctoringstaff', '', 'user');
+        assign_capability($capability, CAP_ALLOW, $role, \context_system::instance()->id);
+        role_assign($role, $user->id, \context_system::instance()->id);
+
+        $this->assertFalse(security::is_learner_account($user));
+    }
 }

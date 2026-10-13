@@ -51,6 +51,23 @@ final class create_login_key_test extends advanced_testcase {
     }
 
     /**
+     * Customised student roles with effective course staff powers cannot receive login keys.
+     */
+    public function test_student_role_with_course_staff_power_is_refused(): void {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 'student');
+        $role = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
+        assign_capability('moodle/grade:edit', CAP_ALLOW, $role, \context_course::instance($course->id)->id);
+
+        $result = create_login_key::execute($user->id, '192.0.2.10');
+        $this->assertSame('', $result['key']);
+        $this->assertFalse($DB->record_exists('user_private_key', ['script' => create_login_key::SCRIPT, 'userid' => $user->id]));
+    }
+
+    /**
      * Invalid IP restrictions are refused rather than weakened.
      */
     public function test_invalid_ip_is_refused(): void {

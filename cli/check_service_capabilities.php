@@ -206,7 +206,7 @@ foreach ($services as $service) {
 
     // What the site believes each function needs. This is the copy the upgrade
     // installed, and therefore the copy the site actually enforces.
-    $sql = "SELECT f.name, f.capabilities
+    $sql = "SELECT f.name, f.capabilities, f.component
               FROM {external_services_functions} sf
               JOIN {external_functions} f ON f.name = sf.functionname
              WHERE sf.externalserviceid = :sid
@@ -236,6 +236,17 @@ foreach ($services as $service) {
                 . 'registered it. Bump version.php and run the upgrade - a file change alone re-registers nothing.';
         }
         foreach (array_diff(array_keys($registered), $sourcefunctions) as $extra) {
+            // Moodle supports explicit contributions from other installed plugins,
+            // such as proctoring's SIS summaries. Verify the current declaration;
+            // an arbitrary database attachment or stale metadata is not sufficient.
+            $contribution = \local_completionhistory\local\service_definition::is_declared_contribution(
+                (string) $functions[$extra]->component,
+                $extra,
+                $service->shortname
+            );
+            if ($contribution) {
+                continue;
+            }
             $failures[] = "{$service->shortname}: the site still serves {$extra}, which db/services.php no "
                 . 'longer declares. Bump version.php and run the upgrade so the removal takes effect.';
         }

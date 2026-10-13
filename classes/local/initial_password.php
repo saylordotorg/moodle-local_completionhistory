@@ -41,6 +41,33 @@ namespace local_completionhistory\local;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class initial_password {
+    /** @var string Provisioning proof, bound to the initial stored password rather than a reusable reset flag. */
+    public const PENDING_PREFERENCE = 'local_completionhistory_initial_password';
+
+    /**
+     * Authorise initial setup only for an account this integration just created.
+     *
+     * Store a digest of the salted password hash, never the password or its hash.
+     * Binding the marker to that hash also invalidates it when Moodle changes the
+     * password through its own reset flow, even if a force-change flag is set later.
+     *
+     * @param \stdClass $user The freshly created account, including its stored password hash.
+     */
+    public static function mark_pending(\stdClass $user): void {
+        set_user_preference(self::PENDING_PREFERENCE, hash('sha256', $user->id . ':' . $user->password), $user->id);
+    }
+
+    /**
+     * Whether the account still has its original integration-provisioned password.
+     *
+     * @param \stdClass $user A freshly read account, including its stored password hash.
+     * @return bool
+     */
+    public static function is_pending(\stdClass $user): bool {
+        $marker = (string) get_user_preferences(self::PENDING_PREFERENCE, '', $user->id);
+        return $marker !== '' && hash_equals($marker, hash('sha256', $user->id . ':' . $user->password));
+    }
+
     /** @var string Lower-case letters, without the ones easily misread. */
     private const LOWER = 'abcdefghijkmnpqrstuvwxyz';
     /** @var string Upper-case letters, without the ones easily misread. */

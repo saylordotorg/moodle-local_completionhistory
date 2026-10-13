@@ -40,6 +40,23 @@ final class privacy_provider_test extends advanced_testcase {
     }
 
     /**
+     * Initial-setup privacy exports reveal the state without disclosing its credential fingerprint.
+     */
+    public function test_initial_setup_export_contains_status_only(): void {
+        global $DB;
+
+        $user = $this->getDataGenerator()->create_user();
+        $storeduser = $DB->get_record('user', ['id' => $user->id], '*', MUST_EXIST);
+        \local_completionhistory\local\initial_password::mark_pending($storeduser);
+
+        provider::export_user_preferences($user->id);
+        $preferences = writer::with_context(\context_system::instance())->get_user_preferences('local_completionhistory');
+        $name = \local_completionhistory\local\initial_password::PENDING_PREFERENCE;
+        $this->assertSame('1', $preferences->{$name}->value);
+        $this->assertNotSame(get_user_preferences($name, '', $user->id), $preferences->{$name}->value);
+    }
+
+    /**
      * A user with a ledger row is found in the system context.
      */
     public function test_get_contexts_for_userid(): void {

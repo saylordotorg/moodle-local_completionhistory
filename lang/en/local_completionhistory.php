@@ -357,6 +357,7 @@ $string['privacy:metadata:outbox:status'] = 'The delivery status of the queued u
 $string['privacy:metadata:outbox:timecreated'] = 'When the queued copy of user data was created.';
 $string['privacy:metadata:outbox:timemodified'] = 'When the queued copy of user data was last updated.';
 $string['privacy:metadata:preference:attempts_cols'] = 'The user\'s saved exam-attempt column layout.';
+$string['privacy:metadata:preference:initial_password'] = 'Whether initial SIS password setup is still pending; stored as a fingerprint of the initial credential.';
 $string['privacy:metadata:preference:ledger_cols'] = 'The user\'s saved achievement-ledger column layout.';
 $string['privacy:metadata:purge_audit'] = 'Audit trail of completion purge events.';
 $string['privacy:metadata:purge_audit:detailsjson'] = 'Operational details about the user data affected by the purge.';
