@@ -55,7 +55,7 @@ class set_password extends external_api {
      * @return array Whether the password was set and a failure reason when it was not.
      */
     public static function execute(string $email, string $password): array {
-        global $CFG;
+        global $CFG, $DB;
         require_once($CFG->dirroot . '/user/lib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
@@ -95,17 +95,40 @@ class set_password extends external_api {
             return ['success' => false, 'warning' => 'Password setup is already in progress.'];
         }
 
+        $transaction = null;
         try {
-            // This endpoint is setup, not password reset. It can only complete the
-            // one-time password flow established by provision_applicant.
+            $transaction = $DB->start_delegated_transaction();
+            // Core password changes do not take our plugin lock. A portable no-op
+            // UPDATE locks this user row until commit, so a native reset cannot
+            // replace the credential between the proof read and our password write.
+            $DB->execute('UPDATE {user} SET password = password WHERE id = :userid', ['userid' => $user->id]);
+            // Re-read under the lock: another password flow may have changed this
+            // account since the email lookup. The core force-change preference is
+            // also used for ordinary resets and is not proof of SIS provisioning.
+            $user = $DB->get_record('user', ['id' => $user->id, 'deleted' => 0], '*', MUST_EXIST);
             $forcechange = (bool) get_user_preferences('auth_forcepasswordchange', false, $user->id);
-            if (!$forcechange) {
-                return ['success' => false, 'warning' => 'This account is not awaiting initial password setup.'];
+            if (
+                !$forcechange || $user->auth !== 'manual' || !empty($user->suspended) || empty($user->confirmed)
+                    || !\local_completionhistory\local\security::is_learner_account($user)
+                    || !\local_completionhistory\local\initial_password::is_pending($user)
+            ) {
+                $transaction->allow_commit();
+                return [
+                    'success' => false,
+                    'warning' => 'This account is not awaiting SIS initial password setup. Use Moodle forgot password instead.',
+                ];
             }
 
             update_internal_user_password($user, $params['password']);
             // Clear the force-change flag so login/token.php accepts the account.
             unset_user_preference('auth_forcepasswordchange', $user);
+            unset_user_preference(\local_completionhistory\local\initial_password::PENDING_PREFERENCE, $user);
+            $transaction->allow_commit();
+        } catch (\Throwable $exception) {
+            if ($transaction && !$transaction->is_disposed()) {
+                $transaction->rollback($exception);
+            }
+            throw $exception;
         } finally {
             $lock->release();
         }

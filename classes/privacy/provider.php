@@ -146,6 +146,10 @@ class provider implements
             'local_completionhistory_attempts_cols',
             'privacy:metadata:preference:attempts_cols'
         );
+        $collection->add_user_preference(
+            \local_completionhistory\local\initial_password::PENDING_PREFERENCE,
+            'privacy:metadata:preference:initial_password'
+        );
         return $collection;
     }
 
@@ -370,11 +374,13 @@ class provider implements
     }
 
     /**
-     * Export saved table-layout preferences.
+     * Export saved table-layout preferences and pending initial-setup status.
      *
      * @param int $userid User id.
      */
     public static function export_user_preferences(int $userid): void {
+        global $DB;
+
         foreach (
             [
             'local_completionhistory_ledger_cols' => 'privacy:metadata:preference:ledger_cols',
@@ -390,6 +396,16 @@ class provider implements
                     get_string($description, 'local_completionhistory')
                 );
             }
+        }
+        $user = $DB->get_record('user', ['id' => $userid], 'id, password');
+        if ($user && get_user_preferences(\local_completionhistory\local\initial_password::PENDING_PREFERENCE, null, $userid)) {
+            // The credential fingerprint is internal verification data; export its meaning only.
+            writer::export_user_preference(
+                'local_completionhistory',
+                \local_completionhistory\local\initial_password::PENDING_PREFERENCE,
+                (int) \local_completionhistory\local\initial_password::is_pending($user),
+                get_string('privacy:metadata:preference:initial_password', 'local_completionhistory')
+            );
         }
     }
 }

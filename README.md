@@ -87,9 +87,11 @@ The bundled **Completion History SIS** external service keeps its original name,
 | `local/completionhistory:updateprofiles` | Change the six whitelisted learner contact fields, and write the SIS field mapping (ID number, other standard fields, custom profile fields) to learner accounts | None |
 | `local/completionhistory:enrolusers` | Create manual learner enrolments, and suspend the ones it created | None |
 
-The initial-password endpoint is not a general reset API: it accepts only local manual-auth learner accounts carrying Moodle's force-change marker, enforces the site password policy, and consumes the marker after one successful call. Email identity lookups reject duplicate/ambiguous addresses.
+The initial-password endpoint is not a general reset API: it accepts only active, confirmed local manual-auth learner accounts created by this integration, carrying both Moodle's force-change marker and a plugin marker bound to their original credential. It enforces the site password policy and consumes both markers after one successful call. Changing a password through Moodle also invalidates the plugin marker. Email identity lookups reject duplicate/ambiguous addresses.
 
-SSO keys are IP-bound, single-use, scoped to this plugin, and valid for 60 seconds. Both minting and consumption refuse administrators, managers, teachers, and other staff-role accounts. The consumer will not replace an already authenticated session belonging to another user.
+Security upgrade: accounts created before 0.8.2 have no verifiable initial-setup marker. Pending welcome links for those accounts must use Moodle's **Forgot password** flow instead. The upgrade deliberately does not authorise existing force-change accounts: that preference is also used for ordinary administrative password resets.
+
+SSO keys are IP-bound, single-use, scoped to this plugin, and valid for 60 seconds. Both minting and consumption refuse administrators, managers, teachers, and other staff-role accounts, including student-based roles with effective staff permissions granted in a course or activity. The consumer will not replace an already authenticated session belonging to another user.
 
 Browser mutations require POST plus a valid session key. SIS-only functions are not AJAX-callable. Bulk external requests and snapshot responses have defensive ceilings. Use HTTPS, restrict and rotate web-service tokens, and apply network restrictions supported by the hosting platform.
 
@@ -132,6 +134,8 @@ php local/completionhistory/tests/static/check_service_capability_declarations.p
 Every script in `tests/static/` runs against the source tree alone and is part of CI. `check_phpdoc_params.php` fails on any function whose docblock does not document exactly its parameters — the check Moodle's PHPDoc tool would make, without needing an installed Moodle.
 
 The live check reads the capabilities the upgrade **registered**, not the ones on disk, and reports any disagreement between the two in either direction — a function declared but not registered, one still served after being removed, or a changed capability list. Editing `db/services.php` without bumping `version.php` re-registers nothing and leaves the site enforcing a definition no file describes any more. It also flags a disabled service, an enabled service no account can call, a suspended service account, a token whose account is missing from a restricted service's authorised list, and an account with no usable `webservice/*:use` transport.
+
+Other installed plugins may explicitly contribute functions to this service, such as the proctoring SIS summaries. The check accepts those only when the contributing plugin's current `db/services.php` declares that exact function for `completionhistory_sis`; attaching a function in the database alone does not authorise it.
 
 **A narrow service account is not a broken one.** The security model above grants each capability only when the operation is required, so coverage is judged one function at a time:
 

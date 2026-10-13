@@ -130,6 +130,7 @@ class provision_applicant extends external_api {
                 $userid = user_create_user($new, true, true);
                 set_user_preference('auth_forcepasswordchange', 1, $userid);
                 $user = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
+                \local_completionhistory\local\initial_password::mark_pending($user);
                 $created = true;
             } else if (!\local_completionhistory\local\security::is_learner_account($user)) {
                 return [

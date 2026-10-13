@@ -79,6 +79,32 @@ namespace {
 
     $root = dirname(__DIR__, 2);
     $CFG = new stdClass();
+    $preferences = [];
+
+    /**
+     * Save a preference in the standalone account model.
+     *
+     * @param string $name Preference name.
+     * @param mixed $value Stored value.
+     * @param int $userid Account identifier.
+     */
+    function set_user_preference(string $name, $value, int $userid): void {
+        global $preferences;
+        $preferences[$userid][$name] = $value;
+    }
+
+    /**
+     * Read a preference from the standalone account model.
+     *
+     * @param string $name Preference name.
+     * @param mixed $default Fallback value.
+     * @param int $userid Account identifier.
+     * @return mixed
+     */
+    function get_user_preferences(string $name, $default, int $userid) {
+        global $preferences;
+        return $preferences[$userid][$name] ?? $default;
+    }
 
     // When true the fake policy refuses everything (the unsatisfiable-site case).
     $refuseall = false;
@@ -210,6 +236,22 @@ namespace {
 
     $lang = file_get_contents($root . '/lang/en/local_completionhistory.php');
     $check('the error code has a lang string', strpos($lang, "\$string['initialpasswordrefused']") !== false);
+
+    echo "\ninitial setup provenance\n";
+    $account = (object) ['id' => 42, 'password' => password_hash('Initial-password-45!', PASSWORD_DEFAULT)];
+    set_user_preference('auth_forcepasswordchange', 1, $account->id);
+    $check('a generic force-password-change preference is not provisioning proof', !initial_password::is_pending($account));
+    initial_password::mark_pending($account);
+    $check('a newly provisioned credential is eligible', initial_password::is_pending($account));
+    $marker = get_user_preferences(initial_password::PENDING_PREFERENCE, '', $account->id);
+    $check('the marker is not the password hash', $marker !== $account->password);
+    $other = (object) ['id' => 43, 'password' => $account->password];
+    set_user_preference(initial_password::PENDING_PREFERENCE, $marker, $other->id);
+    $check('copying the marker to another account cannot authorise setup', !initial_password::is_pending($other));
+    $account->password = password_hash('Native-reset-password-56!', PASSWORD_DEFAULT);
+    $check('a Moodle password reset invalidates the pending marker', !initial_password::is_pending($account));
+    set_user_preference('auth_forcepasswordchange', 1, $account->id);
+    $check('forcing another change cannot revive an old setup marker', !initial_password::is_pending($account));
 
     printf("\n%d passed, %d failed\n", $passes, count($failures));
     if ($failures) {

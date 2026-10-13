@@ -17,6 +17,7 @@
 namespace local_completionhistory\external;
 
 use advanced_testcase;
+use local_completionhistory\local\initial_password;
 
 /**
  * Tests for the one-time integration password setup endpoint.
@@ -43,8 +44,9 @@ final class set_password_test extends advanced_testcase {
     public function test_password_setup_is_one_time(): void {
         global $DB;
 
-        $user = $this->getDataGenerator()->create_user(['auth' => 'manual']);
-        set_user_preference('auth_forcepasswordchange', 1, $user->id);
+        $provisioned = provision_applicant::execute('newlearner@example.test', 'New', 'Learner');
+        $user = $DB->get_record('user', ['id' => $provisioned['userid']], '*', MUST_EXIST);
+        $this->assertTrue(initial_password::is_pending($user));
         $password = 'A-secure-initial-password-73!';
 
         $result = set_password::execute($user->email, $password);
@@ -52,11 +54,50 @@ final class set_password_test extends advanced_testcase {
         $storeduser = $DB->get_record('user', ['id' => $user->id], '*', MUST_EXIST);
         $this->assertTrue(validate_internal_user_password($storeduser, $password));
         $this->assertFalse((bool) get_user_preferences('auth_forcepasswordchange', false, $user->id));
+        $this->assertFalse((bool) get_user_preferences(initial_password::PENDING_PREFERENCE, false, $user->id));
 
+        // A later administrative force-change request must never reopen setup.
+        set_user_preference('auth_forcepasswordchange', 1, $user->id);
         $second = set_password::execute($user->email, 'A-different-secure-password-84!');
         $this->assertFalse($second['success']);
         $storeduser = $DB->get_record('user', ['id' => $user->id], '*', MUST_EXIST);
         $this->assertTrue(validate_internal_user_password($storeduser, $password));
+    }
+
+    /**
+     * A generic Moodle forced reset does not authorise the integration to replace a password.
+     */
+    public function test_existing_forced_reset_account_is_refused(): void {
+        global $DB;
+
+        $user = $this->getDataGenerator()->create_user(['auth' => 'manual', 'password' => 'Original-password-45!']);
+        set_user_preference('auth_forcepasswordchange', 1, $user->id);
+        $adopted = provision_applicant::execute($user->email, $user->firstname, $user->lastname);
+        $this->assertFalse($adopted['created']);
+        $this->assertFalse(initial_password::is_pending($user));
+
+        $result = set_password::execute($user->email, 'Replacement-password-56!');
+        $this->assertFalse($result['success']);
+        $storeduser = $DB->get_record('user', ['id' => $user->id], '*', MUST_EXIST);
+        $this->assertTrue(validate_internal_user_password($storeduser, 'Original-password-45!'));
+        $this->assertTrue((bool) get_user_preferences('auth_forcepasswordchange', false, $user->id));
+    }
+
+    /**
+     * A password changed through Moodle invalidates any unused SIS setup marker.
+     */
+    public function test_native_password_change_invalidates_pending_setup(): void {
+        global $DB;
+
+        $provisioned = provision_applicant::execute('nativechange@example.test', 'Native', 'Change');
+        $user = $DB->get_record('user', ['id' => $provisioned['userid']], '*', MUST_EXIST);
+        update_internal_user_password($user, 'Native-Moodle-password-45!');
+        set_user_preference('auth_forcepasswordchange', 1, $user->id);
+
+        $result = set_password::execute($user->email, 'Replacement-password-56!');
+        $this->assertFalse($result['success']);
+        $storeduser = $DB->get_record('user', ['id' => $user->id], '*', MUST_EXIST);
+        $this->assertTrue(validate_internal_user_password($storeduser, 'Native-Moodle-password-45!'));
     }
 
     /**
@@ -69,6 +110,7 @@ final class set_password_test extends advanced_testcase {
         $teacher = $this->getDataGenerator()->create_user(['auth' => 'manual', 'password' => 'Original-password-45!']);
         $this->getDataGenerator()->enrol_user($teacher->id, $course->id, 'editingteacher');
         set_user_preference('auth_forcepasswordchange', 1, $teacher->id);
+        initial_password::mark_pending($DB->get_record('user', ['id' => $teacher->id], '*', MUST_EXIST));
 
         $result = set_password::execute($teacher->email, 'Replacement-password-56!');
         $this->assertFalse($result['success']);
