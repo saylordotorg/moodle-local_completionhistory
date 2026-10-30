@@ -113,20 +113,23 @@ foreach (token_get_all($source) as $tok) {
 }
 
 echo "\nquery shape:\n";
-$report('ascending three-part ORDER BY', (bool) preg_match(
-    '/ORDER BY p\.changed_at ASC, p\.userid ASC, p\.courseid ASC/', $code));
-$report('strict > on changed_at', (bool) preg_match('/p\.changed_at > :since\b/', $code));
-$report('userid tie-break on an equal second', (bool) preg_match(
-    '/p\.changed_at = :sincets\s+AND \(p\.userid > :sinceuserid/', $code));
-$report('courseid tie-break on an equal learner', (bool) preg_match(
-    '/p\.userid = :sinceuserid2 AND p\.courseid > :sincecourseid/', $code));
-$report('only completion-enabled courses', (bool) preg_match('/c\.enablecompletion = 1/', $code));
-$report('skips modules being deleted', (bool) preg_match('/cm\.deletioninprogress = 0/', $code));
-$report('excludes deleted users', (bool) preg_match('/u\.deleted = 0/', $code));
-$report('progress comes from core, not re-derived', (bool) preg_match(
-    '/\\\\core_completion\\\\progress::get_course_progress_percentage\(/', $code));
+// Label => pattern the source must match. One table rather than one call per check, so every
+// check reads the same way and adding one is a line.
+$mustmatch = [
+    'ascending three-part ORDER BY' => '/ORDER BY p\.changed_at ASC, p\.userid ASC, p\.courseid ASC/',
+    'strict > on changed_at' => '/p\.changed_at > :since\b/',
+    'userid tie-break on an equal second' => '/p\.changed_at = :sincets\s+AND \(p\.userid > :sinceuserid/',
+    'courseid tie-break on an equal learner' => '/p\.userid = :sinceuserid2 AND p\.courseid > :sincecourseid/',
+    'only completion-enabled courses' => '/c\.enablecompletion = 1/',
+    'skips modules being deleted' => '/cm\.deletioninprogress = 0/',
+    'excludes deleted users' => '/u\.deleted = 0/',
+    'progress comes from core, not re-derived' => '/\\\\core_completion\\\\progress::get_course_progress_percentage\(/',
+    'returns the full cursor triple' => "/'next_since_courseid'/",
+];
+foreach ($mustmatch as $label => $pattern) {
+    $report($label, (bool) preg_match($pattern, $code));
+}
 $report('returns no names or emails', !preg_match('/u\.(email|firstname|lastname|username)/', $code));
-$report('returns the full cursor triple', (bool) preg_match("/'next_since_courseid'/", $code));
 
 if ($failed) {
     echo "\nFAIL: {$failed} problem(s)\n";

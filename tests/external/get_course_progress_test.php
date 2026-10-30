@@ -78,7 +78,10 @@ final class get_course_progress_test extends advanced_testcase {
         [$course, $cms, [$user]] = $this->course_with_two_activities(1);
         (new \completion_info($course))->update_state($cms[0], COMPLETION_COMPLETE, $user->id);
 
-        $result = external_api_clean(get_course_progress::execute(0, 0, 0, 50));
+        $result = \core_external\external_api::clean_returnvalue(
+            get_course_progress::execute_returns(),
+            get_course_progress::execute(0, 0, 0, 50)
+        );
 
         $this->assertCount(1, $result['progress']);
         $row = $result['progress'][0];
@@ -105,7 +108,10 @@ final class get_course_progress_test extends advanced_testcase {
         $this->assertCount(1, $first['progress']);
         $this->assertTrue($first['truncated']);
         $second = get_course_progress::execute(
-            $first['next_since'], $first['next_since_userid'], $first['next_since_courseid'], 1
+            $first['next_since'],
+            $first['next_since_userid'],
+            $first['next_since_courseid'],
+            1
         );
         $this->assertCount(1, $second['progress']);
         $seen = [$first['progress'][0]['userid'], $second['progress'][0]['userid']];
@@ -115,7 +121,10 @@ final class get_course_progress_test extends advanced_testcase {
         $this->assertSame($want, $seen);
 
         $third = get_course_progress::execute(
-            $second['next_since'], $second['next_since_userid'], $second['next_since_courseid'], 1
+            $second['next_since'],
+            $second['next_since_userid'],
+            $second['next_since_courseid'],
+            1
         );
         $this->assertCount(0, $third['progress']);
     }
@@ -134,12 +143,3 @@ final class get_course_progress_test extends advanced_testcase {
     }
 }
 
-/**
- * Run a result through the declared return structure, as the web service layer would.
- *
- * @param array $result What execute() returned.
- * @return array
- */
-function external_api_clean(array $result): array {
-    return \core_external\external_api::clean_returnvalue(get_course_progress::execute_returns(), $result);
-}
