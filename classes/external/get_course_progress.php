@@ -92,9 +92,11 @@ class get_course_progress extends external_api {
     /**
      * Normalise Moodle's percentage for the wire.
      *
-     * Null stays null: core returns null when the course tracks no activities, and 0 would claim the
-     * student has done nothing in a course that cannot measure it. Anything else is clamped to 0..100
-     * and rounded to 2 places.
+     * Null stays null: core returns null when it cannot measure this learner in this course — the course
+     * tracks no activities, or the learner is not a tracked user there (for example a suspended
+     * enrolment, whose completion rows this plugin deliberately keeps). 0 would claim the student has
+     * done nothing. Anything else is clamped to 0..100 and rounded to 2 places. A caller tells the two
+     * null cases apart with activities_tracked.
      *
      * @param float|int|null $percent What core returned.
      * @return float|null
@@ -274,7 +276,8 @@ class get_course_progress extends external_api {
                 'progress'           => new external_value(
                     PARAM_FLOAT,
                     'Percentage of the course\'s tracked activities completed, as on the Moodle dashboard; '
-                    . 'null when the course tracks no activities — never read null as 0',
+                    . 'null when it cannot be measured: the course tracks no activities (activities_tracked = 0), '
+                    . 'or the learner is not tracked there, e.g. a suspended enrolment — never read null as 0',
                     VALUE_REQUIRED,
                     null,
                     NULL_ALLOWED
