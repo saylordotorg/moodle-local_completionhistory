@@ -162,6 +162,14 @@ $functions = [
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate',
     ],
+    'local_completionhistory_get_course_progress' => [
+        'classname'    => 'local_completionhistory\external\get_course_progress',
+        'description'  => 'Per-learner, per-course progress as Moodle measures it (share of completion-tracked '
+            . 'activities completed), as a resumable feed for the SIS mid-course survey (SIS-246).',
+        'type'         => 'read',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
+    ],
     'local_completionhistory_get_user_inprogress_courses' => [
         'classname'    => 'local_completionhistory\external\get_user_inprogress_courses',
         'description'  => 'Courses a user has started but not completed (SIS requirements/teach-out engine).',
@@ -242,6 +250,7 @@ $services = [
             'local_completionhistory_get_grade_items',
             'local_completionhistory_list_programs',
             'local_completionhistory_get_user_inprogress_courses',
+            'local_completionhistory_get_course_progress',
             'local_completionhistory_enrol_user_in_course',
             'local_completionhistory_unenrol_user_from_course',
             'local_completionhistory_create_login_key',
