@@ -125,6 +125,7 @@ $mustmatch = [
     'excludes deleted users' => '/u\.deleted = 0/',
     'progress comes from core, not re-derived' => '/\\\\core_completion\\\\progress::get_course_progress_percentage\(/',
     'returns the full cursor triple' => "/'next_since_courseid'/",
+    'pages settled seconds only' => '/p\.changed_at <= :settled/',
 ];
 foreach ($mustmatch as $label => $pattern) {
     $report($label, (bool) preg_match($pattern, $code));

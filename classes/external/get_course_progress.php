@@ -40,6 +40,11 @@ use core_external\external_value;
  * (changed_at, userid, courseid). A learner who has completed nothing has no row and no progress,
  * which is the truth: zero is not halfway.
  *
+ * ONLY SETTLED SECONDS ARE PAGED. A pair whose newest change is in the last SETTLE_SECONDS is held
+ * back until the next call. Without that, a page ending at second T could be followed by another
+ * learner's completion in that same second T with a lower user id, or by a completion committed late
+ * with an earlier timestamp — both sort before the cursor and would never be returned.
+ *
  * WHAT IT CANNOT SEE, so callers re-read periodically: a teacher ADDING or removing a tracked activity
  * changes every learner's percentage without touching their completion rows. A full re-read
  * (`since = 0`) picks that up; at the SIS's scale it is a few pages.
@@ -59,6 +64,9 @@ use core_external\external_value;
 class get_course_progress extends external_api {
     /** Hard ceiling on rows per call. Each row builds the learner's course modinfo, so it stays modest. */
     private const MAX_LIMIT = 500;
+
+    /** Changes newer than this many seconds are left for the next call (see the class docblock). */
+    private const SETTLE_SECONDS = 120;
 
     /**
      * Advance the paging cursor past a page of rows.
@@ -191,6 +199,7 @@ class get_course_progress extends external_api {
                   JOIN {user} u ON u.id = p.userid
                  WHERE c.enablecompletion = 1
                    AND u.deleted = 0
+                   AND p.changed_at <= :settled
                    AND (p.changed_at > :since
                         OR (p.changed_at = :sincets
                             AND (p.userid > :sinceuserid
@@ -198,6 +207,7 @@ class get_course_progress extends external_api {
               ORDER BY p.changed_at ASC, p.userid ASC, p.courseid ASC";
         $sqlparams = [
             'sinceinner'    => $since,
+            'settled'       => time() - self::SETTLE_SECONDS,
             'since'         => $since,
             'sincets'       => $since,
             'sinceuserid'   => $sinceuserid,

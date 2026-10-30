@@ -75,8 +75,11 @@ final class get_course_progress_test extends advanced_testcase {
      * Half of the tracked activities completed is 50%, with the tracked count alongside.
      */
     public function test_half_the_activities_is_fifty_percent(): void {
+        global $DB;
         [$course, $cms, [$user]] = $this->course_with_two_activities(1);
         (new \completion_info($course))->update_state($cms[0], COMPLETION_COMPLETE, $user->id);
+        // Settled: older than the feed's settle window.
+        $DB->set_field('course_modules_completion', 'timemodified', time() - 600);
 
         $result = \core_external\external_api::clean_returnvalue(
             get_course_progress::execute_returns(),
@@ -127,6 +130,19 @@ final class get_course_progress_test extends advanced_testcase {
             1
         );
         $this->assertCount(0, $third['progress']);
+    }
+
+    /**
+     * A change in the last two minutes is held back, so a later same-second change cannot slip
+     * behind the cursor.
+     */
+    public function test_an_unsettled_change_waits_for_the_next_call(): void {
+        [$course, $cms, [$user]] = $this->course_with_two_activities(1);
+        (new \completion_info($course))->update_state($cms[0], COMPLETION_COMPLETE, $user->id);
+
+        $result = get_course_progress::execute(0, 0, 0, 50);
+        $this->assertSame([], $result['progress']);
+        $this->assertSame(0, $result['next_since']);
     }
 
     /**
