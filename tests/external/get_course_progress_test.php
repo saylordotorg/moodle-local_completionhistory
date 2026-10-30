@@ -142,4 +142,3 @@ final class get_course_progress_test extends advanced_testcase {
         $this->assertFalse($result['site_completion_enabled']);
     }
 }
-
