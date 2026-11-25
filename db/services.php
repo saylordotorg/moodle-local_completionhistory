@@ -195,6 +195,16 @@ $functions = [
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:enrolusers',
     ],
+    // SIS-264 Part B. 'write': it changes how many times a learner may sit an exam. A per-user quiz
+    // override on the course's program final quiz; never lowers one, and writes nothing when none is needed.
+    'local_completionhistory_grant_exam_attempts' => [
+        'classname'    => 'local_completionhistory\external\grant_exam_attempts',
+        'description'  => 'Give a learner a fresh set of program final exam attempts in a course, by email + idnumber, '
+            . 'through a per-user quiz override (SIS course reset on admission to a new programme).',
+        'type'         => 'write',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:grantattempts',
+    ],
     // The one function here that can produce a LOGGED-IN BROWSER SESSION rather than
     // just data. 'write' rather than 'read' for that reason, even though it writes only
     // a key: the type is what an administrator reads when deciding what a token can do,
@@ -253,6 +263,7 @@ $services = [
             'local_completionhistory_get_course_progress',
             'local_completionhistory_enrol_user_in_course',
             'local_completionhistory_unenrol_user_from_course',
+            'local_completionhistory_grant_exam_attempts',
             'local_completionhistory_create_login_key',
             'local_completionhistory_update_user_profile',
             'local_completionhistory_get_profile_fields',

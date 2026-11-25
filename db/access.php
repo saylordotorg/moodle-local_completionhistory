@@ -108,4 +108,12 @@ $capabilities = [
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [],
     ],
+    // SIS-264 Part B: a fresh set of program final exam attempts for a learner whose failed course the
+    // SIS reset on admission to a new programme. A per-user quiz override, so RISK_CONFIG like enrolusers.
+    'local/completionhistory:grantattempts' => [
+        'riskbitmask' => RISK_PERSONAL | RISK_CONFIG,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [],
+    ],
 ];
