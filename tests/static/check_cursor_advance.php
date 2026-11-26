@@ -74,6 +74,17 @@ $targets = [
             'excludes deleted'     => '/u\.deleted\s*=\s*0/',
         ],
     ],
+    'get_question_attempts' => [
+        'file' => $root . '/classes/external/get_question_attempts.php',
+        // Pages on the exam attempt id, not a time: a backfilled attempt with an old timetaken
+        // gets a new id and must still arrive.
+        'ts'   => 'examattemptid',
+        'tsre' => 'ea\\.id',
+        'extra' => [
+            'withholds response text'  => '/^(?!.*(responsesummary|rightanswer|questionsummary)).*$/s',
+            'withholds learner names'  => '/^(?!.*(firstname|lastname|email)).*$/s',
+        ],
+    ],
     'get_grade_items' => [
         'file' => $root . '/classes/external/get_grade_items.php',
         'ts'   => 'changed_at',
