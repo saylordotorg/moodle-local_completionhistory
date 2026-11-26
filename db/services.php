@@ -205,6 +205,15 @@ $functions = [
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:grantattempts',
     ],
+    // SIS-242: the questions of every recorded exam attempt, for the per-question exam audit.
+    'local_completionhistory_get_question_attempts' => [
+        'classname'    => 'local_completionhistory\\external\\get_question_attempts',
+        'description'  => 'Page through the questions of recorded exam attempts: question, bank entry, category, '
+            . 'maximum mark and the final state and fraction. No response text or learner identity.',
+        'type'         => 'read',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate',
+    ],
     // Backfills on a site whose command line the institution cannot reach (0.11.0): queued here,
     // run by cron, read back with get_backfill_run.
     'local_completionhistory_request_backfill' => [
@@ -282,6 +291,7 @@ $services = [
             'local_completionhistory_unenrol_user_from_course',
             'local_completionhistory_grant_exam_attempts',
             'local_completionhistory_request_backfill',
+            'local_completionhistory_get_question_attempts',
             'local_completionhistory_get_backfill_run',
             'local_completionhistory_create_login_key',
             'local_completionhistory_update_user_profile',

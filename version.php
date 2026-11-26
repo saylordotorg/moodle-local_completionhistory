@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_completionhistory';
-$plugin->version   = 2026112600;
+$plugin->version   = 2026112601;
 $plugin->requires  = 2024100700; // Moodle 4.5.
 $plugin->supported = [405, 502];
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.11.0';
+$plugin->release   = '0.12.0';
