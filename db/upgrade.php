@@ -413,5 +413,34 @@ function xmldb_local_completionhistory_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026090700, 'local', 'completionhistory');
     }
 
+    if ($oldversion < 2026112600) {
+        // Backfills requested from the admin page or by the SIS, run by cron (0.11.0). A site
+        // whose command line the institution cannot reach could otherwise never run them.
+        $table = new xmldb_table('local_completionhistory_backfill_run');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+            $table->add_field('kind', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('dryrun', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1');
+            $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('status', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, 'queued');
+            $table->add_field('summaryjson', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('log', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('source', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, 'web');
+            $table->add_field('requestedby', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+            $table->add_field('timestarted', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('timefinished', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('requestedby_fk', XMLDB_KEY_FOREIGN, ['requestedby'], 'user', ['id']);
+            $table->add_index('kind_status_ix', XMLDB_INDEX_NOTUNIQUE, ['kind', 'status']);
+            $table->add_index('timecreated_ix', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
+
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026112600, 'local', 'completionhistory');
+    }
+
     return true;
 }

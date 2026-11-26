@@ -87,6 +87,7 @@ The bundled **Completion History SIS** external service keeps its original name,
 | `local/completionhistory:updateprofiles` | Change the six whitelisted learner contact fields, and write the SIS field mapping (ID number, other standard fields, custom profile fields) to learner accounts | None |
 | `local/completionhistory:enrolusers` | Create manual learner enrolments, and suspend the ones it created | None |
 | `local/completionhistory:grantattempts` | Give a learner a fresh set of program final exam attempts through a per-user quiz override (SIS course reset, SIS-264) | None |
+| `local/completionhistory:runbackfill` | Queue a backfill or grade refresh for cron and read its result (`request_backfill`, `get_backfill_run`); also opens the **Backfills** admin page | None |
 
 The initial-password endpoint is not a general reset API: it accepts only active, confirmed local manual-auth learner accounts created by this integration, carrying both Moodle's force-change marker and a plugin marker bound to their original credential. It enforces the site password policy and consumes both markers after one successful call. Changing a password through Moodle also invalidates the plugin marker. Email identity lookups reject duplicate/ambiguous addresses.
 
@@ -117,6 +118,18 @@ php local/completionhistory/cli/backfill_achievements.php --userid=42
 php local/completionhistory/cli/audit_achievements.php
 php local/completionhistory/cli/reconcile_anonymization.php --dryrun
 ```
+
+### Without a command line
+
+A hosted site may give you no shell. **Site administration > Plugins > Local plugins > Backfills** (capability `local/completionhistory:runbackfill`) runs the same jobs through cron, and the SIS can ask for them with `local_completionhistory_request_backfill` and read the result with `local_completionhistory_get_backfill_run`:
+
+| Job | What it does |
+|---|---|
+| Missing completions | Ledger rows for completions that have none (`backfill_achievements.php`, every completion rather than one batch) |
+| Missing exam attempts | Finished attempts on tracked exam quizzes that were never recorded (`backfill_exam_attempts.php`). The SIS needs a full exam re-scan afterwards |
+| Refresh grades and pass flags | The newest ledger row for each learner and course brought into line with the gradebook course total, through the same correction history as a regrade. Run it after setting a course's **Grade to pass**: Moodle does not regrade for a new pass mark, so nothing else revises earlier completions |
+
+**Preview** counts without writing; **Run** writes. A job runs on the next cron run, one at a time per job: asking again while it is queued or running shows the existing run.
 
 The completion-ledger reconciliation task runs daily. Outbox processing and deleted-user reconciliation tasks ship disabled and must be enabled deliberately in Scheduled tasks.
 
@@ -182,7 +195,6 @@ Achievement capture is transactional with program snapshots and the optional out
 | `local/completionhistory:viewall` | Manager |
 | `local/completionhistory:manage` | Manager |
 | `local/completionhistory:managecoursemap` | Manager |
-| `local/completionhistory:runbackfill` | None |
 | `local/completionhistory:integrate` | None |
 
 ## Known limitations

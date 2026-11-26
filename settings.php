@@ -156,6 +156,12 @@ if ($hassiteconfig) {
         'local/completionhistory:viewall'
     ));
     $ADMIN->add('localplugins', new admin_externalpage(
+        'local_completionhistory_backfill',
+        get_string('backfills', 'local_completionhistory'),
+        new moodle_url('/local/completionhistory/backfill.php'),
+        'local/completionhistory:runbackfill'
+    ));
+    $ADMIN->add('localplugins', new admin_externalpage(
         'local_completionhistory_manageflags',
         get_string('manageflags', 'local_completionhistory'),
         new moodle_url('/local/completionhistory/manage_flags.php'),

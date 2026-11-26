@@ -500,11 +500,13 @@ class callbacks {
      * `grade_passed` is compared as a nullable int so that NULL (never captured) stays distinct
      * from 0 (captured as a fail) — under the old string cast both became ''.
      *
+     * Public so that the grade refresh (backfill_runner) decides by exactly this rule.
+     *
      * @param \stdClass $a        The stored achievement row.
      * @param \stdClass $snapshot The current gradebook total.
      * @return bool
      */
-    private static function grade_differs(\stdClass $a, \stdClass $snapshot): bool {
+    public static function grade_differs(\stdClass $a, \stdClass $snapshot): bool {
         // Half a unit in the last place the column can actually store.
         $epsilon = 0.5 * (10 ** -self::GRADE_DECIMALS);
 
@@ -536,11 +538,14 @@ class callbacks {
      * and build the outbox payload from a row read back after the write — never from the copy this
      * method was reasoning about.
      *
+     * Public so that the grade refresh (backfill_runner) writes through exactly this path. The caller
+     * owns the transaction.
+     *
      * @param int       $id       Achievement id.
      * @param \stdClass $snapshot The gradebook total to store.
      * @return int Outbox row id, or 0 when nothing was queued.
      */
-    private static function apply_grade_correction(int $id, \stdClass $snapshot): int {
+    public static function apply_grade_correction(int $id, \stdClass $snapshot): int {
         global $DB;
 
         $current = $DB->get_record('local_completionhistory_achievement', ['id' => $id]);
