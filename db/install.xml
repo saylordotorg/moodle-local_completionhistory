@@ -228,5 +228,29 @@
         <INDEX NAME="entityid_ix" UNIQUE="false" FIELDS="entityid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_completionhistory_backfill_run" COMMENT="One requested backfill or grade refresh, run by cron as an ad hoc task, so it can be started from the admin page or by the SIS on a site whose command line is out of reach.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="kind" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="achievements, exams or grades"/>
+        <FIELD NAME="dryrun" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="1 = count only, write nothing"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Limit to one course; null = every course"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="queued" SEQUENCE="false" COMMENT="queued, running, done, failed"/>
+        <FIELD NAME="summaryjson" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="The service's counts, as JSON"/>
+        <FIELD NAME="log" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="The last lines the run printed, or the error that stopped it"/>
+        <FIELD NAME="source" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="web" SEQUENCE="false" COMMENT="web (the admin page) or sis (the web service)"/>
+        <FIELD NAME="requestedby" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timestarted" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timefinished" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="requestedby_fk" TYPE="foreign" FIELDS="requestedby" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="kind_status_ix" UNIQUE="false" FIELDS="kind, status"/>
+        <INDEX NAME="timecreated_ix" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

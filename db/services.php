@@ -205,6 +205,23 @@ $functions = [
         'ajax'         => false,
         'capabilities' => 'local/completionhistory:integrate,local/completionhistory:grantattempts',
     ],
+    // Backfills on a site whose command line the institution cannot reach (0.11.0): queued here,
+    // run by cron, read back with get_backfill_run.
+    'local_completionhistory_request_backfill' => [
+        'classname'    => 'local_completionhistory\external\request_backfill',
+        'description'  => 'Queue a backfill or grade refresh (achievements, exams or grades) for cron, or return '
+            . 'the run of that job already queued or running.',
+        'type'         => 'write',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:runbackfill',
+    ],
+    'local_completionhistory_get_backfill_run' => [
+        'classname'    => 'local_completionhistory\external\get_backfill_run',
+        'description'  => 'Read one backfill run: status, counts and the last lines of output.',
+        'type'         => 'read',
+        'ajax'         => false,
+        'capabilities' => 'local/completionhistory:integrate,local/completionhistory:runbackfill',
+    ],
     // The one function here that can produce a LOGGED-IN BROWSER SESSION rather than
     // just data. 'write' rather than 'read' for that reason, even though it writes only
     // a key: the type is what an administrator reads when deciding what a token can do,
@@ -264,6 +281,8 @@ $services = [
             'local_completionhistory_enrol_user_in_course',
             'local_completionhistory_unenrol_user_from_course',
             'local_completionhistory_grant_exam_attempts',
+            'local_completionhistory_request_backfill',
+            'local_completionhistory_get_backfill_run',
             'local_completionhistory_create_login_key',
             'local_completionhistory_update_user_profile',
             'local_completionhistory_get_profile_fields',

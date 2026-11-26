@@ -20,6 +20,7 @@ use core_privacy\local\metadata\collection;
 use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\contextlist;
+use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use local_completionhistory\local\ledger_service;
@@ -128,6 +129,13 @@ class provider implements
             'timemodified' => 'privacy:metadata:outbox:timemodified',
         ], 'privacy:metadata:outbox');
 
+        $collection->add_database_table('local_completionhistory_backfill_run', [
+            'requestedby' => 'privacy:metadata:backfill_run:requestedby',
+            'kind' => 'privacy:metadata:backfill_run:kind',
+            'dryrun' => 'privacy:metadata:backfill_run:dryrun',
+            'timecreated' => 'privacy:metadata:backfill_run:timecreated',
+        ], 'privacy:metadata:backfill_run');
+
         $collection->add_external_location_link('saylor_sis', [
             'userid' => 'privacy:metadata:saylor_sis:userid',
             'useridnumber' => 'privacy:metadata:saylor_sis:useridnumber',
@@ -180,12 +188,17 @@ class provider implements
                            SELECT 1 FROM {local_completionhistory_purge_audit} pa
                             WHERE pa.userid = :audituserid
                        )
+                       OR EXISTS (
+                           SELECT 1 FROM {local_completionhistory_backfill_run} br
+                            WHERE br.requestedby = :runuserid
+                       )
                    )";
         $contextlist->add_from_sql($sql, [
             'contextlevel' => CONTEXT_SYSTEM,
             'achievementuserid' => $userid,
             'attemptuserid' => $userid,
             'audituserid' => $userid,
+            'runuserid' => $userid,
         ]);
 
         return $contextlist;
@@ -206,7 +219,9 @@ class provider implements
                 UNION
                 SELECT userid FROM {local_completionhistory_exam_attempt} WHERE userid > 0
                 UNION
-                SELECT userid FROM {local_completionhistory_purge_audit} WHERE userid > 0";
+                SELECT userid FROM {local_completionhistory_purge_audit} WHERE userid > 0
+                UNION
+                SELECT requestedby AS userid FROM {local_completionhistory_backfill_run} WHERE requestedby > 0";
         $userlist->add_from_sql('userid', $sql, []);
     }
 
@@ -289,6 +304,23 @@ class provider implements
                 $audit
             );
         }
+        // Backfill runs this user requested, as staff or as the SIS service account.
+        $runs = $DB->get_records('local_completionhistory_backfill_run', ['requestedby' => $userid], 'timecreated DESC');
+        foreach ($runs as $run) {
+            writer::with_context($systemcontext)->export_data(
+                [
+                    get_string('pluginname', 'local_completionhistory'),
+                    get_string('backfillruns', 'local_completionhistory'),
+                    $run->id,
+                ],
+                (object) [
+                    'kind' => $run->kind,
+                    'dryrun' => (int) $run->dryrun,
+                    'status' => $run->status,
+                    'timecreated' => transform::datetime($run->timecreated),
+                ]
+            );
+        }
     }
 
     /**
@@ -320,6 +352,8 @@ class provider implements
         ledger_service::anonymize_users(array_merge($achievementusers, $attemptusers));
         // Delete purge audit records (these are operational, not academic).
         $DB->delete_records('local_completionhistory_purge_audit');
+        // Backfill runs are kept as an operational record; only who asked for them is erased.
+        $DB->set_field_select('local_completionhistory_backfill_run', 'requestedby', 0, 'requestedby <> 0');
     }
 
     /**
@@ -342,6 +376,7 @@ class provider implements
 
         // Delete purge audit records.
         $DB->delete_records('local_completionhistory_purge_audit', ['userid' => $userid]);
+        $DB->set_field('local_completionhistory_backfill_run', 'requestedby', 0, ['requestedby' => $userid]);
     }
 
     /**
@@ -371,6 +406,7 @@ class provider implements
             "DELETE FROM {local_completionhistory_purge_audit} WHERE userid {$insql}",
             $params
         );
+        $DB->set_field_select('local_completionhistory_backfill_run', 'requestedby', 0, "requestedby {$insql}", $params);
     }
 
     /**
