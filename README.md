@@ -86,6 +86,7 @@ The bundled **Completion History SIS** external service keeps its original name,
 | `local/completionhistory:createloginkeys` | Mint short-lived learner SSO keys | None |
 | `local/completionhistory:updateprofiles` | Change the six whitelisted learner contact fields, and write the SIS field mapping (ID number, other standard fields, custom profile fields) to learner accounts | None |
 | `local/completionhistory:enrolusers` | Create manual learner enrolments, and suspend the ones it created | None |
+| `local/completionhistory:grantattempts` | Give a learner a fresh set of program final exam attempts through a per-user quiz override (SIS course reset, SIS-264) | None |
 
 The initial-password endpoint is not a general reset API: it accepts only active, confirmed local manual-auth learner accounts created by this integration, carrying both Moodle's force-change marker and a plugin marker bound to their original credential. It enforces the site password policy and consumes both markers after one successful call. Changing a password through Moodle also invalidates the plugin marker. Email identity lookups reject duplicate/ambiguous addresses.
 
